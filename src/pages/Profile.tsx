@@ -1,12 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { Input, Select } from '../components/Input';
 import Button from '../components/Button';
 import TravelStatusBadge from '../components/TravelStatusBadge';
+import Avatar from '../components/Avatar';
 import { TRAVEL_STATUS_OPTIONS, GENDER_OPTIONS } from '../lib/constants';
+import ErrorAlert from '../components/ErrorAlert';
 
 interface ProfileProps {
-  onNavigate: (page: 'home' | 'login' | 'register' | 'profile') => void;
+  onNavigate: (page: 'home' | 'login' | 'register' | 'profile' | 'post-ride' | 'dashboard' | 'edit-ride' | 'ride-details' | 'my-bookings' | 'profile-edit' | 'public-profile', rideId?: string, userId?: string) => void;
 }
 
 export default function Profile({ onNavigate }: ProfileProps) {
@@ -18,6 +21,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
     travel_status: 'solo' as 'solo' | 'couple',
     partner_name: '',
   });
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
@@ -31,6 +37,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
         travel_status: profile.travel_status,
         partner_name: profile.partner_name || '',
       });
+      setPhotoPreview(profile.profile_photo_url || null);
     }
   }, [profile]);
 
@@ -48,6 +55,88 @@ export default function Profile({ onNavigate }: ProfileProps) {
       ...prev,
       [name]: value,
     }));
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png'];
+    if (!validTypes.includes(file.type)) {
+      setError('Please upload a JPG or PNG image only');
+      return;
+    }
+
+    // Validate file size (5MB = 5 * 1024 * 1024 bytes)
+    const maxSize = 5 * 1024 * 1024;
+    if (file.size > maxSize) {
+      setError('Image size must be less than 5MB');
+      return;
+    }
+
+    setError('');
+    setSelectedFile(file);
+
+    // Create preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPhotoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handlePhotoUpload = async () => {
+    if (!selectedFile || !user) {
+      setError('Please select an image to upload');
+      return;
+    }
+
+    setUploadingPhoto(true);
+    setError('');
+
+    try {
+      // Generate unique filename
+      const fileExt = selectedFile.name.split('.').pop();
+      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      // Upload to Supabase Storage
+      const { error: uploadError } = await supabase.storage
+        .from('profile-photos')
+        .upload(filePath, selectedFile, {
+          cacheControl: '3600',
+          upsert: true, // Replace if exists
+        });
+
+      if (uploadError) throw uploadError;
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('profile-photos')
+        .getPublicUrl(filePath);
+
+      if (!urlData?.publicUrl) {
+        throw new Error('Failed to get image URL');
+      }
+
+      // Update profile with photo URL
+      await updateProfile({
+        profile_photo_url: urlData.publicUrl,
+      });
+
+      setSuccess('Profile photo updated successfully!');
+      setSelectedFile(null);
+      // Clear file input
+      const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
+      if (fileInput) {
+        fileInput.value = '';
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload photo');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const validateForm = (): boolean => {
@@ -114,20 +203,69 @@ export default function Profile({ onNavigate }: ProfileProps) {
     <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-2xl mx-auto">
         <div className="bg-white rounded-lg shadow-md p-8">
-          <div className="mb-6">
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">
-              Your Profile
-            </h2>
-            <p className="text-gray-600">Manage your account information</p>
+          <div className="mb-6 flex justify-between items-start">
+            <div>
+              <h2 className="text-3xl font-bold text-gray-900 mb-2">
+                Your Profile
+              </h2>
+              <p className="text-gray-600">Manage your account information</p>
+            </div>
+            <Button
+              variant="secondary"
+              onClick={() => onNavigate('profile-edit')}
+            >
+              Edit Profile
+            </Button>
           </div>
 
-          <div className="mb-6 flex items-center space-x-4">
-            <span className="text-sm text-gray-600">Current Status:</span>
-            <TravelStatusBadge
-              travelStatus={profile.travel_status}
-              gender={profile.gender}
-              partnerName={profile.partner_name}
-            />
+          <div className="mb-6 space-y-4">
+            <div className="flex items-center space-x-4">
+              <span className="text-sm text-gray-600">Current Status:</span>
+              <TravelStatusBadge
+                travelStatus={profile.travel_status}
+                gender={profile.gender}
+                partnerName={profile.partner_name}
+              />
+            </div>
+
+            {/* Profile Photo Section */}
+            <div className="border-t pt-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">
+                Profile Photo
+              </h3>
+              <div className="flex items-start space-x-6">
+                <div className="flex-shrink-0">
+                  <Avatar
+                    photoUrl={photoPreview || profile.profile_photo_url}
+                    name={profile.name}
+                    size="lg"
+                  />
+                </div>
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Upload Photo (JPG/PNG, max 5MB)
+                    </label>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={handleFileChange}
+                      className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"
+                      disabled={uploadingPhoto}
+                    />
+                  </div>
+                  {selectedFile && (
+                    <Button
+                      type="button"
+                      onClick={handlePhotoUpload}
+                      disabled={uploadingPhoto}
+                    >
+                      {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -196,15 +334,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
             </div>
 
             {error && (
-              <div className="rounded-md bg-red-50 p-4">
-                <p className="text-sm text-red-800">{error}</p>
-              </div>
-            )}
-
-            {success && (
-              <div className="rounded-md bg-green-50 p-4">
-                <p className="text-sm text-green-800">{success}</p>
-              </div>
+              <ErrorAlert message={error} />
             )}
 
             <div className="flex flex-col space-y-3">

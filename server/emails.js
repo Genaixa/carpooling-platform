@@ -1,0 +1,168 @@
+// ~/carpooling-platform/server/emails.js - SIMPLIFIED WORKING VERSION
+import { Resend } from 'resend';
+import { createClient } from '@supabase/supabase-js';
+
+// Use the API key directly
+const resend = new Resend('re_18TmyYFv_7VDHb7RXGKTsd8WeirGFF4D7');
+
+// Supabase client
+const supabase = createClient(
+  'https://fiylgivjirvmgkytejep.supabase.co',
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpeWxnaXZqaXJ2bWdreXRlamVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA4OTI1NSwiZXhwIjoyMDg0NjY1MjU1fQ.ifLBGtb2O-Hhhmaq0OysOJdyg6rFvwcM4ao3JoWJXx0'
+);
+
+// Format date
+function formatDate(dateString) {
+  try {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  } catch (error) {
+    return dateString;
+  }
+}
+
+// 1. Simple booking confirmation email
+export async function sendBookingConfirmationEmail(passengerEmail, passengerName, bookingDetails, rideDetails, driverName) {
+  try {
+    console.log(`📧 Attempting to send email to: ${passengerEmail}`);
+    
+    const { data, error } = await resend.emails.send({
+      from: 'Chaparide <noreply@chaparide.com>', // Using our verified chaparide.com domain
+      to: [passengerEmail],
+      reply_to: 'support@chaparide.com',
+      subject: `Booking Confirmed: ${rideDetails.departure} → ${rideDetails.destination}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>Booking Confirmed! ✅</h2>
+          <p>Hi ${passengerName},</p>
+          <p>Your booking has been confirmed!</p>
+          
+          <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3>Booking Details</h3>
+            <p><strong>Route:</strong> ${rideDetails.departure} → ${rideDetails.destination}</p>
+            <p><strong>Date:</strong> ${formatDate(rideDetails.date_time)}</p>
+            <p><strong>Seats booked:</strong> ${bookingDetails.seats_booked}</p>
+            <p><strong>Total paid:</strong> £${bookingDetails.total_paid}</p>
+            <p><strong>Driver:</strong> ${driverName}</p>
+          </div>
+          
+          <p>You'll receive driver contact details 24 hours before the ride.</p>
+          
+          <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;">
+            <p>Safe travels!<br>The ChapaRide Team</p>
+          </div>
+        </div>
+      `,
+    });
+
+    if (error) {
+      console.error('Email error:', error);
+      return false;
+    }
+
+    console.log('✅ Email sent successfully');
+    return true;
+  } catch (error) {
+    console.error('Failed to send email:', error);
+    return false;
+  }
+}
+
+// 2. Main function to send booking emails
+export async function sendBookingEmails(bookingData) {
+  try {
+    console.log('📧 Starting to send booking emails...');
+    
+    // Get ride details
+    const { data: ride, error: rideError } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('id', bookingData.ride_id)
+      .single();
+
+    if (rideError) {
+      console.error('Error fetching ride:', rideError);
+      return false;
+    }
+
+    // Get driver details
+    const { data: driver, error: driverError } = await supabase
+      .from('profiles')
+      .select('email, name')
+      .eq('id', ride.driver_id)
+      .single();
+
+    if (driverError) {
+      console.error('Error fetching driver:', driverError);
+      return false;
+    }
+
+    // Get passenger details
+    const { data: passenger, error: passengerError } = await supabase
+      .from('profiles')
+      .select('email, name')
+      .eq('id', bookingData.passenger_id)
+      .single();
+
+    if (passengerError) {
+      console.error('Error fetching passenger:', passengerError);
+      return false;
+    }
+
+    // Send email to passenger
+    const emailSent = await sendBookingConfirmationEmail(
+      passenger.email,
+      passenger.name,
+      {
+        seats_booked: bookingData.seats_booked,
+        total_paid: bookingData.total_paid
+      },
+      {
+        departure: ride.departure_location,
+        destination: ride.arrival_location,
+        date_time: ride.date_time
+      },
+      driver.name
+    );
+
+    console.log('📧 Email result:', emailSent ? '✅ Sent' : '❌ Failed');
+    return emailSent;
+  } catch (error) {
+    console.error('Failed to send booking emails:', error);
+    return false;
+  }
+}
+
+// 3. Test function
+export async function testEmail(email, name, type = 'booking-confirmation') {
+  try {
+    console.log(`📧 Testing email to: ${email}`);
+    
+    const result = await sendBookingConfirmationEmail(
+      email,
+      name,
+      {
+        seats_booked: 1,
+        total_paid: 25
+      },
+      {
+        departure: 'London',
+        destination: 'Manchester',
+        date_time: new Date(Date.now() + 86400000).toISOString()
+      },
+      'Test Driver'
+    );
+    
+    return result;
+  } catch (error) {
+    console.error('Test email error:', error);
+    return false;
+  }
+}
