@@ -42,6 +42,7 @@ export interface Ride {
   created_at: string;
   updated_at: string;
   driver?: Profile;
+  bookings?: Array<{ seats_booked: number }>;
 }
 
 export interface Booking {

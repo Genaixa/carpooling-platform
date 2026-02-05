@@ -1,0 +1,223 @@
+import express from 'express';
+import cors from 'cors';
+import Stripe from 'stripe';
+import { createClient } from '@supabase/supabase-js';
+
+// Hardcoded credentials
+const STRIPE_SECRET_KEY = 'sk_test_51Ssh0BRxbBbI7yKqbWFjdTvU7qBFXSjr5UIPMUL7C2EbuYIjotAWaEdCNnoY5cdOFxT9s2CIcDGfznL8pPoqJmmD00e2WWZIkg';
+const VITE_SUPABASE_URL = 'https://fiylgivjirvmgkytejep.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpeWxnaXZqaXJ2bWdreXRlamVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA4OTI1NSwiZXhwIjoyMDg0NjY1MjU1fQ.ifLBGtb2O-Hhhmaq0OysOJdyg6rFvwcM4ao3JoWJXx0';
+
+const app = express();
+const stripe = new Stripe(STRIPE_SECRET_KEY);
+const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// Track processed sessions - CRITICAL for preventing duplicates
+const processedSessions = new Set();
+
+app.use(cors());
+app.use(express.json());
+
+// Create Stripe Checkout Session
+app.post('/api/create-checkout-session', async (req, res) => {
+  try {
+    const { amount, rideId, userId, rideName, seatsToBook = 1 } = req.body;
+
+    if (!amount || !rideId || !userId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Calculate total amount
+    const totalAmount = amount;
+
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: [{
+        price_data: {
+          currency: 'gbp',
+          product_data: {
+            name: `${rideName || 'Carpooling Ride'} (${seatsToBook} seat${seatsToBook !== 1 ? 's' : ''})`,
+            description: `Booking ${seatsToBook} seat${seatsToBook !== 1 ? 's' : ''} for ride ${rideId}`,
+          },
+          unit_amount: Math.round(totalAmount * 100),
+        },
+        quantity: 1,
+      }],
+      mode: 'payment',
+      // Add seats_to_book to success URL
+      success_url: `http://72.62.210.21:3000/?payment=success&session_id={CHECKOUT_SESSION_ID}&ride_id=${rideId}&seats_to_book=${seatsToBook}`,
+      cancel_url: `http://72.62.210.21:3000/?payment=cancelled`,
+      metadata: {
+        ride_id: rideId,
+        passenger_id: userId,
+        amount: amount.toString(),
+        seats_to_book: seatsToBook.toString(),
+        total_amount: totalAmount.toString(),
+      },
+    });
+
+    res.json({ url: session.url });
+  } catch (error) {
+    console.error('Checkout session error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Verify payment and create booking
+app.post('/api/verify-payment', async (req, res) => {
+  try {
+    console.log(`\n=== VERIFY-PAYMENT CALLED ===`);
+    console.log(`Time: ${new Date().toLocaleTimeString()}.${Date.now() % 1000}`);
+    console.log(`Session: ${req.body.sessionId?.substring(0, 30)}...`);
+    
+    const { sessionId, rideId, userId, seatsToBook } = req.body;
+
+    if (!sessionId || !rideId || !userId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // CRITICAL: Check if session already processed BEFORE any async operations
+    if (processedSessions.has(sessionId)) {
+      console.log('⚠️  SESSION ALREADY PROCESSED - BLOCKING DUPLICATE!');
+      const { data: existing } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('ride_id', rideId)
+        .eq('passenger_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+      return res.json({ success: true, booking: existing, duplicate: true });
+    }
+    
+    // Lock this session immediately
+    processedSessions.add(sessionId);
+    console.log(`✓ Session locked: ${sessionId.substring(0, 20)}...`);
+
+    // Retrieve Stripe session
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+
+    if (session.payment_status !== 'paid') {
+      processedSessions.delete(sessionId); // Unlock on failure
+      return res.json({ success: false, error: 'Payment not completed' });
+    }
+
+    // Get seats from either request body or session metadata
+    const seatsFromMetadata = parseInt(session.metadata.seats_to_book) || 1;
+    const finalSeatsToBook = seatsToBook || seatsFromMetadata;
+    const unitPrice = parseFloat(session.metadata.amount);
+    const totalAmount = unitPrice * finalSeatsToBook;
+
+    console.log(`Creating booking: ${finalSeatsToBook} seats for £${totalAmount} (unit price: £${unitPrice})`);
+
+    // Create booking
+    const { data: bookingData, error: bookingError } = await supabase
+      .from('bookings')
+      .insert([{
+        ride_id: rideId,
+        passenger_id: userId,
+        seats_booked: finalSeatsToBook,
+        total_paid: totalAmount,
+        commission_amount: totalAmount * 0.10,
+        driver_payout_amount: totalAmount * 0.90,
+        status: 'confirmed',
+      }])
+      .select()
+      .single();
+
+    if (bookingError) {
+      console.error('Booking creation error:', bookingError);
+      processedSessions.delete(sessionId); // Unlock on failure
+      throw bookingError;
+    }
+
+    console.log(`✓ Booking created: ${bookingData.id}`);
+
+    // ✅ FIXED: Calculate from seats_total and ALL bookings (source of truth)
+    // Step 1: Get the ride's total seats
+    const { data: rideData, error: rideError } = await supabase
+      .from('rides')
+      .select('seats_total, id')
+      .eq('id', rideId)
+      .single();
+
+    if (rideError) {
+      console.error('Ride fetch error:', rideError);
+      throw rideError;
+    }
+
+    // Step 2: Get ALL bookings for this ride (including the one we just created)
+    const { data: allBookings, error: bookingsError } = await supabase
+      .from('bookings')
+      .select('seats_booked')
+      .eq('ride_id', rideId);
+
+    if (bookingsError) {
+      console.error('Bookings fetch error:', bookingsError);
+      throw bookingsError;
+    }
+
+    // Step 3: Calculate total booked seats from ALL bookings
+    const totalBookedSeats = allBookings?.reduce((sum, b) => sum + b.seats_booked, 0) || 0;
+
+    // Step 4: Calculate new available seats from seats_total (immutable source of truth)
+    const newSeats = rideData.seats_total - totalBookedSeats;
+
+    console.log(`🔍 SEAT CALCULATION:`, {
+      seats_total: rideData.seats_total,
+      total_booked: totalBookedSeats,
+      new_available: newSeats,
+      this_booking: finalSeatsToBook
+    });
+
+    // Step 5: Validation - prevent negative seats
+    if (newSeats < 0) {
+      console.error('❌ NEGATIVE SEATS DETECTED:', newSeats);
+      throw new Error(`Seat calculation error: ${rideData.seats_total} - ${totalBookedSeats} = ${newSeats}`);
+    }
+
+    // Step 6: Update with the correctly calculated value
+    const { error: seatError } = await supabase
+      .from('rides')
+      .update({ seats_available: newSeats })
+      .eq('id', rideId);
+
+    if (seatError) {
+      console.error('Seat update failed:', seatError);
+    } else {
+      console.log(`✓ Seats updated to ${newSeats}`);
+    }
+
+    res.json({ 
+      success: true, 
+      booking: bookingData,
+      seatsBooked: finalSeatsToBook,
+      seatsAvailable: newSeats 
+    });
+  } catch (error) {
+    console.error('Payment verification error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+const PORT = 3001;
+app.listen(PORT, () => {
+  console.log(`✅ Payment server running on port ${PORT}`);
+});
+
+// FIX ALL SEAT COUNTS
+app.post('/api/fix-all-seats', async (req, res) => {
+  try {
+    const { data: rides } = await supabase.from('rides').select('id, seats_total').eq('status', 'upcoming');
+    let fixed = 0;
+    for (const ride of rides) {
+      const { data: bookings } = await supabase.from('bookings').select('seats_booked').eq('ride_id', ride.id);
+      const correctSeats = ride.seats_total - bookings.reduce((sum, b) => sum + b.seats_booked, 0);
+      await supabase.from('rides').update({ seats_available: correctSeats }).eq('id', ride.id);
+      fixed++;
+    }
+    res.json({ success: true, fixed });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
