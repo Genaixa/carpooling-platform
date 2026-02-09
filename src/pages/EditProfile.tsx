@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import toast from 'react-hot-toast'; // ✅ ADDED
+import toast from 'react-hot-toast';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Input, Select, TextArea } from '../components/Input';
 import Button from '../components/Button';
 import Loading from '../components/Loading';
-import ErrorAlert from '../components/ErrorAlert'; // ✅ ADDED
+import ErrorAlert from '../components/ErrorAlert';
+import type { NavigateFn } from '../lib/types';
 
 interface EditProfileProps {
-  onNavigate: (page: 'home' | 'login' | 'register' | 'profile' | 'post-ride' | 'dashboard' | 'edit-ride' | 'ride-details' | 'my-bookings' | 'profile-edit' | 'public-profile', rideId?: string, userId?: string) => void;
+  onNavigate: NavigateFn;
 }
 
 type TravelStatusOption = 'solo-male' | 'solo-female' | 'couple';

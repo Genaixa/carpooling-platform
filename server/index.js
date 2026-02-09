@@ -1,254 +1,548 @@
-import 'dotenv/config'; // Add this line - MUST BE FIRST
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import Stripe from 'stripe';
+import { Client, Environment } from 'square';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
-// Hardcoded credentials
-const STRIPE_SECRET_KEY = 'sk_test_51Ssh0BRxbBbI7yKqbWFjdTvU7qBFXSjr5UIPMUL7C2EbuYIjotAWaEdCNnoY5cdOFxT9s2CIcDGfznL8pPoqJmmD00e2WWZIkg';
-const VITE_SUPABASE_URL = 'https://fiylgivjirvmgkytejep.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpeWxnaXZqaXJ2bWdreXRlamVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA4OTI1NSwiZXhwIjoyMDg0NjY1MjU1fQ.ifLBGtb2O-Hhhmaq0OysOJdyg6rFvwcM4ao3JoWJXx0';
+// Credentials (use env vars in production)
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
+const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fiylgivjirvmgkytejep.supabase.co';
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpeWxnaXZqaXJ2bWdreXRlamVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA4OTI1NSwiZXhwIjoyMDg0NjY1MjU1fQ.ifLBGtb2O-Hhhmaq0OysOJdyg6rFvwcM4ao3JoWJXx0';
+
+const COMMISSION_RATE = 0.30; // 30% platform commission
+const DRIVER_RATE = 0.70;    // 70% to driver
 
 const app = express();
-const stripe = new Stripe(STRIPE_SECRET_KEY);
-const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// Track processed sessions - CRITICAL for preventing duplicates
-const processedSessions = new Set();
+const squareClient = new Client({
+  accessToken: SQUARE_ACCESS_TOKEN,
+  environment: Environment.Sandbox,
+});
+
+const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 app.use(cors());
 app.use(express.json());
 
-// Create Stripe Checkout Session
-app.post('/api/create-checkout-session', async (req, res) => {
-  try {
-    const { amount, rideId, userId, rideName, seatsToBook = 1 } = req.body;
+// ============================================================
+// PAYMENT ENDPOINTS (Square delayed capture)
+// ============================================================
 
-    if (!amount || !rideId || !userId) {
+// Create payment with delayed capture (hold on card)
+app.post('/api/create-payment', async (req, res) => {
+  try {
+    const { sourceId, amount, rideId, userId, seatsToBook = 1, rideName } = req.body;
+
+    if (!sourceId || !amount || !rideId || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
-    // Calculate total amount
-    const totalAmount = amount;
+    const totalAmountCents = BigInt(Math.round(amount * 100));
 
-    const session = await stripe.checkout.sessions.create({
-      payment_method_types: ['card'],
-      line_items: [{
-        price_data: {
-          currency: 'gbp',
-          product_data: {
-            name: `${rideName || 'Carpooling Ride'} (${seatsToBook} seat${seatsToBook !== 1 ? 's' : ''})`,
-            description: `Booking ${seatsToBook} seat${seatsToBook !== 1 ? 's' : ''} for ride ${rideId}`,
-          },
-          unit_amount: Math.round(totalAmount * 100),
-        },
-        quantity: 1,
-      }],
-      mode: 'payment',
-      // Add seats_to_book to success URL
-      success_url: `http://72.62.210.21:3000/?payment=success&session_id={CHECKOUT_SESSION_ID}&ride_id=${rideId}&seats_to_book=${seatsToBook}`,
-      cancel_url: `http://72.62.210.21:3000/?payment=cancelled`,
-      metadata: {
-        ride_id: rideId,
-        passenger_id: userId,
-        amount: amount.toString(),
-        seats_to_book: seatsToBook.toString(),
-        total_amount: totalAmount.toString(),
+    const { result } = await squareClient.paymentsApi.createPayment({
+      sourceId,
+      idempotencyKey: crypto.randomUUID(),
+      amountMoney: {
+        amount: totalAmountCents,
+        currency: 'GBP',
       },
+      autocomplete: false, // DELAYED CAPTURE - hold only
+      referenceId: rideId,
+      note: `ChapaRide booking: ${rideName || rideId} (${seatsToBook} seat${seatsToBook !== 1 ? 's' : ''})`,
     });
 
-    res.json({ url: session.url });
-  } catch (error) {
-    console.error('Checkout session error:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
+    const paymentId = result.payment.id;
+    const totalPaid = amount;
+    const commissionAmount = totalPaid * COMMISSION_RATE;
+    const driverPayout = totalPaid * DRIVER_RATE;
 
-// Verify payment and create booking
-app.post('/api/verify-payment', async (req, res) => {
-  try {
-    console.log(`\n=== VERIFY-PAYMENT CALLED ===`);
-    console.log(`Time: ${new Date().toLocaleTimeString()}.${Date.now() % 1000}`);
-    console.log(`Session: ${req.body.sessionId?.substring(0, 30)}...`);
-    
-    const { sessionId, rideId, userId, seatsToBook } = req.body;
-
-    if (!sessionId || !rideId || !userId) {
-      return res.status(400).json({ error: 'Missing required fields' });
-    }
-
-    // CRITICAL: Check if session already processed BEFORE any async operations
-    if (processedSessions.has(sessionId)) {
-      console.log('⚠️  SESSION ALREADY PROCESSED - BLOCKING DUPLICATE!');
-      const { data: existing } = await supabase
-        .from('bookings')
-        .select('*')
-        .eq('ride_id', rideId)
-        .eq('passenger_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .single();
-      return res.json({ success: true, booking: existing, duplicate: true });
-    }
-    
-    // Lock this session immediately
-    processedSessions.add(sessionId);
-    console.log(`✓ Session locked: ${sessionId.substring(0, 20)}...`);
-
-    // Retrieve Stripe session
-    const session = await stripe.checkout.sessions.retrieve(sessionId);
-
-    if (session.payment_status !== 'paid') {
-      processedSessions.delete(sessionId); // Unlock on failure
-      return res.json({ success: false, error: 'Payment not completed' });
-    }
-
-    // Get seats from either request body or session metadata
-    const seatsFromMetadata = parseInt(session.metadata.seats_to_book) || 1;
-    const finalSeatsToBook = seatsToBook || seatsFromMetadata;
-    const unitPrice = parseFloat(session.metadata.amount);
-    const totalAmount = unitPrice * finalSeatsToBook;
-
-    console.log(`Creating booking: ${finalSeatsToBook} seats for £${totalAmount} (unit price: £${unitPrice})`);
-
-    // Create booking
+    // Create booking with pending_driver status
     const { data: bookingData, error: bookingError } = await supabase
       .from('bookings')
       .insert([{
         ride_id: rideId,
         passenger_id: userId,
-        seats_booked: finalSeatsToBook,
-        total_paid: totalAmount,
-        commission_amount: totalAmount * 0.10,
-        driver_payout_amount: totalAmount * 0.90,
-        status: 'confirmed',
+        seats_booked: seatsToBook,
+        total_paid: totalPaid,
+        commission_amount: commissionAmount,
+        driver_payout_amount: driverPayout,
+        square_payment_id: paymentId,
+        status: 'pending_driver',
       }])
       .select()
       .single();
 
     if (bookingError) {
       console.error('Booking creation error:', bookingError);
-      processedSessions.delete(sessionId); // Unlock on failure
+      // Cancel the payment hold if booking fails
+      try { await squareClient.paymentsApi.cancelPayment(paymentId); } catch {}
       throw bookingError;
     }
 
-    console.log(`✓ Booking created: ${bookingData.id}`);
-// Send booking confirmation emails (async - don't wait for it)
-try {
-  const { sendBookingEmails } = await import('./emails.js');
-  sendBookingEmails(bookingData).then(success => {
-    console.log(`📧 Booking emails ${success ? 'sent successfully' : 'failed to send'}`);
-  });
-} catch (emailError) {
-  console.error('Failed to import or call email function:', emailError);
-  // Don't fail the booking if email fails
-}
-    // ✅ FIXED: Calculate from seats_total and ALL bookings (source of truth)
-    // Step 1: Get the ride's total seats
-    const { data: rideData, error: rideError } = await supabase
-      .from('rides')
-      .select('seats_total, id')
-      .eq('id', rideId)
+    console.log(`✓ Payment authorized: ${paymentId}, Booking: ${bookingData.id}`);
+
+    // Send email to driver about new booking request
+    try {
+      const { sendBookingRequestEmail } = await import('./emails.js');
+      sendBookingRequestEmail(bookingData).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    res.json({ success: true, paymentId, bookingId: bookingData.id });
+  } catch (error) {
+    console.error('Payment error:', error);
+    res.status(500).json({ error: error.message || 'Payment failed' });
+  }
+});
+
+// Driver accepts booking - capture payment
+app.post('/api/driver/accept-booking', async (req, res) => {
+  try {
+    const { bookingId, driverId } = req.body;
+    if (!bookingId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Get booking
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('*, ride:rides!bookings_ride_id_fkey(*)')
+      .eq('id', bookingId)
       .single();
 
-    if (rideError) {
-      console.error('Ride fetch error:', rideError);
-      throw rideError;
+    if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.ride.driver_id !== driverId) return res.status(403).json({ error: 'Not authorized' });
+    if (booking.status !== 'pending_driver') return res.status(400).json({ error: 'Booking is not pending driver action' });
+
+    // Capture the payment
+    if (booking.square_payment_id) {
+      await squareClient.paymentsApi.completePayment(booking.square_payment_id, {});
     }
 
-    // Step 2: Get ALL bookings for this ride (including the one we just created)
-    const { data: allBookings, error: bookingsError } = await supabase
+    // Update booking
+    const { error: updateError } = await supabase
       .from('bookings')
-      .select('seats_booked')
-      .eq('ride_id', rideId);
+      .update({
+        status: 'confirmed',
+        driver_action: 'accepted',
+        driver_action_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
 
-    if (bookingsError) {
-      console.error('Bookings fetch error:', bookingsError);
-      throw bookingsError;
-    }
+    if (updateError) throw updateError;
 
-    // Step 3: Calculate total booked seats from ALL bookings
-    const totalBookedSeats = allBookings?.reduce((sum, b) => sum + b.seats_booked, 0) || 0;
+    // Update seat count
+    await recalculateSeats(booking.ride_id);
 
-    // Step 4: Calculate new available seats from seats_total (immutable source of truth)
-    const newSeats = rideData.seats_total - totalBookedSeats;
+    // Send email to passenger
+    try {
+      const { sendBookingAcceptedEmail } = await import('./emails.js');
+      sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+    } catch {}
 
-    console.log(`🔍 SEAT CALCULATION:`, {
-      seats_total: rideData.seats_total,
-      total_booked: totalBookedSeats,
-      new_available: newSeats,
-      this_booking: finalSeatsToBook
-    });
-
-    // Step 5: Validation - prevent negative seats
-    if (newSeats < 0) {
-      console.error('❌ NEGATIVE SEATS DETECTED:', newSeats);
-      throw new Error(`Seat calculation error: ${rideData.seats_total} - ${totalBookedSeats} = ${newSeats}`);
-    }
-
-    // Step 6: Update with the correctly calculated value
-    const { error: seatError } = await supabase
-      .from('rides')
-      .update({ seats_available: newSeats })
-      .eq('id', rideId);
-
-    if (seatError) {
-      console.error('Seat update failed:', seatError);
-    } else {
-      console.log(`✓ Seats updated to ${newSeats}`);
-    }
-
-    res.json({ 
-      success: true, 
-      booking: bookingData,
-      seatsBooked: finalSeatsToBook,
-      seatsAvailable: newSeats 
-    });
+    console.log(`✓ Booking accepted: ${bookingId}`);
+    res.json({ success: true });
   } catch (error) {
-    console.error('Payment verification error:', error);
+    console.error('Accept booking error:', error);
     res.status(500).json({ error: error.message });
   }
 });
-// Test email endpoint (remove in production)
+
+// Driver rejects booking - cancel payment hold
+app.post('/api/driver/reject-booking', async (req, res) => {
+  try {
+    const { bookingId, driverId } = req.body;
+    if (!bookingId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('*, ride:rides!bookings_ride_id_fkey(*)')
+      .eq('id', bookingId)
+      .single();
+
+    if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.ride.driver_id !== driverId) return res.status(403).json({ error: 'Not authorized' });
+    if (booking.status !== 'pending_driver') return res.status(400).json({ error: 'Booking is not pending driver action' });
+
+    // Cancel the payment hold
+    if (booking.square_payment_id) {
+      await squareClient.paymentsApi.cancelPayment(booking.square_payment_id);
+    }
+
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        status: 'rejected',
+        driver_action: 'rejected',
+        driver_action_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
+
+    if (updateError) throw updateError;
+
+    // Send email to passenger
+    try {
+      const { sendBookingRejectedEmail } = await import('./emails.js');
+      sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Booking rejected: ${bookingId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reject booking error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// CANCELLATION ENDPOINTS
+// ============================================================
+
+// Passenger cancels booking
+app.post('/api/passenger/cancel-booking', async (req, res) => {
+  try {
+    const { bookingId, passengerId } = req.body;
+    if (!bookingId || !passengerId) return res.status(400).json({ error: 'Missing required fields' });
+
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .select('*, ride:rides!bookings_ride_id_fkey(*)')
+      .eq('id', bookingId)
+      .eq('passenger_id', passengerId)
+      .single();
+
+    if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
+
+    // If pending_driver, just cancel the hold
+    if (booking.status === 'pending_driver') {
+      if (booking.square_payment_id) {
+        await squareClient.paymentsApi.cancelPayment(booking.square_payment_id);
+      }
+      await supabase.from('bookings').update({
+        status: 'cancelled',
+        cancelled_at: new Date().toISOString(),
+        cancellation_refund_amount: 0,
+      }).eq('id', bookingId);
+
+      await recalculateSeats(booking.ride_id);
+      return res.json({ success: true, refundAmount: 0, message: 'Booking cancelled, no charge.' });
+    }
+
+    if (booking.status !== 'confirmed') {
+      return res.status(400).json({ error: 'Can only cancel confirmed or pending bookings' });
+    }
+
+    // Calculate refund based on time
+    const rideTime = new Date(booking.ride.date_time).getTime();
+    const now = Date.now();
+    const hoursUntilRide = (rideTime - now) / (1000 * 60 * 60);
+    let refundAmount = 0;
+
+    if (hoursUntilRide >= 48) {
+      // 70% refund (30% commission kept)
+      refundAmount = booking.total_paid * 0.70;
+    }
+    // Under 48 hours: no refund
+
+    // Issue refund via Square
+    if (refundAmount > 0 && booking.square_payment_id) {
+      const refundCents = BigInt(Math.round(refundAmount * 100));
+      await squareClient.refundsApi.refundPayment({
+        idempotencyKey: crypto.randomUUID(),
+        paymentId: booking.square_payment_id,
+        amountMoney: {
+          amount: refundCents,
+          currency: 'GBP',
+        },
+      });
+    }
+
+    await supabase.from('bookings').update({
+      status: refundAmount > 0 ? 'refunded' : 'cancelled',
+      cancelled_at: new Date().toISOString(),
+      cancellation_refund_amount: refundAmount,
+    }).eq('id', bookingId);
+
+    await recalculateSeats(booking.ride_id);
+
+    // Send email
+    try {
+      const { sendPassengerCancellationEmail } = await import('./emails.js');
+      sendPassengerCancellationEmail(booking, refundAmount).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Passenger cancelled booking: ${bookingId}, refund: £${refundAmount.toFixed(2)}`);
+    res.json({ success: true, refundAmount });
+  } catch (error) {
+    console.error('Cancel booking error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Driver cancels entire ride (full refund to all passengers)
+app.post('/api/driver/cancel-ride', async (req, res) => {
+  try {
+    const { rideId, driverId } = req.body;
+    if (!rideId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Verify driver owns ride
+    const { data: ride, error: rideError } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('id', rideId)
+      .eq('driver_id', driverId)
+      .single();
+
+    if (rideError || !ride) return res.status(404).json({ error: 'Ride not found' });
+
+    // Get all active bookings
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('ride_id', rideId)
+      .in('status', ['confirmed', 'pending_driver']);
+
+    const refundResults = [];
+
+    for (const booking of (bookings || [])) {
+      try {
+        if (booking.status === 'pending_driver' && booking.square_payment_id) {
+          // Cancel the hold
+          await squareClient.paymentsApi.cancelPayment(booking.square_payment_id);
+          await supabase.from('bookings').update({
+            status: 'cancelled',
+            cancelled_at: new Date().toISOString(),
+            cancellation_refund_amount: 0,
+          }).eq('id', booking.id);
+          refundResults.push({ bookingId: booking.id, refund: 0, method: 'hold_cancelled' });
+        } else if (booking.status === 'confirmed' && booking.square_payment_id) {
+          // Full refund
+          const refundCents = BigInt(Math.round(booking.total_paid * 100));
+          await squareClient.refundsApi.refundPayment({
+            idempotencyKey: crypto.randomUUID(),
+            paymentId: booking.square_payment_id,
+            amountMoney: { amount: refundCents, currency: 'GBP' },
+          });
+          await supabase.from('bookings').update({
+            status: 'refunded',
+            cancelled_at: new Date().toISOString(),
+            cancellation_refund_amount: booking.total_paid,
+          }).eq('id', booking.id);
+          refundResults.push({ bookingId: booking.id, refund: booking.total_paid, method: 'full_refund' });
+        }
+      } catch (refundError) {
+        console.error(`Refund error for booking ${booking.id}:`, refundError);
+        refundResults.push({ bookingId: booking.id, error: refundError.message });
+      }
+    }
+
+    // Cancel the ride
+    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', rideId);
+
+    // Send emails to passengers
+    try {
+      const { sendDriverCancellationEmail } = await import('./emails.js');
+      for (const booking of (bookings || [])) {
+        sendDriverCancellationEmail(booking, ride).catch(err => console.error('Email error:', err));
+      }
+    } catch {}
+
+    console.log(`✓ Ride cancelled: ${rideId}, ${refundResults.length} bookings processed`);
+    res.json({ success: true, refundResults });
+  } catch (error) {
+    console.error('Cancel ride error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// ADMIN ENDPOINTS
+// ============================================================
+
+app.post('/api/admin/approve-driver', async (req, res) => {
+  try {
+    const { applicationId, adminId, adminNotes } = req.body;
+    if (!applicationId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Verify admin
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Get application
+    const { data: application, error: appError } = await supabase
+      .from('driver_applications')
+      .select('*')
+      .eq('id', applicationId)
+      .single();
+
+    if (appError || !application) return res.status(404).json({ error: 'Application not found' });
+
+    // Update application
+    await supabase.from('driver_applications').update({
+      status: 'approved',
+      admin_notes: adminNotes || null,
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+    }).eq('id', applicationId);
+
+    // Update profile
+    await supabase.from('profiles').update({
+      is_approved_driver: true,
+    }).eq('id', application.user_id);
+
+    // Send email
+    try {
+      const { sendDriverApprovedEmail } = await import('./emails.js');
+      sendDriverApprovedEmail(application).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Driver approved: ${application.user_id}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Approve driver error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/reject-driver', async (req, res) => {
+  try {
+    const { applicationId, adminId, adminNotes } = req.body;
+    if (!applicationId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    await supabase.from('driver_applications').update({
+      status: 'rejected',
+      admin_notes: adminNotes || null,
+      reviewed_by: adminId,
+      reviewed_at: new Date().toISOString(),
+    }).eq('id', applicationId);
+
+    // Send email
+    try {
+      const { sendDriverRejectedEmail } = await import('./emails.js');
+      const { data: application } = await supabase.from('driver_applications').select('*').eq('id', applicationId).single();
+      if (application) sendDriverRejectedEmail(application).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reject driver error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// REVIEWS ENDPOINT
+// ============================================================
+
+app.post('/api/reviews/submit', async (req, res) => {
+  try {
+    const { reviewerId, revieweeId, rideId, bookingId, rating, comment, type } = req.body;
+
+    if (!reviewerId || !revieweeId || !rideId || !bookingId || !rating || !type) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    if (rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+
+    // Check for existing review
+    const { data: existing } = await supabase
+      .from('reviews')
+      .select('id')
+      .eq('reviewer_id', reviewerId)
+      .eq('booking_id', bookingId)
+      .eq('type', type)
+      .maybeSingle();
+
+    if (existing) return res.status(400).json({ error: 'You have already reviewed this booking' });
+
+    // Insert review
+    const { data: review, error: reviewError } = await supabase
+      .from('reviews')
+      .insert([{
+        reviewer_id: reviewerId,
+        reviewee_id: revieweeId,
+        ride_id: rideId,
+        booking_id: bookingId,
+        rating,
+        comment: comment || null,
+        type,
+      }])
+      .select()
+      .single();
+
+    if (reviewError) throw reviewError;
+
+    // Recalculate average rating for reviewee
+    const { data: allReviews } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('reviewee_id', revieweeId);
+
+    if (allReviews && allReviews.length > 0) {
+      const avgRating = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length;
+      await supabase.from('profiles').update({
+        average_rating: Math.round(avgRating * 10) / 10,
+        total_reviews: allReviews.length,
+      }).eq('id', revieweeId);
+    }
+
+    console.log(`✓ Review submitted: ${review.id}`);
+    res.json({ success: true, review });
+  } catch (error) {
+    console.error('Review error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// UTILITY
+// ============================================================
+
+async function recalculateSeats(rideId) {
+  const { data: rideData } = await supabase.from('rides').select('seats_total').eq('id', rideId).single();
+  if (!rideData) return;
+
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('seats_booked')
+    .eq('ride_id', rideId)
+    .in('status', ['confirmed', 'pending_driver']);
+
+  const totalBooked = (bookings || []).reduce((sum, b) => sum + b.seats_booked, 0);
+  const available = Math.max(0, rideData.seats_total - totalBooked);
+
+  await supabase.from('rides').update({ seats_available: available }).eq('id', rideId);
+}
+
+// Test email endpoint
 app.post('/api/test-email', async (req, res) => {
   try {
     const { type, email, name } = req.body;
-    
     const { testEmail } = await import('./emails.js');
-    
-    const result = await testEmail(
-      email || 'test@example.com',
-      name || 'Test User',
-      type || 'booking-confirmation'
-    );
-    
-    res.json({ 
-      success: result, 
-      message: `Test ${type} email ${result ? 'sent successfully' : 'failed to send'}`
-    });
+    const result = await testEmail(email || 'test@example.com', name || 'Test User', type || 'booking-confirmation');
+    res.json({ success: result, message: `Test ${type} email ${result ? 'sent' : 'failed'}` });
   } catch (error) {
-    console.error('Test email error:', error);
     res.status(500).json({ error: error.message });
   }
 });
-const PORT = 3001;
-app.listen(PORT, () => {
-  console.log(`✅ Payment server running on port ${PORT}`);
-});
 
-// FIX ALL SEAT COUNTS
+// Fix all seat counts
 app.post('/api/fix-all-seats', async (req, res) => {
   try {
     const { data: rides } = await supabase.from('rides').select('id, seats_total').eq('status', 'upcoming');
     let fixed = 0;
-    for (const ride of rides) {
-      const { data: bookings } = await supabase.from('bookings').select('seats_booked').eq('ride_id', ride.id);
-      const correctSeats = ride.seats_total - bookings.reduce((sum, b) => sum + b.seats_booked, 0);
-      await supabase.from('rides').update({ seats_available: correctSeats }).eq('id', ride.id);
+    for (const ride of (rides || [])) {
+      await recalculateSeats(ride.id);
       fixed++;
     }
     res.json({ success: true, fixed });
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
+});
+
+const PORT = 3001;
+app.listen(PORT, () => {
+  console.log(`✅ ChapaRide server running on port ${PORT}`);
 });

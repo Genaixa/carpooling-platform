@@ -13,7 +13,6 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@stripe/react-stripe-js": "^5.5.0",
     "@supabase/supabase-js": "^2.91.0",
     "@tailwindcss/postcss": "^4.1.18",
     "cors": "^2.8.6",
@@ -24,7 +23,7 @@
     "react-dom": "^19.2.3",
     "react-hot-toast": "^2.6.0",
     "resend": "^6.8.0",
-    "stripe": "^20.2.0"
+    "square": "^42.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",

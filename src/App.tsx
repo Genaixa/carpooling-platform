@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';  // ✅ CORRECT
+import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import Home from './pages/Home';
@@ -13,8 +13,9 @@ import MyBookings from './pages/MyBookings';
 import EditProfile from './pages/EditProfile';
 import PublicProfile from './pages/PublicProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
-
-type Page = 'home' | 'login' | 'register' | 'profile' | 'post-ride' | 'dashboard' | 'edit-ride' | 'ride-details' | 'my-bookings' | 'profile-edit' | 'public-profile' | 'payment-success';
+import DriverApplication from './pages/DriverApplication';
+import AdminDashboard from './pages/AdminDashboard';
+import type { Page } from './lib/types';
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('home');
@@ -81,6 +82,10 @@ function App() {
         return publicProfileUserId ? <PublicProfile onNavigate={handleNavigate} userId={publicProfileUserId} /> : <Home onNavigate={handleNavigate} />;
       case 'payment-success':
         return <PaymentSuccess onNavigate={handleNavigate} />;
+      case 'driver-apply':
+        return <DriverApplication onNavigate={handleNavigate} />;
+      case 'admin-dashboard':
+        return <AdminDashboard onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }

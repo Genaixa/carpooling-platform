@@ -7,9 +7,10 @@ import TravelStatusBadge from '../components/TravelStatusBadge';
 import Avatar from '../components/Avatar';
 import { TRAVEL_STATUS_OPTIONS, GENDER_OPTIONS } from '../lib/constants';
 import ErrorAlert from '../components/ErrorAlert';
+import type { NavigateFn } from '../lib/types';
 
 interface ProfileProps {
-  onNavigate: (page: 'home' | 'login' | 'register' | 'profile' | 'post-ride' | 'dashboard' | 'edit-ride' | 'ride-details' | 'my-bookings' | 'profile-edit' | 'public-profile', rideId?: string, userId?: string) => void;
+  onNavigate: NavigateFn;
 }
 
 export default function Profile({ onNavigate }: ProfileProps) {

@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, checkRideCompatibility } from '../lib/supabase';
+import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason } from '../lib/supabase';
+import { NavigateFn } from '../lib/types';
+import { ROUTE_LOCATIONS } from '../lib/constants';
 import Button from '../components/Button';
 import TravelStatusBadge from '../components/TravelStatusBadge';
 import Loading from '../components/Loading';
@@ -9,19 +11,26 @@ import { Input, Select } from '../components/Input';
 import { SkeletonCard } from '../components/SkeletonLoader';
 import ErrorAlert from '../components/ErrorAlert';
 import PaymentModal from '../components/PaymentModal';
+import LocationDropdown from '../components/LocationDropdown';
+import StarRating from '../components/StarRating';
 import toast from 'react-hot-toast';
 
 interface HomeProps {
-  onNavigate: (page: 'home' | 'login' | 'register' | 'profile' | 'post-ride' | 'dashboard' | 'edit-ride' | 'ride-details' | 'my-bookings' | 'profile-edit' | 'public-profile', rideId?: string, userId?: string) => void;
+  onNavigate: NavigateFn;
 }
 
 type SortOption = 'date-asc' | 'date-desc' | 'price-asc' | 'price-desc' | 'seats-desc';
 type DriverType = 'solo-male' | 'solo-female' | 'couple';
 type JourneyType = 'single' | 'return';
 
+interface RideWithCompatibility extends Ride {
+  compatible: boolean;
+  incompatibilityReason: string | null;
+}
+
 export default function Home({ onNavigate }: HomeProps) {
   const { user, profile, signOut } = useAuth();
-  const [allRides, setAllRides] = useState<Ride[]>([]);
+  const [allRides, setAllRides] = useState<RideWithCompatibility[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingRide, setBookingRide] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -38,27 +47,28 @@ export default function Home({ onNavigate }: HomeProps) {
 
   // Helper function to get today's date in YYYY-MM-DD format
   const getTodayDate = () => new Date().toISOString().split('T')[0];
-  
+
+  // Square payment modal state
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [selectedRide, setSelectedRide] = useState<Ride | null>(null);
-  
+  const [selectedRide, setSelectedRide] = useState<RideWithCompatibility | null>(null);
+  const [seatsForPayment, setSeatsForPayment] = useState(1);
 
   // Get default driver types based on user compatibility
   const getDefaultDriverTypes = (): DriverType[] => {
     if (!profile) return ['solo-male', 'solo-female', 'couple'];
-    
+
     if (profile.travel_status === 'couple') {
       return ['solo-male', 'solo-female', 'couple'];
     }
-    
+
     if (profile.gender === 'Male') {
       return ['solo-male', 'couple'];
     }
-    
+
     if (profile.gender === 'Female') {
       return ['solo-female', 'couple'];
     }
-    
+
     return ['solo-male', 'solo-female', 'couple'];
   };
 
@@ -132,21 +142,13 @@ export default function Home({ onNavigate }: HomeProps) {
   const loadRides = async () => {
     try {
       setLoading(true);
-      /* DEBUG: Ride loading process
-      console.log('=== DEBUG: Starting loadRides ===');
-      console.log('Current profile exists:', !!profile);
-      if (profile) {
-        console.log('Profile travel_status:', profile.travel_status);
-        console.log('Profile gender:', profile.gender);
-      }
-      */
-      
-      // Load rides from database
+
+      // Load ALL rides from database (no compatibility filtering)
       const { data, error } = await supabase
         .from('rides')
         .select(`
           *,
-          driver:profiles(id, name, travel_status, gender, partner_name, profile_photo_url)
+          driver:profiles(id, name, travel_status, gender, partner_name, profile_photo_url, average_rating, total_reviews, is_approved_driver)
         `)
         .eq('status', 'upcoming')
         .gt('seats_available', 0)
@@ -158,72 +160,40 @@ export default function Home({ onNavigate }: HomeProps) {
         throw error;
       }
 
-      /* DEBUG: Raw data inspection
-      console.log('=== DEBUG: Raw data from Supabase ===');
-      console.log('Number of rides found:', data?.length || 0);
-      
-      if (data && data.length > 0) {
-        data.forEach((ride, index) => {
-          console.log(`Ride ${index + 1}:`);
-          console.log(`  ID: ${ride.id}`);
-          console.log(`  From: ${ride.departure_location} → To: ${ride.arrival_location}`);
-          console.log(`  Driver ID: ${ride.driver_id}`);
-          console.log(`  Driver data loaded: ${!!ride.driver}`);
-          if (ride.driver) {
-            console.log(`  Driver name: ${ride.driver.name}`);
-            console.log(`  Driver travel_status: ${ride.driver.travel_status}`);
-            console.log(`  Driver gender: ${ride.driver.gender}`);
-          } else {
-            console.log('  WARNING: No driver data found!');
-          }
-        });
-      }
-      */
+      // Mark each ride with compatibility info instead of filtering
+      const ridesWithCompat: RideWithCompatibility[] = (data || []).map((ride) => {
+        let compatible = true;
+        let incompatibilityReason: string | null = null;
 
-      // Apply compatibility filtering
-      let filteredRides = data || [];
-      if (profile) {
-        /* DEBUG: Compatibility filtering
-        console.log('=== DEBUG: Applying compatibility filter ===');
-        console.log('User profile exists, filtering rides...');
-        */
-        
-        filteredRides = (data || []).filter((ride) => {
-          if (!ride.driver) {
-            return false;
-          }
-
-          const isCompatible = checkRideCompatibility(
+        if (!ride.driver) {
+          compatible = false;
+          incompatibilityReason = 'Driver information unavailable';
+        } else if (profile) {
+          compatible = checkRideCompatibility(
             profile.travel_status,
             profile.gender,
             ride.driver.travel_status,
             ride.driver.gender
           );
-          
-          return isCompatible;
-        });
-        
-        /* DEBUG: Filter results
-        console.log(`Filtered rides count: ${filteredRides.length}`);
-        */
-      }
+          if (!compatible) {
+            incompatibilityReason = getIncompatibilityReason(
+              profile.travel_status,
+              profile.gender,
+              ride.driver.travel_status,
+              ride.driver.gender
+            );
+          }
+        }
 
-      /* DEBUG: Final rides to display
-      console.log('=== DEBUG: Final rides to display ===');
-      console.log('Number of rides to show:', filteredRides.length);
-      console.log('Rides to show:', filteredRides.map(r => ({
-        id: r.id,
-        from: r.departure_location,
-        to: r.arrival_location,
-        driver: r.driver?.name,
-        driver_status: r.driver?.travel_status,
-        driver_gender: r.driver?.gender,
-        seats: r.seats_available
-      })));
-      */
-      
-      setAllRides(filteredRides);
-      
+        return {
+          ...ride,
+          compatible,
+          incompatibilityReason,
+        };
+      });
+
+      setAllRides(ridesWithCompat);
+
     } catch (error) {
       console.error('Error loading rides:', error);
       toast.error('Failed to load rides');
@@ -367,7 +337,7 @@ export default function Home({ onNavigate }: HomeProps) {
   const setDateFilter = (type: 'today' | 'tomorrow' | 'this-week' | 'this-month') => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
-    
+
     switch (type) {
       case 'today':
         const todayStr = today.toISOString().split('T')[0];
@@ -422,7 +392,7 @@ export default function Home({ onNavigate }: HomeProps) {
   // Get active filter badges
   const getActiveFilters = () => {
     const filters: Array<{ key: string; label: string; onRemove: () => void }> = [];
-    
+
     if (searchFrom.trim()) {
       filters.push({
         key: 'from',
@@ -430,7 +400,7 @@ export default function Home({ onNavigate }: HomeProps) {
         onRemove: () => setSearchFrom(''),
       });
     }
-    
+
     if (searchTo.trim()) {
       filters.push({
         key: 'to',
@@ -438,7 +408,7 @@ export default function Home({ onNavigate }: HomeProps) {
         onRemove: () => setSearchTo(''),
       });
     }
-    
+
     if (dateMin || dateMax) {
       const dateLabel = dateMin && dateMax ? `${dateMin} to ${dateMax}` : dateMin ? `From ${dateMin}` : `Until ${dateMax}`;
       filters.push({
@@ -450,7 +420,7 @@ export default function Home({ onNavigate }: HomeProps) {
         },
       });
     }
-    
+
     if (priceMin || priceMax) {
       const priceLabel = priceMin && priceMax ? `£${priceMin} - £${priceMax}` : priceMin ? `From £${priceMin}` : `Up to £${priceMax}`;
       filters.push({
@@ -462,7 +432,7 @@ export default function Home({ onNavigate }: HomeProps) {
         },
       });
     }
-    
+
     if (seatsNeeded) {
       filters.push({
         key: 'seats',
@@ -470,7 +440,7 @@ export default function Home({ onNavigate }: HomeProps) {
         onRemove: () => setSeatsNeeded(''),
       });
     }
-    
+
     if (driverTypes.length < 3) {
       const typeLabels = driverTypes.map((t) => {
         if (t === 'solo-male') return 'Solo Male';
@@ -483,11 +453,11 @@ export default function Home({ onNavigate }: HomeProps) {
         onRemove: () => setDriverTypes(getDefaultDriverTypes()),
       });
     }
-    
+
     return filters;
   };
 
-  // FIXED: Handle booking a ride with proper price calculation
+  // Handle booking a ride - opens Square payment modal
   const handleBookRide = async (rideId: string, seatsAvailable: number, seatsToBook: number = 1) => {
     if (!user || !profile) {
       onNavigate('login');
@@ -510,101 +480,26 @@ export default function Home({ onNavigate }: HomeProps) {
       return;
     }
 
-    // DEBUG: Check what price we're getting
-    console.log('=== DEBUG: Booking Details ===');
-    console.log('Ride price_per_seat:', ride.price_per_seat);
-    console.log('Seats to book:', seatsToBook);
-    console.log('Calculated amount:', ride.price_per_seat * seatsToBook);
-
-    try {
-      setBookingRide(rideId);
-      
-      // IMPORTANT FIX: Ensure the price is correct
-      // The bug was that ride.price_per_seat might be corrupted/mutated
-      // We'll use a safe calculation
-      const pricePerSeat = parseFloat(ride.price_per_seat.toString());
-      const amount = pricePerSeat * seatsToBook;
-      
-      console.log('Safe calculation:', pricePerSeat, '×', seatsToBook, '=', amount);
-      
-      const response = await fetch('http://srv1291941.hstgr.cloud:3001/api/create-checkout-session', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          amount: amount,
-          rideId: ride.id,
-          userId: user.id,
-          rideName: `${ride.departure_location} → ${ride.arrival_location}`,
-          seatsToBook: seatsToBook,
-        }),
-      });
-
-      const { url, error } = await response.json();
-      if (error) throw new Error(error);
-      
-      window.location.href = url;
-    } catch (error: any) {
-      toast.error('Payment failed: ' + error.message);
-      setBookingRide(null);
-    }
+    // Open the Square payment modal
+    setSelectedRide(ride);
+    setSeatsForPayment(seatsToBook);
+    setShowPaymentModal(true);
   };
 
-  // Handle payment success/cancel on return from Stripe
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const paymentStatus = urlParams.get('payment');
-    const sessionId = urlParams.get('session_id');
-    const rideId = urlParams.get('ride_id');
+  // Handle successful Square payment
+  const handlePaymentSuccess = async (paymentId: string) => {
+    setShowPaymentModal(false);
+    setSelectedRide(null);
+    setBookingRide(null);
+    toast.success('Payment successful! Booking confirmed.');
+    loadRides();
+  };
 
-    if (paymentStatus === 'success' && sessionId && rideId) {
-      fetch('http://srv1291941.hstgr.cloud:3001/api/verify-payment', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ sessionId, rideId, userId: user?.id }),
-      })
-        .then(res => res.json())
-        .then(data => {
-          if (data.success) {
-            toast.success('Payment successful! Booking confirmed.');
-            loadRides();
-          } else {
-            toast.error('Payment verification failed');
-          }
-        })
-        .catch(() => {
-          toast.error('Error verifying payment');
-        });
-    } else if (paymentStatus === 'cancelled') {
-      toast.error('Payment cancelled');
-    }
-  }, [user]);
-
-  const handlePaymentSuccess = async (paymentIntentId: string) => {
-    if (!selectedRide || !user) return;
-
-    try {
-      const { error } = await supabase.from('bookings').insert([
-        {
-          ride_id: selectedRide.id,
-          passenger_id: user.id,
-          seats_booked: 1,
-          total_paid: selectedRide.price_per_seat,
-          commission_amount: selectedRide.price_per_seat * 0.10,
-          driver_payout_amount: selectedRide.price_per_seat * 0.90,
-          payment_intent_id: paymentIntentId,
-          status: 'confirmed',
-        },
-      ]);
-
-      if (error) throw error;
-
-      toast.success('Payment successful! Booking confirmed.');
-      setShowPaymentModal(false);
-      setSelectedRide(null);
-      loadRides();
-    } catch (error: any) {
-      toast.error('Booking failed: ' + error.message);
-    }
+  // Handle payment modal cancel
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+    setSelectedRide(null);
+    setBookingRide(null);
   };
 
   const handleSignOut = async () => {
@@ -614,6 +509,17 @@ export default function Home({ onNavigate }: HomeProps) {
     } catch (error) {
       console.error('Error signing out:', error);
       toast.error('Error signing out');
+    }
+  };
+
+  // Helper to get luggage label
+  const getLuggageLabel = (size: string) => {
+    switch (size) {
+      case 'small': return 'Small (backpack/handbag)';
+      case 'medium': return 'Medium (carry-on)';
+      case 'large': return 'Large (full-size suitcase)';
+      case 'none': return 'No luggage';
+      default: return size;
     }
   };
 
@@ -630,77 +536,125 @@ export default function Home({ onNavigate }: HomeProps) {
 
             {/* Desktop Navigation */}
             <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              <button 
+              <button
                 onClick={() => document.getElementById('rides-section')?.scrollIntoView({ behavior: 'smooth' })}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#4B5563', 
-                  fontSize: '16px', 
-                  cursor: 'pointer', 
-                  fontWeight: '500', 
-                  transition: 'color 0.3s' 
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#4B5563',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  transition: 'color 0.3s'
                 }}
               >
                 Find a Ride
               </button>
-              <button 
-                onClick={() => onNavigate('post-ride')}
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#4B5563', 
-                  fontSize: '16px', 
-                  cursor: 'pointer', 
-                  fontWeight: '500', 
-                  transition: 'color 0.3s' 
-                }}
-              >
-                Post a Ride
-              </button>
-              <button 
-                style={{ 
-                  background: 'none', 
-                  border: 'none', 
-                  color: '#4B5563', 
-                  fontSize: '16px', 
-                  cursor: 'pointer', 
-                  fontWeight: '500', 
-                  transition: 'color 0.3s' 
+              {user && profile?.is_approved_driver ? (
+                <button
+                  onClick={() => onNavigate('post-ride')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4B5563',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    transition: 'color 0.3s'
+                  }}
+                >
+                  Post a Ride
+                </button>
+              ) : user ? (
+                <button
+                  onClick={() => onNavigate('driver-apply')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4B5563',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    transition: 'color 0.3s'
+                  }}
+                >
+                  Become a Driver
+                </button>
+              ) : (
+                <button
+                  onClick={() => onNavigate('post-ride')}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#4B5563',
+                    fontSize: '16px',
+                    cursor: 'pointer',
+                    fontWeight: '500',
+                    transition: 'color 0.3s'
+                  }}
+                >
+                  Post a Ride
+                </button>
+              )}
+              <button
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#4B5563',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  fontWeight: '500',
+                  transition: 'color 0.3s'
                 }}
               >
                 How it Works
               </button>
               {user && (
                 <>
-                  <button 
+                  <button
                     onClick={() => onNavigate('my-bookings')}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#4B5563', 
-                      fontSize: '16px', 
-                      cursor: 'pointer', 
-                      fontWeight: '500', 
-                      transition: 'color 0.3s' 
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#4B5563',
+                      fontSize: '16px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      transition: 'color 0.3s'
                     }}
                   >
                     My Bookings
                   </button>
-                  <button 
+                  <button
                     onClick={() => onNavigate('dashboard')}
-                    style={{ 
-                      background: 'none', 
-                      border: 'none', 
-                      color: '#4B5563', 
-                      fontSize: '16px', 
-                      cursor: 'pointer', 
-                      fontWeight: '500', 
-                      transition: 'color 0.3s' 
+                    style={{
+                      background: 'none',
+                      border: 'none',
+                      color: '#4B5563',
+                      fontSize: '16px',
+                      cursor: 'pointer',
+                      fontWeight: '500',
+                      transition: 'color 0.3s'
                     }}
                   >
                     Dashboard
                   </button>
+                  {profile?.is_admin && (
+                    <button
+                      onClick={() => onNavigate('admin-dashboard')}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#1A9D9D',
+                        fontSize: '16px',
+                        cursor: 'pointer',
+                        fontWeight: '600',
+                        transition: 'color 0.3s'
+                      }}
+                    >
+                      Admin
+                    </button>
+                  )}
                 </>
               )}
             </div>
@@ -718,18 +672,18 @@ export default function Home({ onNavigate }: HomeProps) {
                     <span style={{ fontSize: '14px', color: '#4B5563', fontWeight: '500' }}>{profile.name}</span>
                   </div>
                 )}
-                <button 
+                <button
                   onClick={handleSignOut}
-                  style={{ 
-                    padding: '10px 24px', 
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-                    color: 'white', 
-                    borderRadius: '25px', 
-                    fontSize: '16px', 
-                    fontWeight: '600', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)', 
+                  style={{
+                    padding: '10px 24px',
+                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                    color: 'white',
+                    borderRadius: '25px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
                     transition: 'transform 0.3s'
                   }}
                 >
@@ -738,34 +692,34 @@ export default function Home({ onNavigate }: HomeProps) {
               </div>
             ) : (
               <div style={{ position: 'absolute', right: '20px', display: 'flex', gap: '15px' }}>
-                <button 
+                <button
                   onClick={() => onNavigate('login')}
-                  style={{ 
-                    padding: '10px 24px', 
-                    background: 'none', 
-                    color: '#1A9D9D', 
-                    border: '2px solid #1A9D9D', 
-                    borderRadius: '25px', 
-                    fontSize: '16px', 
-                    fontWeight: '600', 
-                    cursor: 'pointer', 
+                  style={{
+                    padding: '10px 24px',
+                    background: 'none',
+                    color: '#1A9D9D',
+                    border: '2px solid #1A9D9D',
+                    borderRadius: '25px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
                     transition: 'all 0.3s'
                   }}
                 >
                   Login
                 </button>
-                <button 
+                <button
                   onClick={() => onNavigate('register')}
-                  style={{ 
-                    padding: '10px 24px', 
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-                    color: 'white', 
-                    borderRadius: '25px', 
-                    fontSize: '16px', 
-                    fontWeight: '600', 
-                    border: 'none', 
-                    cursor: 'pointer', 
-                    boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)', 
+                  style={{
+                    padding: '10px 24px',
+                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                    color: 'white',
+                    borderRadius: '25px',
+                    fontSize: '16px',
+                    fontWeight: '600',
+                    border: 'none',
+                    cursor: 'pointer',
+                    boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
                     transition: 'transform 0.3s'
                   }}
                 >
@@ -777,7 +731,7 @@ export default function Home({ onNavigate }: HomeProps) {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ 
+              style={{
                 display: 'none',
                 padding: '8px',
                 color: '#6B7280',
@@ -798,20 +752,20 @@ export default function Home({ onNavigate }: HomeProps) {
 
           {/* Mobile Menu */}
           {mobileMenuOpen && (
-            <div style={{ 
-              padding: '16px 0', 
+            <div style={{
+              padding: '16px 0',
               borderTop: '1px solid #E8EBED',
               backgroundColor: 'white'
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <button 
+                <button
                   onClick={() => {
                     document.getElementById('rides-section')?.scrollIntoView({ behavior: 'smooth' });
                     setMobileMenuOpen(false);
                   }}
-                  style={{ 
-                    textAlign: 'left', 
-                    color: '#4B5563', 
+                  style={{
+                    textAlign: 'left',
+                    color: '#4B5563',
                     background: 'none',
                     border: 'none',
                     fontSize: '14px',
@@ -821,27 +775,65 @@ export default function Home({ onNavigate }: HomeProps) {
                 >
                   Find a Ride
                 </button>
-                <button 
-                  onClick={() => {
-                    onNavigate('post-ride');
-                    setMobileMenuOpen(false);
-                  }}
-                  style={{ 
-                    textAlign: 'left', 
-                    color: '#4B5563', 
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    padding: '8px 0'
-                  }}
-                >
-                  Post a Ride
-                </button>
-                <button 
-                  style={{ 
-                    textAlign: 'left', 
-                    color: '#4B5563', 
+                {user && profile?.is_approved_driver ? (
+                  <button
+                    onClick={() => {
+                      onNavigate('post-ride');
+                      setMobileMenuOpen(false);
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      color: '#4B5563',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      padding: '8px 0'
+                    }}
+                  >
+                    Post a Ride
+                  </button>
+                ) : user ? (
+                  <button
+                    onClick={() => {
+                      onNavigate('driver-apply');
+                      setMobileMenuOpen(false);
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      color: '#4B5563',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      padding: '8px 0'
+                    }}
+                  >
+                    Become a Driver
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      onNavigate('post-ride');
+                      setMobileMenuOpen(false);
+                    }}
+                    style={{
+                      textAlign: 'left',
+                      color: '#4B5563',
+                      background: 'none',
+                      border: 'none',
+                      fontSize: '14px',
+                      cursor: 'pointer',
+                      padding: '8px 0'
+                    }}
+                  >
+                    Post a Ride
+                  </button>
+                )}
+                <button
+                  style={{
+                    textAlign: 'left',
+                    color: '#4B5563',
                     background: 'none',
                     border: 'none',
                     fontSize: '14px',
@@ -853,11 +845,11 @@ export default function Home({ onNavigate }: HomeProps) {
                 </button>
                 {user ? (
                   <>
-                    <button 
+                    <button
                       onClick={() => onNavigate('my-bookings')}
-                      style={{ 
-                        textAlign: 'left', 
-                        color: '#4B5563', 
+                      style={{
+                        textAlign: 'left',
+                        color: '#4B5563',
                         background: 'none',
                         border: 'none',
                         fontSize: '14px',
@@ -867,11 +859,11 @@ export default function Home({ onNavigate }: HomeProps) {
                     >
                       My Bookings
                     </button>
-                    <button 
+                    <button
                       onClick={() => onNavigate('dashboard')}
-                      style={{ 
-                        textAlign: 'left', 
-                        color: '#4B5563', 
+                      style={{
+                        textAlign: 'left',
+                        color: '#4B5563',
                         background: 'none',
                         border: 'none',
                         fontSize: '14px',
@@ -881,11 +873,31 @@ export default function Home({ onNavigate }: HomeProps) {
                     >
                       Dashboard
                     </button>
-                    <button 
+                    {profile?.is_admin && (
+                      <button
+                        onClick={() => {
+                          onNavigate('admin-dashboard');
+                          setMobileMenuOpen(false);
+                        }}
+                        style={{
+                          textAlign: 'left',
+                          color: '#1A9D9D',
+                          background: 'none',
+                          border: 'none',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          fontWeight: '600',
+                          padding: '8px 0'
+                        }}
+                      >
+                        Admin
+                      </button>
+                    )}
+                    <button
                       onClick={handleSignOut}
-                      style={{ 
-                        textAlign: 'left', 
-                        color: '#4B5563', 
+                      style={{
+                        textAlign: 'left',
+                        color: '#4B5563',
                         background: 'none',
                         border: 'none',
                         fontSize: '14px',
@@ -898,11 +910,11 @@ export default function Home({ onNavigate }: HomeProps) {
                   </>
                 ) : (
                   <>
-                    <button 
+                    <button
                       onClick={() => onNavigate('login')}
-                      style={{ 
-                        textAlign: 'left', 
-                        color: '#4B5563', 
+                      style={{
+                        textAlign: 'left',
+                        color: '#4B5563',
                         background: 'none',
                         border: 'none',
                         fontSize: '14px',
@@ -912,18 +924,18 @@ export default function Home({ onNavigate }: HomeProps) {
                     >
                       Sign In
                     </button>
-                    <button 
+                    <button
                       onClick={() => onNavigate('register')}
-                      style={{ 
-                        padding: '10px 16px', 
-                        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-                        color: 'white', 
-                        borderRadius: '25px', 
-                        fontSize: '14px', 
-                        fontWeight: '600', 
-                        border: 'none', 
-                        cursor: 'pointer', 
-                        boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)', 
+                      style={{
+                        padding: '10px 16px',
+                        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                        color: 'white',
+                        borderRadius: '25px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        border: 'none',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
                         textAlign: 'center',
                         marginTop: '8px'
                       }}
@@ -939,9 +951,9 @@ export default function Home({ onNavigate }: HomeProps) {
       </nav>
 
       {/* Hero Section with Background */}
-      <section style={{ 
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-        color: 'white', 
+      <section style={{
+        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+        color: 'white',
         padding: '64px 20px',
         position: 'relative',
         overflow: 'hidden'
@@ -950,7 +962,7 @@ export default function Home({ onNavigate }: HomeProps) {
         <div style={{ position: 'absolute', inset: 0, opacity: 0.1 }}>
           <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
         </div>
-        
+
         <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 10 }}>
           {/* Hero Tagline */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
@@ -964,9 +976,9 @@ export default function Home({ onNavigate }: HomeProps) {
 
           {/* Booking Form - White Card Container */}
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '20px', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
               padding: '32px',
               boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
             }}>
@@ -974,10 +986,10 @@ export default function Home({ onNavigate }: HomeProps) {
               <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
                 <button
                   onClick={() => setJourneyType('single')}
-                  style={{ 
-                    padding: '10px 24px', 
-                    fontWeight: '600', 
-                    fontSize: '14px', 
+                  style={{
+                    padding: '10px 24px',
+                    fontWeight: '600',
+                    fontSize: '14px',
                     borderRadius: '50px',
                     transition: 'all 0.3s',
                     border: 'none',
@@ -990,10 +1002,10 @@ export default function Home({ onNavigate }: HomeProps) {
                 </button>
                 <button
                   onClick={() => setJourneyType('return')}
-                  style={{ 
-                    padding: '10px 24px', 
-                    fontWeight: '600', 
-                    fontSize: '14px', 
+                  style={{
+                    padding: '10px 24px',
+                    fontWeight: '600',
+                    fontSize: '14px',
                     borderRadius: '50px',
                     transition: 'all 0.3s',
                     border: 'none',
@@ -1011,35 +1023,17 @@ export default function Home({ onNavigate }: HomeProps) {
                 {/* From/To Locations Group */}
                 <div style={{ position: 'relative' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                        From
-                      </label>
-                      <input
-                        type="text"
-                        value={heroFrom}
-                        onChange={(e) => setHeroFrom(e.target.value)}
-                        placeholder="Enter departure location"
-                        style={{ 
-                          width: '100%', 
-                          padding: '12px 16px', 
-                          border: '2px solid #E5E7EB', 
-                          borderRadius: '12px', 
-                          outline: 'none',
-                          fontSize: '16px',
-                          fontWeight: '500',
-                          color: '#111827',
-                          transition: 'border-color 0.3s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
-                        onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-                      />
-                    </div>
+                    <LocationDropdown
+                      value={heroFrom}
+                      onChange={setHeroFrom}
+                      label="From"
+                      placeholder="Select departure location"
+                    />
                     {/* Floating Swap Button */}
                     <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
                       <button
                         onClick={swapLocations}
-                        style={{ 
+                        style={{
                           backgroundColor: '#1A9D9D',
                           borderRadius: '50%',
                           width: '32px',
@@ -1060,30 +1054,12 @@ export default function Home({ onNavigate }: HomeProps) {
                         </svg>
                       </button>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                        To
-                      </label>
-                      <input
-                        type="text"
-                        value={heroTo}
-                        onChange={(e) => setHeroTo(e.target.value)}
-                        placeholder="Enter destination"
-                        style={{ 
-                          width: '100%', 
-                          padding: '12px 16px', 
-                          border: '2px solid #E5E7EB', 
-                          borderRadius: '12px', 
-                          outline: 'none',
-                          fontSize: '16px',
-                          fontWeight: '500',
-                          color: '#111827',
-                          transition: 'border-color 0.3s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
-                        onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-                      />
-                    </div>
+                    <LocationDropdown
+                      value={heroTo}
+                      onChange={setHeroTo}
+                      label="To"
+                      placeholder="Select destination"
+                    />
                   </div>
                 </div>
 
@@ -1098,11 +1074,11 @@ export default function Home({ onNavigate }: HomeProps) {
                       value={heroDate}
                       onChange={(e) => setHeroDate(e.target.value)}
                       min={getTodayDate()}
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px 16px', 
-                        border: '2px solid #E5E7EB', 
-                        borderRadius: '12px', 
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: '12px',
                         outline: 'none',
                         fontSize: '16px',
                         fontWeight: '500',
@@ -1123,11 +1099,11 @@ export default function Home({ onNavigate }: HomeProps) {
                         value={heroReturnDate}
                         onChange={(e) => setHeroReturnDate(e.target.value)}
                         min={heroDate || getTodayDate()}
-                        style={{ 
-                          width: '100%', 
-                          padding: '12px 16px', 
-                          border: '2px solid #E5E7EB', 
-                          borderRadius: '12px', 
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: '2px solid #E5E7EB',
+                          borderRadius: '12px',
                           outline: 'none',
                           fontSize: '16px',
                           fontWeight: '500',
@@ -1147,11 +1123,11 @@ export default function Home({ onNavigate }: HomeProps) {
                       type="time"
                       value={heroTime}
                       onChange={(e) => setHeroTime(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px 16px', 
-                        border: '2px solid #E5E7EB', 
-                        borderRadius: '12px', 
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: '12px',
                         outline: 'none',
                         fontSize: '16px',
                         fontWeight: '500',
@@ -1173,11 +1149,11 @@ export default function Home({ onNavigate }: HomeProps) {
                     <select
                       value={heroPassengers}
                       onChange={(e) => setHeroPassengers(e.target.value)}
-                      style={{ 
-                        width: '100%', 
-                        padding: '12px 16px', 
-                        border: '2px solid #E5E7EB', 
-                        borderRadius: '12px', 
+                      style={{
+                        width: '100%',
+                        padding: '12px 16px',
+                        border: '2px solid #E5E7EB',
+                        borderRadius: '12px',
                         outline: 'none',
                         fontSize: '16px',
                         fontWeight: '500',
@@ -1204,16 +1180,16 @@ export default function Home({ onNavigate }: HomeProps) {
                 {/* Search Button - Prominent CTA */}
                 <button
                   onClick={handleHeroSearch}
-                  style={{ 
-                    width: '100%', 
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-                    color: 'white', 
-                    fontWeight: 'bold', 
-                    padding: '16px 32px', 
-                    borderRadius: '30px', 
-                    fontSize: '18px', 
-                    border: 'none', 
-                    cursor: 'pointer', 
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                    color: 'white',
+                    fontWeight: 'bold',
+                    padding: '16px 32px',
+                    borderRadius: '30px',
+                    fontSize: '18px',
+                    border: 'none',
+                    cursor: 'pointer',
                     boxShadow: '0 8px 24px rgba(26, 157, 157, 0.3)',
                     transition: 'transform 0.3s, box-shadow 0.3s'
                   }}
@@ -1239,9 +1215,9 @@ export default function Home({ onNavigate }: HomeProps) {
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '24px' }}>
             {/* Feature Card 1 */}
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '20px', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
               padding: '24px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
               border: '1px solid #E8EBED',
@@ -1256,14 +1232,14 @@ export default function Home({ onNavigate }: HomeProps) {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
             }}>
-              <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                backgroundColor: '#1A9D9D', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
+              <div style={{
+                width: '48px',
+                height: '48px',
+                backgroundColor: '#1A9D9D',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 margin: '0 auto 16px auto'
               }}>
                 <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1277,9 +1253,9 @@ export default function Home({ onNavigate }: HomeProps) {
             </div>
 
             {/* Feature Card 2 */}
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '20px', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
               padding: '24px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
               border: '1px solid #E8EBED',
@@ -1294,14 +1270,14 @@ export default function Home({ onNavigate }: HomeProps) {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
             }}>
-              <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                backgroundColor: '#1A9D9D', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
+              <div style={{
+                width: '48px',
+                height: '48px',
+                backgroundColor: '#1A9D9D',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 margin: '0 auto 16px auto'
               }}>
                 <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1315,9 +1291,9 @@ export default function Home({ onNavigate }: HomeProps) {
             </div>
 
             {/* Feature Card 3 */}
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '20px', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
               padding: '24px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
               border: '1px solid #E8EBED',
@@ -1332,14 +1308,14 @@ export default function Home({ onNavigate }: HomeProps) {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
             }}>
-              <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                backgroundColor: '#1A9D9D', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
+              <div style={{
+                width: '48px',
+                height: '48px',
+                backgroundColor: '#1A9D9D',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 margin: '0 auto 16px auto'
               }}>
                 <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1353,9 +1329,9 @@ export default function Home({ onNavigate }: HomeProps) {
             </div>
 
             {/* Feature Card 4 */}
-            <div style={{ 
-              backgroundColor: 'white', 
-              borderRadius: '20px', 
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
               padding: '24px',
               boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
               border: '1px solid #E8EBED',
@@ -1370,14 +1346,14 @@ export default function Home({ onNavigate }: HomeProps) {
               e.currentTarget.style.transform = 'translateY(0)';
               e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
             }}>
-              <div style={{ 
-                width: '48px', 
-                height: '48px', 
-                backgroundColor: '#1A9D9D', 
-                borderRadius: '50%', 
-                display: 'flex', 
-                alignItems: 'center', 
-                justifyContent: 'center', 
+              <div style={{
+                width: '48px',
+                height: '48px',
+                backgroundColor: '#1A9D9D',
+                borderRadius: '50%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
                 margin: '0 auto 16px auto'
               }}>
                 <svg style={{ width: '20px', height: '20px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1394,11 +1370,11 @@ export default function Home({ onNavigate }: HomeProps) {
       </section>
 
       {/* Rides Section */}
-      <main id="rides-section" style={{ 
-        maxWidth: '1400px', 
-        margin: '0 auto', 
-        padding: '32px 20px', 
-        backgroundColor: '#F8FAFB', 
+      <main id="rides-section" style={{
+        maxWidth: '1400px',
+        margin: '0 auto',
+        padding: '32px 20px',
+        backgroundColor: '#F8FAFB',
         minHeight: '100vh'
       }}>
         {/* Header */}
@@ -1408,17 +1384,17 @@ export default function Home({ onNavigate }: HomeProps) {
           </h2>
           {profile && (
             <p style={{ fontSize: '14px', color: '#4B5563' }}>
-              Showing rides compatible with your travel status
+              Showing all rides - incompatible rides are greyed out
               {profile && ` (You are ${profile.travel_status} ${profile.gender || ''})`}
             </p>
           )}
           {!user && (
-            <div style={{ 
-              marginTop: '12px', 
-              backgroundColor: 'white', 
-              border: '1px solid #1A9D9D', 
-              borderRadius: '12px', 
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)', 
+            <div style={{
+              marginTop: '12px',
+              backgroundColor: 'white',
+              border: '1px solid #1A9D9D',
+              borderRadius: '12px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
               padding: '12px'
             }}>
               <p style={{ fontSize: '14px', color: '#1F2937', fontWeight: '500' }}>
@@ -1445,31 +1421,29 @@ export default function Home({ onNavigate }: HomeProps) {
                 ))}
               </div>
             ) : rides.length === 0 ? (
-              <div style={{ 
-                backgroundColor: 'white', 
-                borderRadius: '20px', 
-                border: '1px solid #E8EBED', 
-                boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
-                padding: '48px', 
-                textAlign: 'center' 
+              <div style={{
+                backgroundColor: 'white',
+                borderRadius: '20px',
+                border: '1px solid #E8EBED',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+                padding: '48px',
+                textAlign: 'center'
               }}>
                 <p style={{ color: '#6B7280', marginBottom: '16px' }}>
                   {allRides.length === 0
-                    ? profile
-                      ? 'No compatible rides available at the moment.'
-                      : 'No rides available at the moment.'
+                    ? 'No rides available at the moment.'
                     : 'No rides match your search criteria. Try adjusting your filters.'}
                 </p>
                 {allRides.length > 0 && (
                   <button
                     onClick={clearAllFilters}
-                    style={{ 
-                      marginTop: '16px', 
-                      fontSize: '14px', 
-                      color: '#1A9D9D', 
-                      background: 'none', 
-                      border: 'none', 
-                      cursor: 'pointer', 
+                    style={{
+                      marginTop: '16px',
+                      fontSize: '14px',
+                      color: '#1A9D9D',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
                       fontWeight: '500'
                     }}
                   >
@@ -1482,23 +1456,48 @@ export default function Home({ onNavigate }: HomeProps) {
                 {rides.map((ride) => (
                   <div
                     key={ride.id}
-                    style={{ 
-                      backgroundColor: 'white', 
-                      borderRadius: '20px', 
-                      border: '1px solid #E8EBED', 
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.06)', 
+                    style={{
+                      backgroundColor: 'white',
+                      borderRadius: '20px',
+                      border: '1px solid #E8EBED',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
                       padding: '24px',
-                      transition: 'transform 0.3s, box-shadow 0.3s'
+                      transition: 'transform 0.3s, box-shadow 0.3s',
+                      opacity: ride.compatible ? 1 : 0.5,
+                      position: 'relative',
                     }}
                     onMouseOver={(e) => {
-                      e.currentTarget.style.transform = 'translateY(-4px)';
-                      e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                      if (ride.compatible) {
+                        e.currentTarget.style.transform = 'translateY(-4px)';
+                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
+                      }
                     }}
                     onMouseOut={(e) => {
                       e.currentTarget.style.transform = 'translateY(0)';
                       e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
                     }}
                   >
+                    {/* Incompatibility Banner */}
+                    {!ride.compatible && ride.incompatibilityReason && (
+                      <div style={{
+                        backgroundColor: '#FEF3C7',
+                        border: '1px solid #F59E0B',
+                        borderRadius: '12px',
+                        padding: '10px 16px',
+                        marginBottom: '16px',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                      }}>
+                        <svg style={{ width: '16px', height: '16px', color: '#D97706', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <span style={{ fontSize: '13px', color: '#92400E', fontWeight: '500' }}>
+                          {ride.incompatibilityReason}
+                        </span>
+                      </div>
+                    )}
+
                     {/* Grid Layout: Driver Info | Journey Details | Price/CTA */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
                       {/* Driver Info - Top */}
@@ -1514,10 +1513,10 @@ export default function Home({ onNavigate }: HomeProps) {
                               <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937' }}>
                                 <button
                                   onClick={() => onNavigate('public-profile', undefined, ride.driver.id)}
-                                  style={{ 
-                                    color: '#1A9D9D', 
-                                    background: 'none', 
-                                    border: 'none', 
+                                  style={{
+                                    color: '#1A9D9D',
+                                    background: 'none',
+                                    border: 'none',
                                     cursor: 'pointer',
                                     fontSize: '14px',
                                     fontWeight: '600'
@@ -1532,6 +1531,15 @@ export default function Home({ onNavigate }: HomeProps) {
                                 partnerName={ride.driver.partner_name}
                                 className="text-xs mt-1"
                               />
+                              {/* Driver Rating */}
+                              {ride.driver.average_rating != null && ride.driver.average_rating > 0 && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
+                                  <StarRating rating={ride.driver.average_rating} size="sm" />
+                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>
+                                    ({ride.driver.average_rating.toFixed(1)})
+                                  </span>
+                                </div>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -1561,6 +1569,16 @@ export default function Home({ onNavigate }: HomeProps) {
                               <span style={{ fontWeight: '600', color: '#1F2937' }}>Drop-off:</span> {ride.arrival_spot}
                             </p>
                           )}
+                          {/* Luggage Info */}
+                          {ride.luggage_size && ride.luggage_size !== 'none' && (
+                            <p>
+                              <span style={{ fontWeight: '600', color: '#1F2937' }}>Luggage:</span>{' '}
+                              {getLuggageLabel(ride.luggage_size)}
+                              {ride.luggage_count != null && ride.luggage_count > 0 && (
+                                <span> - {ride.luggage_count} item{ride.luggage_count !== 1 ? 's' : ''} allowed</span>
+                              )}
+                            </p>
+                          )}
                           {ride.additional_notes && (
                             <p style={{ fontSize: '12px', color: '#6B7280', fontStyle: 'italic', marginTop: '4px' }}>
                               {ride.additional_notes}
@@ -1577,12 +1595,12 @@ export default function Home({ onNavigate }: HomeProps) {
                               <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937' }}>£{ride.price_per_seat}</p>
                               <p style={{ fontSize: '12px', color: '#4B5563' }}>per seat</p>
                               <p style={{ fontSize: '14px', color: '#4B5563', marginTop: '4px' }}>
-                                Total for {getSelectedSeats(ride.id)} seat{getSelectedSeats(ride.id) !== 1 ? 's' : ''}: 
+                                Total for {getSelectedSeats(ride.id)} seat{getSelectedSeats(ride.id) !== 1 ? 's' : ''}:
                                 <span style={{ fontWeight: 'bold', color: '#1F2937' }}> £{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}</span>
                               </p>
                             </div>
                           </div>
-                          
+
                           {/* Seat Selector - Numeric Input */}
                           {ride.seats_available > 1 && (
                             <div style={{ width: '100%', marginTop: '12px' }}>
@@ -1595,12 +1613,12 @@ export default function Home({ onNavigate }: HomeProps) {
                                     const current = getSelectedSeats(ride.id);
                                     if (current > 1) handleSeatChange(ride.id, current - 1);
                                   }}
-                                  style={{ 
-                                    width: '32px', 
-                                    height: '32px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     backgroundColor: '#F3F4F6',
                                     borderRadius: '12px',
                                     color: '#374151',
@@ -1622,11 +1640,11 @@ export default function Home({ onNavigate }: HomeProps) {
                                       handleSeatChange(ride.id, value);
                                     }
                                   }}
-                                  style={{ 
-                                    flex: 1, 
-                                    padding: '8px 12px', 
-                                    border: '1px solid #D1D5DB', 
-                                    borderRadius: '12px', 
+                                  style={{
+                                    flex: 1,
+                                    padding: '8px 12px',
+                                    border: '1px solid #D1D5DB',
+                                    borderRadius: '12px',
                                     textAlign: 'center',
                                     color: '#111827',
                                     fontSize: '14px'
@@ -1637,12 +1655,12 @@ export default function Home({ onNavigate }: HomeProps) {
                                     const current = getSelectedSeats(ride.id);
                                     if (current < ride.seats_available) handleSeatChange(ride.id, current + 1);
                                   }}
-                                  style={{ 
-                                    width: '32px', 
-                                    height: '32px', 
-                                    display: 'flex', 
-                                    alignItems: 'center', 
-                                    justifyContent: 'center', 
+                                  style={{
+                                    width: '32px',
+                                    height: '32px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
                                     backgroundColor: '#F3F4F6',
                                     borderRadius: '12px',
                                     color: '#374151',
@@ -1660,14 +1678,16 @@ export default function Home({ onNavigate }: HomeProps) {
                             </div>
                           )}
                         </div>
-                        
+
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
                           <Button
                             onClick={() => handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id))}
-                            disabled={bookingRide === ride.id || !user}
+                            disabled={bookingRide === ride.id || !user || !ride.compatible}
                             style={{ width: '100%' }}
                           >
-                            {bookingRide === ride.id
+                            {!ride.compatible
+                              ? 'Not Available'
+                              : bookingRide === ride.id
                               ? `Booking ${getSelectedSeats(ride.id)} seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}...`
                               : user
                               ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}`
@@ -1675,12 +1695,12 @@ export default function Home({ onNavigate }: HomeProps) {
                           </Button>
                           <button
                             onClick={() => onNavigate('ride-details', ride.id)}
-                            style={{ 
-                              fontSize: '14px', 
-                              color: '#1A9D9D', 
-                              background: 'none', 
-                              border: 'none', 
-                              cursor: 'pointer', 
+                            style={{
+                              fontSize: '14px',
+                              color: '#1A9D9D',
+                              background: 'none',
+                              border: 'none',
+                              cursor: 'pointer',
                               fontWeight: '600',
                               textAlign: 'center'
                             }}
@@ -1697,6 +1717,19 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         </div>
       </main>
+
+      {/* Square Payment Modal */}
+      {showPaymentModal && selectedRide && user && (
+        <PaymentModal
+          amount={selectedRide.price_per_seat * seatsForPayment}
+          rideId={selectedRide.id}
+          userId={user.id}
+          seatsToBook={seatsForPayment}
+          rideName={`${selectedRide.departure_location} → ${selectedRide.arrival_location}`}
+          onSuccess={handlePaymentSuccess}
+          onCancel={handlePaymentCancel}
+        />
+      )}
 
       <style>{`
         button:hover:not(:disabled) {

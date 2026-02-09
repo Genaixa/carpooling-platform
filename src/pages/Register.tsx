@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import type { NavigateFn } from '../lib/types';
 
 interface RegisterProps {
-  onNavigate: (page: 'home' | 'login' | 'register' | 'profile' | 'post-ride' | 'dashboard' | 'edit-ride' | 'ride-details' | 'my-bookings' | 'profile-edit' | 'public-profile') => void;
+  onNavigate: NavigateFn;
 }
 
 export default function Register({ onNavigate }: RegisterProps) {

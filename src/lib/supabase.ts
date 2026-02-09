@@ -16,7 +16,9 @@ export interface Profile {
   profile_photo_url: string | null;
   is_verified: boolean;
   is_admin: boolean;
-  stripe_connect_account_id: string | null;
+  is_approved_driver: boolean;
+  average_rating: number | null;
+  total_reviews: number;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +39,8 @@ export interface Ride {
   vehicle_model: string | null;
   vehicle_color: string | null;
   vehicle_registration: string | null;
+  luggage_size: 'none' | 'small' | 'medium' | 'large' | null;
+  luggage_count: number | null;
   additional_notes: string | null;
   status: 'upcoming' | 'completed' | 'cancelled';
   created_at: string;
@@ -53,9 +57,11 @@ export interface Booking {
   total_paid: number;
   commission_amount: number;
   driver_payout_amount: number;
-  stripe_payment_intent_id: string | null;
-  stripe_payout_id: string | null;
-  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'refunded';
+  square_payment_id: string | null;
+  square_payout_id: string | null;
+  status: 'pending' | 'confirmed' | 'cancelled' | 'completed' | 'refunded' | 'pending_driver';
+  driver_action: 'accepted' | 'rejected' | null;
+  driver_action_at: string | null;
   cancellation_refund_amount: number | null;
   cancelled_at: string | null;
   completed_at: string | null;
@@ -63,6 +69,44 @@ export interface Booking {
   updated_at: string;
   ride?: Ride;
   passenger?: Profile;
+}
+
+export interface DriverApplication {
+  id: string;
+  user_id: string;
+  first_name: string;
+  surname: string;
+  age_group: '18-25' | '26-35' | '36-45' | '46-55' | '56+';
+  gender: 'Male' | 'Female' | 'Prefer not to say';
+  has_drivers_license: boolean;
+  car_insured: boolean;
+  has_mot: boolean;
+  car_make: string;
+  car_model: string;
+  years_driving_experience: number;
+  dbs_check_acknowledged: boolean;
+  emergency_contact_name: string;
+  emergency_contact_phone: string;
+  status: 'pending' | 'approved' | 'rejected';
+  admin_notes: string | null;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  created_at: string;
+  user?: Profile;
+}
+
+export interface Review {
+  id: string;
+  reviewer_id: string;
+  reviewee_id: string;
+  ride_id: string;
+  booking_id: string;
+  rating: number;
+  comment: string | null;
+  type: 'driver-to-passenger' | 'passenger-to-driver';
+  created_at: string;
+  reviewer?: Profile;
+  reviewee?: Profile;
 }
 
 /**
@@ -108,6 +152,32 @@ export function checkRideCompatibility(
   return false;
 }
 
+/**
+ * Returns a human-readable reason why a ride is incompatible, or null if compatible.
+ */
+export function getIncompatibilityReason(
+  passengerTravelStatus: 'solo' | 'couple',
+  passengerGender: string | null,
+  driverTravelStatus: 'solo' | 'couple',
+  driverGender: string | null
+): string | null {
+  if (checkRideCompatibility(passengerTravelStatus, passengerGender, driverTravelStatus, driverGender)) {
+    return null;
+  }
+
+  if (passengerTravelStatus === 'solo' && driverTravelStatus === 'solo') {
+    if (passengerGender === 'Male' && driverGender === 'Female') {
+      return 'This ride is not available for solo male passengers';
+    }
+    if (passengerGender === 'Female' && driverGender === 'Male') {
+      return 'This ride is not available for solo female passengers';
+    }
+    return 'This ride is not compatible with your travel status';
+  }
+
+  return 'This ride is not compatible with your travel status';
+}
+
 export function getTravelStatusLabel(travelStatus: 'solo' | 'couple', gender: string | null, partnerName: string | null): string {
   if (travelStatus === 'couple' && partnerName) {
     return `Couple: ${partnerName}`;
@@ -118,4 +188,14 @@ export function getTravelStatusLabel(travelStatus: 'solo' | 'couple', gender: st
   }
 
   return 'Status Unknown';
+}
+
+/**
+ * Returns true if contact details should be visible (within 12 hours of ride departure).
+ */
+export function isContactVisible(rideDateTime: string): boolean {
+  const rideTime = new Date(rideDateTime).getTime();
+  const now = Date.now();
+  const twelveHoursMs = 12 * 60 * 60 * 1000;
+  return (rideTime - now) <= twelveHoursMs;
 }

@@ -1,32 +1,23 @@
-export const CITIES = ['Gateshead', 'Manchester', 'London'];
+export const ROUTE_LOCATIONS = [
+  'London - Stamford Hill',
+  'London - Golders Green',
+  'Edgware',
+  'Manchester',
+  'Gateshead',
+  'Canvey Island',
+  'Heathrow Airport',
+  'Gatwick Airport',
+  'Stansted Airport',
+  'Luton Airport',
+  'Manchester Airport',
+  'Newcastle Airport',
+] as const;
 
-export const LOCATIONS: Record<string, string[]> = {
-  Gateshead: [
-    'Gateshead Metro Station',
-    'Gateshead Town Centre',
-    'IKEA Gateshead',
-    'Team Valley Trading Estate',
-  ],
-  Manchester: [
-    'Manchester Piccadilly Station',
-    'Manchester Airport',
-    'Manchester City Centre (Piccadilly Gardens)',
-    'Trafford Centre',
-  ],
-  London: [
-    "King's Cross Station",
-    'Victoria Station',
-    'London City Airport',
-    'Heathrow Airport',
-  ],
-};
-
-export const COMMISSION_RATE = 0.1; // 10% platform commission
+export const COMMISSION_RATE = 0.3; // 30% platform commission
 
 export const REFUND_POLICY = {
-  FULL: 24,
-  HALF: 12,
-  NONE: 0,
+  PARTIAL_REFUND_HOURS: 48,
+  PARTIAL_REFUND_PERCENT: 0.70, // 70% refund if cancelled 48+ hours before
 };
 
 export const TRAVEL_STATUS_OPTIONS = [
@@ -39,4 +30,19 @@ export const GENDER_OPTIONS = [
   { value: 'Male', label: 'Male' },
   { value: 'Female', label: 'Female' },
   { value: 'Prefer not to say', label: 'Prefer not to say' },
+] as const;
+
+export const LUGGAGE_OPTIONS = [
+  { value: 'none', label: 'No luggage' },
+  { value: 'small', label: 'Small (backpack/handbag)' },
+  { value: 'medium', label: 'Medium (carry-on suitcase)' },
+  { value: 'large', label: 'Large (full-size suitcase)' },
+] as const;
+
+export const AGE_GROUP_OPTIONS = [
+  { value: '18-25', label: '18-25' },
+  { value: '26-35', label: '26-35' },
+  { value: '36-45', label: '36-45' },
+  { value: '46-55', label: '46-55' },
+  { value: '56+', label: '56+' },
 ] as const;
