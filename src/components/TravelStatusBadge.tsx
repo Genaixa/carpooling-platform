@@ -1,6 +1,6 @@
 interface TravelStatusBadgeProps {
   travelStatus: 'solo' | 'couple';
-  gender: 'Male' | 'Female' | 'Prefer not to say' | null;
+  gender: 'Male' | 'Female' | null;
   partnerName?: string | null;
   className?: string;
 }

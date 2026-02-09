@@ -9,7 +9,7 @@ interface AuthContextType {
   signUp: (email: string, password: string, profileData: {
     name: string;
     phone: string;
-    gender: 'Male' | 'Female' | 'Prefer not to say';
+    gender: 'Male' | 'Female';
     travel_status: 'solo' | 'couple';
     partner_name: string | null;
   }) => Promise<void>;
@@ -74,7 +74,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profileData: {
       name: string;
       phone: string;
-      gender: 'Male' | 'Female' | 'Prefer not to say';
+      gender: 'Male' | 'Female';
       travel_status: 'solo' | 'couple';
       partner_name: string | null;
     }

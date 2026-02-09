@@ -10,7 +10,7 @@ export interface Profile {
   email: string;
   name: string;
   phone: string | null;
-  gender: 'Male' | 'Female' | 'Prefer not to say' | null;
+  gender: 'Male' | 'Female' | null;
   travel_status: 'solo' | 'couple';
   partner_name: string | null;
   profile_photo_url: string | null;
@@ -77,7 +77,7 @@ export interface DriverApplication {
   first_name: string;
   surname: string;
   age_group: '18-25' | '26-35' | '36-45' | '46-55' | '56+';
-  gender: 'Male' | 'Female' | 'Prefer not to say';
+  gender: 'Male' | 'Female';
   has_drivers_license: boolean;
   car_insured: boolean;
   has_mot: boolean;
@@ -145,7 +145,7 @@ export function checkRideCompatibility(
       return true;
     }
 
-    // Different genders or "Prefer not to say" - not compatible for safety
+    // Different genders - not compatible for safety
     return false;
   }
 

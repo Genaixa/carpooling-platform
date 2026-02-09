@@ -18,7 +18,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
-    gender: '' as 'Male' | 'Female' | 'Prefer not to say' | '',
+    gender: '' as 'Male' | 'Female' | '',
     travel_status: 'solo' as 'solo' | 'couple',
     partner_name: '',
   });
@@ -179,7 +179,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
       await updateProfile({
         name: formData.name,
         phone: formData.phone,
-        gender: formData.gender as 'Male' | 'Female' | 'Prefer not to say',
+        gender: formData.gender as 'Male' | 'Female',
         travel_status: formData.travel_status,
         partner_name:
           formData.travel_status === 'couple' ? formData.partner_name : null,

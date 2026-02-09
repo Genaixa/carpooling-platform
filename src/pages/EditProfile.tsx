@@ -27,7 +27,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
     email: '',
     bio: '',
     travelStatusOption: 'solo-male' as TravelStatusOption,
-    gender: 'Male' as 'Male' | 'Female' | 'Other',
+    gender: 'Male' as 'Male' | 'Female',
     partner_name: '',
     vehicle_make: '',
     vehicle_model: '',
@@ -66,7 +66,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
         email: profile.email || '',
         bio: (profile as any).bio || '',
         travelStatusOption,
-        gender: profile.gender === 'Prefer not to say' ? 'Other' : (profile.gender || 'Male') as 'Male' | 'Female' | 'Other',
+        gender: (profile.gender || 'Male') as 'Male' | 'Female',
         partner_name: profile.partner_name || '',
         vehicle_make: (profile as any).vehicle_make || '',
         vehicle_model: (profile as any).vehicle_model || '',
@@ -152,7 +152,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
       // Derive travel_status and gender from travelStatusOption
       const travel_status = formData.travelStatusOption === 'couple' ? 'couple' : 'solo';
       const gender = formData.travelStatusOption === 'couple' 
-        ? (formData.gender === 'Other' ? 'Prefer not to say' : formData.gender as 'Male' | 'Female' | 'Prefer not to say')
+        ? (formData.gender as 'Male' | 'Female')
         : (formData.travelStatusOption === 'solo-female' ? 'Female' : 'Male');
 
       const updateData: any = {
@@ -336,7 +336,6 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
               options={[
                 { value: 'Male', label: 'Male' },
                 { value: 'Female', label: 'Female' },
-                { value: 'Other', label: 'Other' },
               ]}
             />
             {formData.travelStatusOption !== 'couple' && (

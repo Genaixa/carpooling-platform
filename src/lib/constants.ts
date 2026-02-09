@@ -29,7 +29,6 @@ export const GENDER_OPTIONS = [
   { value: '', label: 'Select gender' },
   { value: 'Male', label: 'Male' },
   { value: 'Female', label: 'Female' },
-  { value: 'Prefer not to say', label: 'Prefer not to say' },
 ] as const;
 
 export const LUGGAGE_OPTIONS = [

@@ -50,7 +50,7 @@ export default function Register({ onNavigate }: RegisterProps) {
   
     try {
       // Determine gender from travel status
-      let gender: 'Male' | 'Female' | 'Prefer not to say' = 'Prefer not to say';
+      let gender: 'Male' | 'Female' = 'Male';
       if (formData.travelStatus === 'solo-male') {
         gender = 'Male';
       } else if (formData.travelStatus === 'solo-female') {
