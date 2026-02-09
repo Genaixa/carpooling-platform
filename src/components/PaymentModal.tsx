@@ -32,12 +32,26 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
     };
   }, []);
 
+  const waitForSquare = (): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (window.Square) return resolve();
+      let attempts = 0;
+      const interval = setInterval(() => {
+        attempts++;
+        if (window.Square) {
+          clearInterval(interval);
+          resolve();
+        } else if (attempts >= 20) {
+          clearInterval(interval);
+          reject(new Error('Square SDK failed to load'));
+        }
+      }, 500);
+    });
+  };
+
   const initializeSquare = async () => {
     try {
-      if (!window.Square) {
-        setError('Square payments SDK not loaded. Please refresh the page.');
-        return;
-      }
+      await waitForSquare();
 
       const applicationId = import.meta.env.VITE_SQUARE_APPLICATION_ID;
       const locationId = import.meta.env.VITE_SQUARE_LOCATION_ID;
