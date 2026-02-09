@@ -1,7 +1,8 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
-import { Client, Environment } from 'square';
+import squarePkg from 'square';
+const { SquareClient, SquareEnvironment } = squarePkg;
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 
@@ -15,9 +16,9 @@ const DRIVER_RATE = 0.70;    // 70% to driver
 
 const app = express();
 
-const squareClient = new Client({
-  accessToken: SQUARE_ACCESS_TOKEN,
-  environment: Environment.Sandbox,
+const squareClient = new SquareClient({
+  token: SQUARE_ACCESS_TOKEN,
+  environment: SquareEnvironment.Sandbox,
 });
 
 const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
@@ -40,7 +41,7 @@ app.post('/api/create-payment', async (req, res) => {
 
     const totalAmountCents = BigInt(Math.round(amount * 100));
 
-    const { result } = await squareClient.paymentsApi.createPayment({
+    const result = await squareClient.payments.create({
       sourceId,
       idempotencyKey: crypto.randomUUID(),
       amountMoney: {
@@ -76,7 +77,7 @@ app.post('/api/create-payment', async (req, res) => {
     if (bookingError) {
       console.error('Booking creation error:', bookingError);
       // Cancel the payment hold if booking fails
-      try { await squareClient.paymentsApi.cancelPayment(paymentId); } catch {}
+      try { await squareClient.payments.cancel(paymentId); } catch {}
       throw bookingError;
     }
 
@@ -114,7 +115,7 @@ app.post('/api/driver/accept-booking', async (req, res) => {
 
     // Capture the payment
     if (booking.square_payment_id) {
-      await squareClient.paymentsApi.completePayment(booking.square_payment_id, {});
+      await squareClient.payments.complete(booking.square_payment_id);
     }
 
     // Update booking
@@ -164,7 +165,7 @@ app.post('/api/driver/reject-booking', async (req, res) => {
 
     // Cancel the payment hold
     if (booking.square_payment_id) {
-      await squareClient.paymentsApi.cancelPayment(booking.square_payment_id);
+      await squareClient.payments.cancel(booking.square_payment_id);
     }
 
     const { error: updateError } = await supabase
@@ -214,7 +215,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
     // If pending_driver, just cancel the hold
     if (booking.status === 'pending_driver') {
       if (booking.square_payment_id) {
-        await squareClient.paymentsApi.cancelPayment(booking.square_payment_id);
+        await squareClient.payments.cancel(booking.square_payment_id);
       }
       await supabase.from('bookings').update({
         status: 'cancelled',
@@ -245,7 +246,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
     // Issue refund via Square
     if (refundAmount > 0 && booking.square_payment_id) {
       const refundCents = BigInt(Math.round(refundAmount * 100));
-      await squareClient.refundsApi.refundPayment({
+      await squareClient.refunds.refundPayment({
         idempotencyKey: crypto.randomUUID(),
         paymentId: booking.square_payment_id,
         amountMoney: {
@@ -306,7 +307,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
       try {
         if (booking.status === 'pending_driver' && booking.square_payment_id) {
           // Cancel the hold
-          await squareClient.paymentsApi.cancelPayment(booking.square_payment_id);
+          await squareClient.payments.cancel(booking.square_payment_id);
           await supabase.from('bookings').update({
             status: 'cancelled',
             cancelled_at: new Date().toISOString(),
@@ -316,7 +317,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
         } else if (booking.status === 'confirmed' && booking.square_payment_id) {
           // Full refund
           const refundCents = BigInt(Math.round(booking.total_paid * 100));
-          await squareClient.refundsApi.refundPayment({
+          await squareClient.refunds.refundPayment({
             idempotencyKey: crypto.randomUUID(),
             paymentId: booking.square_payment_id,
             amountMoney: { amount: refundCents, currency: 'GBP' },
