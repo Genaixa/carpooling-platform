@@ -92,6 +92,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .insert([
           {
             id: data.user.id,
+            user_id: data.user.id,
             email,
             name: profileData.name,
             phone: profileData.phone,
