@@ -18,7 +18,7 @@ const app = express();
 
 const squareClient = new SquareClient({
   token: SQUARE_ACCESS_TOKEN,
-  environment: SquareEnvironment.Sandbox,
+  environment: SquareEnvironment.Production,
 });
 
 const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);

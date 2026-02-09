@@ -68,7 +68,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
       setCardReady(true);
     } catch (err: any) {
       console.error('Square init error:', err);
-      setError('Failed to initialize payment form. Please refresh the page.');
+      setError(`Payment error: ${err.message || err}`);
     }
   };
 
