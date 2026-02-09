@@ -87,10 +87,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setAcceptingBookingId(bookingId);
     try {
-      const res = await fetch('http://srv1291941.hstgr.cloud:3001/api/driver/accept-booking', {
+      const res = await fetch('/api/driver/accept-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, userId: user.id }),
+        body: JSON.stringify({ bookingId, driverId: user.id }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -107,10 +107,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setRejectingBookingId(bookingId);
     try {
-      const res = await fetch('http://srv1291941.hstgr.cloud:3001/api/driver/reject-booking', {
+      const res = await fetch('/api/driver/reject-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId, userId: user.id }),
+        body: JSON.stringify({ bookingId, driverId: user.id }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -127,10 +127,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setCancellingRide(true);
     try {
-      const res = await fetch('http://srv1291941.hstgr.cloud:3001/api/driver/cancel-ride', {
+      const res = await fetch('/api/driver/cancel-ride', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ rideId, userId: user.id }),
+        body: JSON.stringify({ rideId, driverId: user.id }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -147,7 +147,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const handleReviewSubmit = async (rating: number, comment: string) => {
     if (!user || !reviewingBooking) return;
     try {
-      const res = await fetch('http://srv1291941.hstgr.cloud:3001/api/reviews/submit', {
+      const res = await fetch('/api/reviews/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

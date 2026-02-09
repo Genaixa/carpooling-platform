@@ -35,15 +35,30 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
   const waitForSquare = (): Promise<void> => {
     return new Promise((resolve, reject) => {
       if (window.Square) return resolve();
+
+      // Try dynamically loading the script if it hasn't loaded
+      const existingScript = document.querySelector('script[src*="squareup.com"]');
+      if (!existingScript) {
+        const script = document.createElement('script');
+        script.src = 'https://web.squarecdn.com/v1/square.js';
+        script.onload = () => {
+          if (window.Square) resolve();
+          else reject(new Error('Square script loaded but SDK not available'));
+        };
+        script.onerror = () => reject(new Error('Failed to download Square SDK script'));
+        document.head.appendChild(script);
+        return;
+      }
+
       let attempts = 0;
       const interval = setInterval(() => {
         attempts++;
         if (window.Square) {
           clearInterval(interval);
           resolve();
-        } else if (attempts >= 20) {
+        } else if (attempts >= 30) {
           clearInterval(interval);
-          reject(new Error('Square SDK failed to load'));
+          reject(new Error('Square SDK timed out. Check browser console for blocked scripts.'));
         }
       }, 500);
     });
@@ -87,7 +102,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
 
       const sourceId = result.token;
 
-      const response = await fetch('http://srv1291941.hstgr.cloud:3001/api/create-payment', {
+      const response = await fetch('/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

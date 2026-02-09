@@ -56,7 +56,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
     try {
       const endpoint = action === 'approve' ? '/api/admin/approve-driver' : '/api/admin/reject-driver';
-      const response = await fetch(`http://srv1291941.hstgr.cloud:3001${endpoint}`, {
+      const response = await fetch(`/api${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

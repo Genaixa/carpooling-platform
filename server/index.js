@@ -105,12 +105,15 @@ app.post('/api/driver/accept-booking', async (req, res) => {
     // Get booking
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('*, ride:rides!bookings_ride_id_fkey(*)')
+      .select('*')
       .eq('id', bookingId)
       .single();
 
     if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
-    if (booking.ride.driver_id !== driverId) return res.status(403).json({ error: 'Not authorized' });
+
+    // Get ride to verify driver
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
+    if (!ride || ride.driver_id !== driverId) return res.status(403).json({ error: 'Not authorized' });
     if (booking.status !== 'pending_driver') return res.status(400).json({ error: 'Booking is not pending driver action' });
 
     // Capture the payment
@@ -155,12 +158,15 @@ app.post('/api/driver/reject-booking', async (req, res) => {
 
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('*, ride:rides!bookings_ride_id_fkey(*)')
+      .select('*')
       .eq('id', bookingId)
       .single();
 
     if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
-    if (booking.ride.driver_id !== driverId) return res.status(403).json({ error: 'Not authorized' });
+
+    // Get ride to verify driver
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
+    if (!ride || ride.driver_id !== driverId) return res.status(403).json({ error: 'Not authorized' });
     if (booking.status !== 'pending_driver') return res.status(400).json({ error: 'Booking is not pending driver action' });
 
     // Cancel the payment hold
@@ -205,12 +211,15 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
 
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
-      .select('*, ride:rides!bookings_ride_id_fkey(*)')
+      .select('*')
       .eq('id', bookingId)
       .eq('passenger_id', passengerId)
       .single();
 
     if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
+
+    // Get ride
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
 
     // If pending_driver, just cancel the hold
     if (booking.status === 'pending_driver') {
@@ -232,7 +241,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
     }
 
     // Calculate refund based on time
-    const rideTime = new Date(booking.ride.date_time).getTime();
+    const rideTime = new Date(ride.date_time).getTime();
     const now = Date.now();
     const hoursUntilRide = (rideTime - now) / (1000 * 60 * 60);
     let refundAmount = 0;

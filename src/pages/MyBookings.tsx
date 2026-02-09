@@ -70,10 +70,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     if (!user || !cancellingBooking) return;
     setCancelling(true);
     try {
-      const res = await fetch('http://srv1291941.hstgr.cloud:3001/api/passenger/cancel-booking', {
+      const res = await fetch('/api/passenger/cancel-booking', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ bookingId: cancellingBooking.id, userId: user.id }),
+        body: JSON.stringify({ bookingId: cancellingBooking.id, passengerId: user.id }),
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
@@ -90,7 +90,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const handleReviewSubmit = async (rating: number, comment: string) => {
     if (!user || !reviewingBooking || !reviewingBooking.ride) return;
     try {
-      const res = await fetch('http://srv1291941.hstgr.cloud:3001/api/reviews/submit', {
+      const res = await fetch('/api/reviews/submit', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
