@@ -49,7 +49,7 @@ export async function sendBookingRequestEmail(bookingData) {
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
       <p><strong>Seats requested:</strong> ${bookingData.seats_booked}</p>
-      <p><strong>Amount:</strong> £${bookingData.total_paid}</p>
+      <p><strong>Amount:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
     </div>
     <p>The payment hold on the passenger's card will expire in 6 days.</p>
     <p><a href="https://srv1291941.hstgr.cloud/#dashboard" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
@@ -68,7 +68,7 @@ export async function sendBookingAcceptedEmail(bookingData) {
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
       <p><strong>Seats booked:</strong> ${bookingData.seats_booked}</p>
-      <p><strong>Total charged:</strong> £${bookingData.total_paid}</p>
+      <p><strong>Total charged:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
       <p><strong>Driver:</strong> ${driver.name}</p>
     </div>
     <p>Your card has now been charged. Contact details will be available 12 hours before departure.</p>
@@ -101,7 +101,7 @@ export async function sendPassengerCancellationEmail(bookingData, refundAmount) 
     <p>Hi ${passenger.name},</p>
     <p>Your booking for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)} has been cancelled.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-      <p><strong>Original amount:</strong> £${bookingData.total_paid}</p>
+      <p><strong>Original amount:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
       <p><strong>Refund amount:</strong> £${(refundAmount || 0).toFixed(2)}</p>
     </div>
     <p>${refundText}</p>`
@@ -177,7 +177,7 @@ export async function sendBookingConfirmationEmail(passengerEmail, passengerName
       <p><strong>Route:</strong> ${rideDetails.departure} → ${rideDetails.destination}</p>
       <p><strong>Date:</strong> ${formatDate(rideDetails.date_time)}</p>
       <p><strong>Seats booked:</strong> ${bookingDetails.seats_booked}</p>
-      <p><strong>Total paid:</strong> £${bookingDetails.total_paid}</p>
+      <p><strong>Total paid:</strong> £${Number(bookingDetails.total_paid).toFixed(2)}</p>
       <p><strong>Driver:</strong> ${driverName}</p>
     </div>
     <p>Contact details will be available 12 hours before departure.</p>`

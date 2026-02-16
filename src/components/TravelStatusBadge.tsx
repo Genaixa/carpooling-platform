@@ -41,6 +41,10 @@ export default function TravelStatusBadge({
     let females = existingOccupants.females || 0;
     const couples = existingOccupants.couples || 0;
 
+    // Each couple is 1 man + 1 woman
+    males += couples;
+    females += couples;
+
     // Add driver by gender
     if (gender === 'Male') males += 1;
     else if (gender === 'Female') females += 1;
@@ -48,7 +52,6 @@ export default function TravelStatusBadge({
     const parts: string[] = [];
     if (males > 0) parts.push(`${males}M`);
     if (females > 0) parts.push(`${females}F`);
-    if (couples > 0) parts.push(`${couples}C`);
     return parts.length > 0 ? parts.join(' ') : null;
   };
 

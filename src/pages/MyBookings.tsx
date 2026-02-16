@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Booking, isContactVisible } from '../lib/supabase';
+import { REFUND_POLICY } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import ReviewForm from '../components/ReviewForm';
@@ -67,9 +68,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
       return { text: 'The hold on your card will be released.', amount: booking.total_paid };
     }
     const hoursUntil = (new Date(booking.ride.date_time).getTime() - Date.now()) / (1000 * 60 * 60);
-    if (hoursUntil >= 48) {
-      const refund = booking.total_paid * 0.75;
-      return { text: `You will receive a 75% refund of £${refund.toFixed(2)}.`, amount: refund };
+    if (hoursUntil >= REFUND_POLICY.PARTIAL_REFUND_HOURS) {
+      const refund = booking.total_paid * REFUND_POLICY.PARTIAL_REFUND_PERCENT;
+      return { text: `You will receive a ${REFUND_POLICY.PARTIAL_REFUND_PERCENT * 100}% refund of £${refund.toFixed(2)}.`, amount: refund };
     }
     return { text: 'No refund available (less than 48 hours before departure).', amount: 0 };
   };

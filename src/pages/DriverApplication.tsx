@@ -178,7 +178,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
           gender: formData.gender,
           car_make: formData.car_make.trim(),
           car_model: formData.car_model.trim(),
-          years_driving_experience: formData.years_driving_experience,
+          years_driving_experience: parseInt(formData.years_driving_experience),
         }}),
       }).catch(() => {});
 
