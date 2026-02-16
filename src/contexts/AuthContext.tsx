@@ -6,12 +6,17 @@ interface AuthContextType {
   user: User | null;
   profile: Profile | null;
   loading: boolean;
+  passwordRecovery: boolean;
+  clearPasswordRecovery: () => void;
   signUp: (email: string, password: string, profileData: {
     name: string;
     phone: string;
+    address_line1: string;
+    address_line2: string;
+    city: string;
+    postcode: string;
+    country: string;
     gender: 'Male' | 'Female';
-    travel_status: 'solo' | 'couple';
-    partner_name: string | null;
   }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -25,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [passwordRecovery, setPasswordRecovery] = useState(false);
 
   useEffect(() => {
     // Get initial session
@@ -38,8 +44,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
+      if (event === 'PASSWORD_RECOVERY') {
+        setPasswordRecovery(true);
+      }
       if (session?.user) {
         loadProfile(session.user.id);
       } else {
@@ -74,9 +83,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     profileData: {
       name: string;
       phone: string;
+      address_line1: string;
+      address_line2: string;
+      city: string;
+      postcode: string;
+      country: string;
       gender: 'Male' | 'Female';
-      travel_status: 'solo' | 'couple';
-      partner_name: string | null;
     }
   ) => {
     const { data, error } = await supabase.auth.signUp({
@@ -96,9 +108,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             email,
             name: profileData.name,
             phone: profileData.phone,
+            address_line1: profileData.address_line1,
+            address_line2: profileData.address_line2 || null,
+            city: profileData.city,
+            postcode: profileData.postcode,
+            country: profileData.country,
             gender: profileData.gender,
-            travel_status: profileData.travel_status,
-            partner_name: profileData.partner_name,
+            travel_status: 'solo',
           },
         ]);
 
@@ -139,10 +155,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, [user]);
 
+  const clearPasswordRecovery = () => setPasswordRecovery(false);
+
   const value = {
     user,
     profile,
     loading,
+    passwordRecovery,
+    clearPasswordRecovery,
     signUp,
     signIn,
     signOut,

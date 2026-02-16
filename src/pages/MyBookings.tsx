@@ -3,23 +3,35 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, Booking, isContactVisible } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
-import TravelStatusBadge from '../components/TravelStatusBadge';
 import ReviewForm from '../components/ReviewForm';
+import { useIsMobile } from '../hooks/useIsMobile';
 import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
+
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
 
 interface MyBookingsProps {
   onNavigate: NavigateFn;
 }
 
 export default function MyBookings({ onNavigate }: MyBookingsProps) {
-  const { user, loading: authLoading, signOut } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [reviewingBooking, setReviewingBooking] = useState<Booking | null>(null);
+
+  // Financial Report state
+  const [bookingsView, setBookingsView] = useState<'bookings' | 'financials'>('bookings');
+  const [sortField, setSortField] = useState<'date' | 'route' | 'driver' | 'seats' | 'amount' | 'status'>('date');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+  const [driverSearch, setDriverSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed' | 'cancelled' | 'pending'>('all');
 
   useEffect(() => {
     if (!authLoading && !user) onNavigate('login');
@@ -49,10 +61,6 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     }
   };
 
-  const handleSignOut = async () => {
-    try { await signOut(); onNavigate('home'); } catch (e) { console.error(e); }
-  };
-
   const getCancelRefundInfo = (booking: Booking) => {
     if (!booking.ride) return { text: '', amount: 0 };
     if (booking.status === 'pending_driver') {
@@ -60,8 +68,8 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     }
     const hoursUntil = (new Date(booking.ride.date_time).getTime() - Date.now()) / (1000 * 60 * 60);
     if (hoursUntil >= 48) {
-      const refund = booking.total_paid * 0.70;
-      return { text: `You will receive a 70% refund of £${refund.toFixed(2)}.`, amount: refund };
+      const refund = booking.total_paid * 0.75;
+      return { text: `You will receive a 75% refund of £${refund.toFixed(2)}.`, amount: refund };
     }
     return { text: 'No refund available (less than 48 hours before departure).', amount: 0 };
   };
@@ -70,7 +78,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     if (!user || !cancellingBooking) return;
     setCancelling(true);
     try {
-      const res = await fetch('/api/passenger/cancel-booking', {
+      const res = await fetch(`${API_URL}/api/passenger/cancel-booking`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ bookingId: cancellingBooking.id, passengerId: user.id }),
@@ -90,7 +98,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const handleReviewSubmit = async (rating: number, comment: string) => {
     if (!user || !reviewingBooking || !reviewingBooking.ride) return;
     try {
-      const res = await fetch('/api/reviews/submit', {
+      const res = await fetch(`${API_URL}/api/reviews/submit`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -130,6 +138,93 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     return { upcomingBookings: upcoming, pastBookings: past };
   }, [bookings]);
 
+  // Financial Report: filtered, sorted bookings and grand total
+  const { financialBookings, grandTotal } = useMemo(() => {
+    let filtered = bookings.filter((b) => b.ride);
+
+    // Date range filter
+    if (dateFrom) {
+      const from = new Date(dateFrom);
+      from.setHours(0, 0, 0, 0);
+      filtered = filtered.filter((b) => new Date(b.ride!.date_time) >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo);
+      to.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((b) => new Date(b.ride!.date_time) <= to);
+    }
+
+    // Driver name search
+    if (driverSearch.trim()) {
+      const search = driverSearch.trim().toLowerCase();
+      filtered = filtered.filter((b) => {
+        const driver = (b.ride as any)?.driver;
+        return driver?.name?.toLowerCase().includes(search);
+      });
+    }
+
+    // Status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((b) => {
+        if (statusFilter === 'pending') return b.status === 'pending_driver';
+        if (statusFilter === 'cancelled') return b.status === 'cancelled' || b.status === 'refunded';
+        return b.status === statusFilter;
+      });
+    }
+
+    // Sorting
+    filtered.sort((a, b) => {
+      let cmp = 0;
+      switch (sortField) {
+        case 'date':
+          cmp = new Date(a.ride!.date_time).getTime() - new Date(b.ride!.date_time).getTime();
+          break;
+        case 'route': {
+          const routeA = `${a.ride!.departure_location} → ${a.ride!.arrival_location}`;
+          const routeB = `${b.ride!.departure_location} → ${b.ride!.arrival_location}`;
+          cmp = routeA.localeCompare(routeB);
+          break;
+        }
+        case 'driver': {
+          const dA = (a.ride as any)?.driver?.name || '';
+          const dB = (b.ride as any)?.driver?.name || '';
+          cmp = dA.localeCompare(dB);
+          break;
+        }
+        case 'seats':
+          cmp = (a.seats_booked || 0) - (b.seats_booked || 0);
+          break;
+        case 'amount':
+          cmp = (a.total_paid || 0) - (b.total_paid || 0);
+          break;
+        case 'status':
+          cmp = (a.status || '').localeCompare(b.status || '');
+          break;
+      }
+      return sortDir === 'asc' ? cmp : -cmp;
+    });
+
+    // Only count confirmed/completed bookings in the total - cancelled/refunded money was returned
+    const total = filtered
+      .filter(b => b.status === 'confirmed' || b.status === 'completed')
+      .reduce((sum, b) => sum + (b.total_paid || 0), 0);
+    return { financialBookings: filtered, grandTotal: total };
+  }, [bookings, dateFrom, dateTo, driverSearch, statusFilter, sortField, sortDir]);
+
+  const handleSort = (field: typeof sortField) => {
+    if (sortField === field) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'));
+    } else {
+      setSortField(field);
+      setSortDir('asc');
+    }
+  };
+
+  const getSortIndicator = (field: typeof sortField) => {
+    if (sortField !== field) return ' \u2195';
+    return sortDir === 'asc' ? ' \u2191' : ' \u2193';
+  };
+
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
   const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
@@ -157,34 +252,14 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      {/* Navigation */}
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px', position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-              <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Find a Ride</button>
-              <button onClick={() => onNavigate('post-ride')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Post a Ride</button>
-              <button onClick={() => onNavigate('my-bookings')} style={{ background: 'none', border: 'none', color: '#1A9D9D', fontSize: '16px', cursor: 'pointer', fontWeight: '600' }}>My Bookings</button>
-              <button onClick={() => onNavigate('dashboard')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Dashboard</button>
-            </div>
-            <div style={{ position: 'absolute', right: '20px' }}>
-              <button onClick={handleSignOut} style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', borderRadius: '25px', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)' }}>Sign Out</button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* Page Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: '40px 20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '42px', fontWeight: 'bold', color: 'white', marginBottom: '0', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>My Bookings</h1>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '0', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>My Bookings</h1>
         </div>
       </div>
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         {error && (
           <div style={{ marginBottom: '20px', borderRadius: '12px', backgroundColor: '#fee2e2', padding: '16px', border: '1px solid #fca5a5' }}>
             <p style={{ fontSize: '14px', color: '#991b1b', margin: 0 }}>{error}</p>
@@ -219,6 +294,48 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
           </div>
         )}
 
+        {/* View Toggle */}
+        {!loading && bookings.length > 0 && (
+          <div style={{ display: 'flex', gap: '0', marginBottom: '30px', backgroundColor: '#E8EBED', borderRadius: '12px', padding: '4px', maxWidth: isMobile ? '100%' : '360px' }}>
+            <button
+              onClick={() => setBookingsView('bookings')}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                backgroundColor: bookingsView === 'bookings' ? 'white' : 'transparent',
+                color: bookingsView === 'bookings' ? '#1A9D9D' : '#6B7280',
+                boxShadow: bookingsView === 'bookings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              My Bookings
+            </button>
+            <button
+              onClick={() => setBookingsView('financials')}
+              style={{
+                flex: 1,
+                padding: '12px 20px',
+                border: 'none',
+                borderRadius: '10px',
+                fontSize: '14px',
+                fontWeight: '600',
+                cursor: 'pointer',
+                transition: 'all 0.2s',
+                backgroundColor: bookingsView === 'financials' ? 'white' : 'transparent',
+                color: bookingsView === 'financials' ? '#1A9D9D' : '#6B7280',
+                boxShadow: bookingsView === 'financials' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
+              }}
+            >
+              Financial Report
+            </button>
+          </div>
+        )}
+
         {loading ? (
           <div style={{ textAlign: 'center', padding: '80px' }}><Loading /></div>
         ) : bookings.length === 0 ? (
@@ -226,7 +343,222 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
             <p style={{ color: '#4B5563', fontSize: '20px', marginBottom: '25px' }}>No bookings yet. Start exploring rides!</p>
             <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)' }}>Browse Rides</button>
           </div>
+        ) : bookingsView === 'financials' ? (
+          /* ===== FINANCIAL REPORT VIEW ===== */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            {/* Grand Total Summary */}
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #1A9D9D' }}>
+              <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 4px', fontWeight: '500' }}>Total Spent</p>
+              <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#1A9D9D', margin: 0 }}>
+                £{grandTotal.toFixed(2)}
+              </p>
+              <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
+                Across {financialBookings.length} booking{financialBookings.length !== 1 ? 's' : ''}
+                {(dateFrom || dateTo || driverSearch.trim() || statusFilter !== 'all') ? ' (filtered)' : ''}
+              </p>
+            </div>
+
+            {/* Filters */}
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', margin: '0 0 16px' }}>Filters</h3>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(4, 1fr)', gap: '16px', alignItems: 'end' }}>
+                {/* Date From */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#4B5563', marginBottom: '6px' }}>From date</label>
+                  <input
+                    type="date"
+                    value={dateFrom}
+                    onChange={(e) => setDateFrom(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '2px solid #E8EBED',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F8FAFB',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                {/* Date To */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#4B5563', marginBottom: '6px' }}>To date</label>
+                  <input
+                    type="date"
+                    value={dateTo}
+                    onChange={(e) => setDateTo(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '2px solid #E8EBED',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F8FAFB',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                {/* Driver Search */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#4B5563', marginBottom: '6px' }}>Driver name</label>
+                  <input
+                    type="text"
+                    placeholder="Search driver..."
+                    value={driverSearch}
+                    onChange={(e) => setDriverSearch(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '2px solid #E8EBED',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F8FAFB',
+                      boxSizing: 'border-box',
+                    }}
+                  />
+                </div>
+                {/* Status Filter */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '13px', fontWeight: '500', color: '#4B5563', marginBottom: '6px' }}>Status</label>
+                  <select
+                    value={statusFilter}
+                    onChange={(e) => setStatusFilter(e.target.value as any)}
+                    style={{
+                      width: '100%',
+                      padding: '10px 12px',
+                      border: '2px solid #E8EBED',
+                      borderRadius: '10px',
+                      fontSize: '14px',
+                      color: '#1F2937',
+                      backgroundColor: '#F8FAFB',
+                      boxSizing: 'border-box',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <option value="all">All</option>
+                    <option value="confirmed">Confirmed</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
+              </div>
+              {/* Clear filters */}
+              {(dateFrom || dateTo || driverSearch.trim() || statusFilter !== 'all') && (
+                <button
+                  onClick={() => { setDateFrom(''); setDateTo(''); setDriverSearch(''); setStatusFilter('all'); }}
+                  style={{
+                    marginTop: '12px',
+                    padding: '8px 16px',
+                    border: '1px solid #E8EBED',
+                    borderRadius: '8px',
+                    backgroundColor: 'white',
+                    color: '#6B7280',
+                    fontSize: '13px',
+                    fontWeight: '500',
+                    cursor: 'pointer',
+                  }}
+                >
+                  Clear all filters
+                </button>
+              )}
+            </div>
+
+            {/* Financial Table */}
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflowX: 'auto' }}>
+              {financialBookings.length === 0 ? (
+                <div style={{ padding: '40px', textAlign: 'center' }}>
+                  <p style={{ color: '#6B7280', margin: 0 }}>No bookings match the selected filters.</p>
+                </div>
+              ) : (
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F8FAFB', borderBottom: '2px solid #E8EBED' }}>
+                      {([
+                        { field: 'date' as const, label: 'Date' },
+                        { field: 'route' as const, label: 'Route' },
+                        { field: 'driver' as const, label: 'Driver' },
+                        { field: 'seats' as const, label: 'Seats' },
+                        { field: 'amount' as const, label: 'Amount Paid' },
+                        { field: 'status' as const, label: 'Status' },
+                      ]).map(({ field, label }) => (
+                        <th
+                          key={field}
+                          onClick={() => handleSort(field)}
+                          style={{
+                            padding: '14px 16px',
+                            textAlign: field === 'seats' || field === 'amount' ? 'right' : 'left',
+                            fontSize: '13px',
+                            fontWeight: '600',
+                            color: sortField === field ? '#1A9D9D' : '#4B5563',
+                            cursor: 'pointer',
+                            userSelect: 'none',
+                            whiteSpace: 'nowrap',
+                          }}
+                        >
+                          {label}{getSortIndicator(field)}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financialBookings.map((booking) => {
+                      const driver = (booking.ride as any)?.driver;
+                      return (
+                        <tr key={booking.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                          <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937', whiteSpace: 'nowrap' }}>
+                            {formatDate(booking.ride!.date_time)}
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937' }}>
+                            {booking.ride!.departure_location} → {booking.ride!.arrival_location}
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937' }}>
+                            {driver ? (
+                              <span
+                                style={{ cursor: 'pointer', color: '#1A9D9D', fontWeight: '500' }}
+                                onClick={() => onNavigate('public-profile', undefined, driver.id)}
+                              >
+                                {driver.name}
+                              </span>
+                            ) : (
+                              <span style={{ color: '#9CA3AF' }}>Unknown</span>
+                            )}
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937', textAlign: 'right' }}>
+                            {booking.seats_booked}
+                          </td>
+                          <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937', textAlign: 'right', fontWeight: '600' }}>
+                            £{booking.total_paid?.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '14px 16px' }}>
+                            <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
+                              {getStatusLabel(booking.status, booking.driver_action)}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: '2px solid #E8EBED', backgroundColor: '#F8FAFB' }}>
+                      <td colSpan={4} style={{ padding: '14px 16px', fontSize: '14px', fontWeight: 'bold', color: '#1F2937', textAlign: 'right' }}>
+                        Grand Total ({financialBookings.length} booking{financialBookings.length !== 1 ? 's' : ''})
+                      </td>
+                      <td style={{ padding: '14px 16px', fontSize: '16px', fontWeight: 'bold', color: '#1A9D9D', textAlign: 'right' }}>
+                        £{grandTotal.toFixed(2)}
+                      </td>
+                      <td></td>
+                    </tr>
+                  </tfoot>
+                </table>
+              )}
+            </div>
+          </div>
         ) : (
+          /* ===== BOOKINGS VIEW (existing) ===== */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '50px' }}>
             {/* Upcoming Bookings */}
             <div>
@@ -236,7 +568,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                   <p style={{ color: '#4B5563', margin: 0 }}>No upcoming bookings</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
                   {upcomingBookings.map((booking) => {
                     if (!booking.ride || !(booking.ride as any).driver) return null;
                     const driver = (booking.ride as any).driver;
@@ -259,12 +591,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                         </div>
 
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '20px', marginBottom: '20px' }}>
-                          <Avatar photoUrl={driver.profile_photo_url} name={driver.name} size="sm" />
                           <div>
                             <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: 0, cursor: 'pointer' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>
-                              {driver.name}
+                              {driver.name} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
                             </p>
-                            <TravelStatusBadge travelStatus={driver.travel_status} gender={driver.gender} partnerName={driver.partner_name} />
                           </div>
                         </div>
 
@@ -310,7 +640,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
             {pastBookings.length > 0 && (
               <div>
                 <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '25px' }}>Past Bookings</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
                   {pastBookings.map((booking) => {
                     if (!booking.ride) return null;
                     const driver = (booking.ride as any)?.driver;

@@ -13,11 +13,11 @@ export const ROUTE_LOCATIONS = [
   'Newcastle Airport',
 ] as const;
 
-export const COMMISSION_RATE = 0.3; // 30% platform commission
+export const COMMISSION_RATE = 0.25; // 25% platform commission
 
 export const REFUND_POLICY = {
   PARTIAL_REFUND_HOURS: 48,
-  PARTIAL_REFUND_PERCENT: 0.70, // 70% refund if cancelled 48+ hours before
+  PARTIAL_REFUND_PERCENT: 0.75, // 75% refund if cancelled 48+ hours before
 };
 
 export const TRAVEL_STATUS_OPTIONS = [
@@ -26,7 +26,6 @@ export const TRAVEL_STATUS_OPTIONS = [
 ] as const;
 
 export const GENDER_OPTIONS = [
-  { value: '', label: 'Select gender' },
   { value: 'Male', label: 'Male' },
   { value: 'Female', label: 'Female' },
 ] as const;

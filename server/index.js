@@ -5,14 +5,15 @@ import squarePkg from 'square';
 const { SquareClient, SquareEnvironment } = squarePkg;
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
+import multer from 'multer';
 
 // Credentials (use env vars in production)
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
 const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fiylgivjirvmgkytejep.supabase.co';
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpeWxnaXZqaXJ2bWdreXRlamVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA4OTI1NSwiZXhwIjoyMDg0NjY1MjU1fQ.ifLBGtb2O-Hhhmaq0OysOJdyg6rFvwcM4ao3JoWJXx0';
 
-const COMMISSION_RATE = 0.30; // 30% platform commission
-const DRIVER_RATE = 0.70;    // 70% to driver
+const COMMISSION_RATE = 0.25; // 25% platform commission
+const DRIVER_RATE = 0.75;    // 75% to driver
 
 const app = express();
 
@@ -24,7 +25,76 @@ const squareClient = new SquareClient({
 const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (req, file, cb) => {
+    if (['image/jpeg', 'image/jpg', 'image/png'].includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPG and PNG images are allowed'));
+    }
+  },
+});
+
+// ============================================================
+// PROFILE PHOTO UPLOAD
+// ============================================================
+
+app.post('/api/upload-profile-photo', upload.single('photo'), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId || !req.file) {
+      return res.status(400).json({ error: 'Missing userId or photo file' });
+    }
+
+    // Ensure bucket exists (service role can create it)
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === 'profile-photos');
+    if (!bucketExists) {
+      await supabase.storage.createBucket('profile-photos', { public: true });
+    }
+
+    const ext = req.file.originalname.split('.').pop();
+    const fileName = `${userId}-${Date.now()}.${ext}`;
+
+    // Delete old photos for this user
+    const { data: existingFiles } = await supabase.storage.from('profile-photos').list('', {
+      search: userId,
+    });
+    if (existingFiles?.length) {
+      await supabase.storage.from('profile-photos').remove(existingFiles.map(f => f.name));
+    }
+
+    // Upload new photo
+    const { error: uploadError } = await supabase.storage
+      .from('profile-photos')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data: urlData } = supabase.storage.from('profile-photos').getPublicUrl(fileName);
+    if (!urlData?.publicUrl) throw new Error('Failed to get public URL');
+
+    // Update profile
+    await supabase.from('profiles').update({
+      profile_photo_url: urlData.publicUrl,
+    }).eq('id', userId);
+
+    console.log(`✓ Profile photo uploaded for: ${userId}`);
+    res.json({ success: true, url: urlData.publicUrl });
+  } catch (error) {
+    console.error('Photo upload error:', error);
+    res.status(500).json({ error: error.message || 'Upload failed' });
+  }
+});
 
 // ============================================================
 // PAYMENT ENDPOINTS (Square delayed capture)
@@ -77,11 +147,14 @@ app.post('/api/create-payment', async (req, res) => {
     if (bookingError) {
       console.error('Booking creation error:', bookingError);
       // Cancel the payment hold if booking fails
-      try { await squareClient.payments.cancel(paymentId); } catch {}
+      try { await squareClient.payments.cancel({ paymentId }); } catch {}
       throw bookingError;
     }
 
     console.log(`✓ Payment authorized: ${paymentId}, Booking: ${bookingData.id}`);
+
+    // Update available seats to account for pending booking
+    await recalculateSeats(rideId);
 
     // Send email to driver about new booking request
     try {
@@ -118,7 +191,7 @@ app.post('/api/driver/accept-booking', async (req, res) => {
 
     // Capture the payment
     if (booking.square_payment_id) {
-      await squareClient.payments.complete(booking.square_payment_id);
+      await squareClient.payments.complete({ paymentId: booking.square_payment_id });
     }
 
     // Update booking
@@ -171,7 +244,7 @@ app.post('/api/driver/reject-booking', async (req, res) => {
 
     // Cancel the payment hold
     if (booking.square_payment_id) {
-      await squareClient.payments.cancel(booking.square_payment_id);
+      await squareClient.payments.cancel({ paymentId: booking.square_payment_id });
     }
 
     const { error: updateError } = await supabase
@@ -224,7 +297,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
     // If pending_driver, just cancel the hold
     if (booking.status === 'pending_driver') {
       if (booking.square_payment_id) {
-        await squareClient.payments.cancel(booking.square_payment_id);
+        await squareClient.payments.cancel({ paymentId: booking.square_payment_id });
       }
       await supabase.from('bookings').update({
         status: 'cancelled',
@@ -247,8 +320,8 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
     let refundAmount = 0;
 
     if (hoursUntilRide >= 48) {
-      // 70% refund (30% commission kept)
-      refundAmount = booking.total_paid * 0.70;
+      // 75% refund (25% fee kept)
+      refundAmount = booking.total_paid * 0.75;
     }
     // Under 48 hours: no refund
 
@@ -316,7 +389,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
       try {
         if (booking.status === 'pending_driver' && booking.square_payment_id) {
           // Cancel the hold
-          await squareClient.payments.cancel(booking.square_payment_id);
+          await squareClient.payments.cancel({ paymentId: booking.square_payment_id });
           await supabase.from('bookings').update({
             status: 'cancelled',
             cancelled_at: new Date().toISOString(),
@@ -360,6 +433,65 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
   } catch (error) {
     console.error('Cancel ride error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// DRIVER: COMPLETE RIDE
+// ============================================================
+
+app.post('/api/driver/complete-ride', async (req, res) => {
+  try {
+    const { rideId, driverId } = req.body;
+    if (!rideId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Verify the driver owns this ride
+    const { data: ride, error: rideError } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('id', rideId)
+      .eq('driver_id', driverId)
+      .single();
+
+    if (rideError || !ride) return res.status(404).json({ error: 'Ride not found' });
+    if (ride.status !== 'upcoming') return res.status(400).json({ error: 'Only upcoming rides can be marked as complete' });
+
+    // Ensure the departure time has actually passed
+    if (new Date(ride.date_time) > new Date()) {
+      return res.status(400).json({ error: 'Cannot complete a ride before its departure time' });
+    }
+
+    // Mark ride as completed
+    await supabase.from('rides').update({ status: 'completed' }).eq('id', rideId);
+
+    // Mark all confirmed bookings as completed
+    await supabase
+      .from('bookings')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('ride_id', rideId)
+      .eq('status', 'confirmed');
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Complete ride error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// DRIVER APPLICATION NOTIFICATION
+// ============================================================
+
+app.post('/api/notify-driver-application', async (req, res) => {
+  try {
+    const { application } = req.body;
+    if (!application) return res.status(400).json({ error: 'Missing application data' });
+    const { sendDriverApplicationNotification } = await import('./emails.js');
+    await sendDriverApplicationNotification(application);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Driver application notification error:', err);
+    res.json({ success: false });
   }
 });
 
@@ -437,6 +569,214 @@ app.post('/api/admin/reject-driver', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Reject driver error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/revoke-driver', async (req, res) => {
+  try {
+    const { userId, adminId, reason } = req.body;
+    if (!userId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Revoke driver status on profile
+    await supabase.from('profiles').update({
+      is_approved_driver: false,
+    }).eq('id', userId);
+
+    // Update their latest approved application to rejected with reason
+    const { data: latestApp } = await supabase
+      .from('driver_applications')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('status', 'approved')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (latestApp) {
+      await supabase.from('driver_applications').update({
+        status: 'rejected',
+        admin_notes: reason ? `REVOKED: ${reason}` : 'REVOKED: Driver status revoked by admin',
+        reviewed_by: adminId,
+        reviewed_at: new Date().toISOString(),
+      }).eq('id', latestApp.id);
+    }
+
+    console.log(`✓ Driver revoked: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Revoke driver error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// ADMIN FINANCIAL ENDPOINTS
+// ============================================================
+
+// Get all rides with driver info and booking summaries
+app.get('/api/admin/rides-overview', async (req, res) => {
+  try {
+    const { adminId } = req.query;
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Fetch all rides with driver profiles
+    const { data: rides, error: ridesError } = await supabase
+      .from('rides')
+      .select('*, driver:profiles!rides_driver_id_fkey(id, name, email)')
+      .order('date_time', { ascending: false });
+
+    if (ridesError) throw ridesError;
+
+    // For each ride, fetch bookings with passenger info
+    const rideIds = (rides || []).map(r => r.id);
+    let allBookings = [];
+    if (rideIds.length > 0) {
+      const { data: bookings, error: bookingsError } = await supabase
+        .from('bookings')
+        .select('*, passenger:profiles!bookings_passenger_id_fkey(id, name, email)')
+        .in('ride_id', rideIds);
+
+      if (bookingsError) throw bookingsError;
+      allBookings = bookings || [];
+    }
+
+    // Group bookings by ride
+    const bookingsByRide = {};
+    for (const b of allBookings) {
+      if (!bookingsByRide[b.ride_id]) bookingsByRide[b.ride_id] = [];
+      bookingsByRide[b.ride_id].push(b);
+    }
+
+    // Build response with financials
+    const ridesWithFinancials = (rides || []).map(ride => {
+      const rideBookings = bookingsByRide[ride.id] || [];
+      const confirmedBookings = rideBookings.filter(b => ['confirmed', 'completed'].includes(b.status));
+      const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.total_paid || 0), 0);
+      const totalCommission = confirmedBookings.reduce((sum, b) => sum + (b.commission_amount || 0), 0);
+      const totalDriverPayout = confirmedBookings.reduce((sum, b) => sum + (b.driver_payout_amount || 0), 0);
+
+      return {
+        ...ride,
+        bookings: rideBookings,
+        totalRevenue,
+        totalCommission,
+        totalDriverPayout,
+        passengerCount: confirmedBookings.reduce((sum, b) => sum + b.seats_booked, 0),
+      };
+    });
+
+    res.json({ success: true, rides: ridesWithFinancials });
+  } catch (error) {
+    console.error('Rides overview error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Record a manual payout to a driver
+app.post('/api/admin/record-payout', async (req, res) => {
+  try {
+    const { driverId, amount, adminId, notes } = req.body;
+    if (!driverId || !amount || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: payout, error: payoutError } = await supabase
+      .from('driver_payouts')
+      .insert([{
+        driver_id: driverId,
+        amount: parseFloat(amount),
+        admin_id: adminId,
+        notes: notes || null,
+      }])
+      .select()
+      .single();
+
+    if (payoutError) throw payoutError;
+
+    console.log(`✓ Payout recorded: £${amount} to driver ${driverId}`);
+    res.json({ success: true, payout });
+  } catch (error) {
+    console.error('Record payout error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all recorded payouts
+app.get('/api/admin/payouts', async (req, res) => {
+  try {
+    const { adminId } = req.query;
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: payouts, error: payoutsError } = await supabase
+      .from('driver_payouts')
+      .select('*, driver:profiles!driver_payouts_driver_id_fkey(id, name, email)')
+      .order('created_at', { ascending: false });
+
+    if (payoutsError) throw payoutsError;
+
+    res.json({ success: true, payouts: payouts || [] });
+  } catch (error) {
+    console.error('Get payouts error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get all users (for admin management)
+app.get('/api/admin/users', async (req, res) => {
+  try {
+    const { adminId } = req.query;
+    console.log('Admin users request, adminId:', adminId);
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: users, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, is_admin, is_approved_driver, created_at')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    res.json({ success: true, users: users || [] });
+  } catch (error) {
+    console.error('Get users error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Toggle admin status for a user
+app.post('/api/admin/toggle-admin', async (req, res) => {
+  try {
+    const { adminId, userId, makeAdmin } = req.body;
+    if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Prevent removing own admin status
+    if (adminId === userId && !makeAdmin) {
+      return res.status(400).json({ error: 'You cannot remove your own admin status' });
+    }
+
+    const { error } = await supabase.from('profiles').update({ is_admin: !!makeAdmin }).eq('id', userId);
+    if (error) throw error;
+
+    const { data: updated } = await supabase.from('profiles').select('name, email').eq('id', userId).single();
+    console.log(`✓ Admin status ${makeAdmin ? 'granted to' : 'revoked from'} ${updated?.email}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Toggle admin error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -552,7 +892,55 @@ app.post('/api/fix-all-seats', async (req, res) => {
   }
 });
 
+// ============================================================
+// AUTO-COMPLETE RIDES
+// ============================================================
+
+async function cleanupPastRides() {
+  try {
+    // Find all upcoming rides whose departure time has passed
+    const { data: rides, error } = await supabase
+      .from('rides')
+      .select('id')
+      .eq('status', 'upcoming')
+      .lt('date_time', new Date().toISOString());
+
+    if (error) throw error;
+    if (!rides || rides.length === 0) return;
+
+    let cleanedUp = 0;
+    for (const ride of rides) {
+      // Cancel any still-pending bookings (driver never responded) and release card holds
+      const { data: pendingBookings } = await supabase
+        .from('bookings')
+        .select('id, square_payment_id')
+        .eq('ride_id', ride.id)
+        .eq('status', 'pending_driver');
+
+      for (const booking of (pendingBookings || [])) {
+        if (booking.square_payment_id) {
+          try { await squareClient.payments.cancel({ paymentId: booking.square_payment_id }); } catch {}
+        }
+        await supabase.from('bookings').update({
+          status: 'cancelled',
+          cancelled_at: new Date().toISOString(),
+        }).eq('id', booking.id);
+        cleanedUp++;
+      }
+    }
+
+    if (cleanedUp > 0) console.log(`✓ Cleaned up ${cleanedUp} stale pending booking(s)`);
+  } catch (error) {
+    console.error('Cleanup past rides error:', error);
+  }
+}
+
+// Run every 15 minutes
+setInterval(cleanupPastRides, 15 * 60 * 1000);
+
 const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`✅ ChapaRide server running on port ${PORT}`);
+  // Run once on startup after a short delay
+  setTimeout(cleanupPastRides, 5000);
 });

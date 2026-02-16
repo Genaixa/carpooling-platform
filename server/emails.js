@@ -51,7 +51,8 @@ export async function sendBookingRequestEmail(bookingData) {
       <p><strong>Seats requested:</strong> ${bookingData.seats_booked}</p>
       <p><strong>Amount:</strong> £${bookingData.total_paid}</p>
     </div>
-    <p>Please log in to your dashboard to accept or reject this booking. The payment hold on the passenger's card will expire in 6 days.</p>`
+    <p>The payment hold on the passenger's card will expire in 6 days.</p>
+    <p><a href="https://srv1291941.hstgr.cloud/#dashboard" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
   );
 }
 
@@ -70,7 +71,8 @@ export async function sendBookingAcceptedEmail(bookingData) {
       <p><strong>Total charged:</strong> £${bookingData.total_paid}</p>
       <p><strong>Driver:</strong> ${driver.name}</p>
     </div>
-    <p>Your card has now been charged. Contact details will be available 12 hours before departure.</p>`
+    <p>Your card has now been charged. Contact details will be available 12 hours before departure.</p>
+    <p><a href="https://srv1291941.hstgr.cloud/#my-bookings" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
   );
 }
 
@@ -83,7 +85,7 @@ export async function sendBookingRejectedEmail(bookingData) {
     <p>Hi ${passenger.name},</p>
     <p>Unfortunately, ${driver.name} has declined your booking request for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
     <p>The hold on your card has been released and you will not be charged.</p>
-    <p>Please browse other available rides on ChapaRide.</p>`
+    <p><a href="https://srv1291941.hstgr.cloud/#home" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
   );
 }
 
@@ -115,7 +117,7 @@ export async function sendDriverCancellationEmail(bookingData, ride) {
     <p>Hi ${passenger.name},</p>
     <p>We're sorry, but the driver has cancelled the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
     <p>A full refund has been issued to your original payment method.</p>
-    <p>Please browse other available rides on ChapaRide.</p>`
+    <p><a href="https://srv1291941.hstgr.cloud/#home" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
   );
 }
 
@@ -142,6 +144,22 @@ export async function sendDriverRejectedEmail(application) {
     <p>Thank you for your interest in becoming a ChapaRide driver. Unfortunately, we are unable to approve your application at this time.</p>
     ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Reason:</strong> ${application.admin_notes}</p></div>` : ''}
     <p>If you have questions, please contact us at support@chaparide.com.</p>`
+  );
+}
+
+// 8. New driver application notification (to admin)
+export async function sendDriverApplicationNotification(application) {
+  return sendEmail('info@chaparide.com', 'New Driver Application to Review',
+    `<h2>New Driver Application</h2>
+    <p>A new driver application has been submitted and needs your review.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Name:</strong> ${application.first_name} ${application.surname}</p>
+      <p><strong>Age group:</strong> ${application.age_group}</p>
+      <p><strong>Gender:</strong> ${application.gender}</p>
+      <p><strong>Car:</strong> ${application.car_make} ${application.car_model}</p>
+      <p><strong>Driving experience:</strong> ${application.years_driving_experience} years</p>
+    </div>
+    <p><a href="https://srv1291941.hstgr.cloud/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Review Application</a></p>`
   );
 }
 

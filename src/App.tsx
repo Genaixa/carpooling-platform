@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import Home from './pages/Home';
 import Login from './pages/Login';
 import Register from './pages/Register';
@@ -15,13 +15,23 @@ import PublicProfile from './pages/PublicProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
 import DriverApplication from './pages/DriverApplication';
 import AdminDashboard from './pages/AdminDashboard';
+import HowItWorks from './pages/HowItWorks';
+import TermsAndConditions from './pages/TermsAndConditions';
+import ContactUs from './pages/ContactUs';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import FAQs from './pages/FAQs';
+import ResetPassword from './pages/ResetPassword';
+import Header from './components/Header';
+import Footer from './components/Footer';
 import type { Page } from './lib/types';
 
-function App() {
+function AppContent() {
+  const { passwordRecovery } = useAuth();
   const [currentPage, setCurrentPage] = useState<Page>('home');
   const [editRideId, setEditRideId] = useState<string | null>(null);
   const [rideDetailsId, setRideDetailsId] = useState<string | null>(null);
   const [publicProfileUserId, setPublicProfileUserId] = useState<string | null>(null);
+  const [signupIntent, setSignupIntent] = useState<'passenger' | 'driver'>('passenger');
 
   const handleNavigate = (page: Page, rideId?: string, userId?: string) => {
     if (page === 'edit-ride' && rideId) {
@@ -39,7 +49,16 @@ function App() {
       setEditRideId(null);
       setRideDetailsId(null);
       setCurrentPage('public-profile');
+    } else if (page === 'register-driver') {
+      setSignupIntent('driver');
+      setEditRideId(null);
+      setRideDetailsId(null);
+      setPublicProfileUserId(null);
+      setCurrentPage('register');
     } else {
+      if (page === 'register') {
+        setSignupIntent('passenger');
+      }
       setEditRideId(null);
       setRideDetailsId(null);
       setPublicProfileUserId(null);
@@ -63,7 +82,7 @@ function App() {
       case 'login':
         return <Login onNavigate={handleNavigate} />;
       case 'register':
-        return <Register onNavigate={handleNavigate} />;
+        return <Register onNavigate={handleNavigate} intent={signupIntent} />;
       case 'profile':
         return <Profile onNavigate={handleNavigate} />;
       case 'post-ride':
@@ -86,40 +105,58 @@ function App() {
         return <DriverApplication onNavigate={handleNavigate} />;
       case 'admin-dashboard':
         return <AdminDashboard onNavigate={handleNavigate} />;
+      case 'how-it-works':
+        return <HowItWorks onNavigate={handleNavigate} />;
+      case 'terms':
+        return <TermsAndConditions onNavigate={handleNavigate} />;
+      case 'contact':
+        return <ContactUs onNavigate={handleNavigate} />;
+      case 'privacy-policy':
+        return <PrivacyPolicy onNavigate={handleNavigate} />;
+      case 'faqs':
+        return <FAQs onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }
   };
 
   return (
-    <AuthProvider>
-      <div className="min-h-screen bg-[#f2f2f2]">
-        <Toaster
-          position="top-center"
-          toastOptions={{
+    <div className="min-h-screen bg-[#f2f2f2]">
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          duration: 3000,
+          style: {
+            background: '#363636',
+            color: '#fff',
+          },
+          success: {
             duration: 3000,
-            style: {
-              background: '#363636',
-              color: '#fff',
+            iconTheme: {
+              primary: '#10bd59',
+              secondary: '#fff',
             },
-            success: {
-              duration: 3000,
-              iconTheme: {
-                primary: '#10bd59',
-                secondary: '#fff',
-              },
+          },
+          error: {
+            duration: 4000,
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
             },
-            error: {
-              duration: 4000,
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
-        {renderPage()}
-      </div>
+          },
+        }}
+      />
+      <Header onNavigate={handleNavigate} currentPage={currentPage} />
+      {passwordRecovery ? <ResetPassword onNavigate={handleNavigate} /> : renderPage()}
+      <Footer onNavigate={handleNavigate} />
+    </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
     </AuthProvider>
   );
 }

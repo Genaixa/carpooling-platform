@@ -2,8 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { AGE_GROUP_OPTIONS, GENDER_OPTIONS } from '../lib/constants';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 import toast from 'react-hot-toast';
+
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
 
 interface DriverApplicationProps {
   onNavigate: NavigateFn;
@@ -11,6 +14,7 @@ interface DriverApplicationProps {
 
 export default function DriverApplication({ onNavigate }: DriverApplicationProps) {
   const { user, profile, loading: authLoading } = useAuth();
+  const isMobile = useIsMobile();
   const [existingApplication, setExistingApplication] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -28,6 +32,9 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     dbs_check_acknowledged: false,
     emergency_contact_name: '',
     emergency_contact_phone: '',
+    bank_account_name: '',
+    bank_account_number: '',
+    bank_sort_code: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -40,6 +47,41 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
   useEffect(() => {
     if (user) loadExistingApplication();
   }, [user]);
+
+  // Pre-fill form with previous application data when reapplying, or from profile
+  useEffect(() => {
+    if (loading) return;
+    if (existingApplication?.status === 'rejected') {
+      setFormData({
+        first_name: existingApplication.first_name || '',
+        surname: existingApplication.surname || '',
+        age_group: existingApplication.age_group || '',
+        gender: existingApplication.gender || '',
+        has_drivers_license: existingApplication.has_drivers_license || false,
+        car_insured: existingApplication.car_insured || false,
+        has_mot: existingApplication.has_mot || false,
+        car_make: existingApplication.car_make || '',
+        car_model: existingApplication.car_model || '',
+        years_driving_experience: existingApplication.years_driving_experience?.toString() || '',
+        dbs_check_acknowledged: existingApplication.dbs_check_acknowledged || false,
+        emergency_contact_name: existingApplication.emergency_contact_name || '',
+        emergency_contact_phone: existingApplication.emergency_contact_phone || '',
+        bank_account_name: existingApplication.bank_account_name || '',
+        bank_account_number: existingApplication.bank_account_number || '',
+        bank_sort_code: existingApplication.bank_sort_code || '',
+      });
+    } else if (!existingApplication && profile) {
+      const nameParts = (profile.name || '').trim().split(/\s+/);
+      const firstName = nameParts[0] || '';
+      const surname = nameParts.slice(1).join(' ') || '';
+      setFormData(prev => ({
+        ...prev,
+        first_name: firstName,
+        surname: surname,
+        gender: profile.gender || '',
+      }));
+    }
+  }, [existingApplication, profile, loading]);
 
   const loadExistingApplication = async () => {
     if (!user) return;
@@ -84,9 +126,13 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     if (!formData.car_make.trim()) newErrors.car_make = 'Car make is required';
     if (!formData.car_model.trim()) newErrors.car_model = 'Car model is required';
     if (!formData.years_driving_experience) newErrors.years_driving_experience = 'Years of experience is required';
-    if (!formData.dbs_check_acknowledged) newErrors.dbs_check_acknowledged = 'You must acknowledge the DBS check requirement';
     if (!formData.emergency_contact_name.trim()) newErrors.emergency_contact_name = 'Emergency contact name is required';
     if (!formData.emergency_contact_phone.trim()) newErrors.emergency_contact_phone = 'Emergency contact phone is required';
+    if (!formData.bank_account_name.trim()) newErrors.bank_account_name = 'Account name is required';
+    if (!formData.bank_account_number.trim()) newErrors.bank_account_number = 'Account number is required';
+    else if (!/^\d{8}$/.test(formData.bank_account_number.trim())) newErrors.bank_account_number = 'Account number must be 8 digits';
+    if (!formData.bank_sort_code.trim()) newErrors.bank_sort_code = 'Sort code is required';
+    else if (!/^\d{2}-?\d{2}-?\d{2}$/.test(formData.bank_sort_code.trim())) newErrors.bank_sort_code = 'Sort code must be 6 digits (e.g., 12-34-56)';
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -112,11 +158,30 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
         dbs_check_acknowledged: formData.dbs_check_acknowledged,
         emergency_contact_name: formData.emergency_contact_name.trim(),
         emergency_contact_phone: formData.emergency_contact_phone.trim(),
+        bank_account_name: formData.bank_account_name.trim(),
+        bank_account_number: formData.bank_account_number.trim(),
+        bank_sort_code: formData.bank_sort_code.trim(),
         status: 'pending',
       }]);
 
       if (error) throw error;
       toast.success('Application submitted successfully! We will review it shortly.');
+
+      // Notify admin by email
+      fetch(`${API_URL}/api/notify-driver-application`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ application: {
+          first_name: formData.first_name.trim(),
+          surname: formData.surname.trim(),
+          age_group: formData.age_group,
+          gender: formData.gender,
+          car_make: formData.car_make.trim(),
+          car_model: formData.car_model.trim(),
+          years_driving_experience: formData.years_driving_experience,
+        }}),
+      }).catch(() => {});
+
       loadExistingApplication();
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit application');
@@ -136,15 +201,6 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
   if (profile?.is_approved_driver) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-        <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px' }}>
-              <div style={{ cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-                <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-              </div>
-            </div>
-          </div>
-        </nav>
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>&#10003;</div>
@@ -159,25 +215,15 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     );
   }
 
-  if (existingApplication) {
+  if (existingApplication && existingApplication.status !== 'rejected') {
     const statusColors: Record<string, { bg: string; color: string; border: string }> = {
       pending: { bg: '#fef3c7', color: '#92400e', border: '#fde047' },
       approved: { bg: '#dcfce7', color: '#166534', border: '#86efac' },
-      rejected: { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
     };
     const sc = statusColors[existingApplication.status] || statusColors.pending;
 
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-        <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px' }}>
-              <div style={{ cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-                <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-              </div>
-            </div>
-          </div>
-        </nav>
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', marginBottom: '16px' }}>Application Status</h2>
@@ -202,6 +248,9 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     );
   }
 
+  const isReapplying = existingApplication?.status === 'rejected';
+  const wasRevoked = existingApplication?.admin_notes?.startsWith('REVOKED:');
+
   const inputStyle = (field: string) => ({
     width: '100%', padding: '14px', fontSize: '16px',
     border: errors[field] ? '2px solid #ef4444' : '2px solid #E8EBED',
@@ -210,28 +259,39 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px' }}>
-            <div style={{ cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-              <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-            </div>
-          </div>
-        </div>
-      </nav>
-
-      <section style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
+      <section style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
-          <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h1 style={{ fontSize: '48px', fontWeight: 'bold', color: 'white', marginBottom: '15px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Become a Driver</h1>
-            <p style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.95)' }}>Complete this application to start offering rides</p>
+          <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '40px' }}>
+            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: 'white', marginBottom: '15px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>
+              {isReapplying ? 'Reapply as Driver' : 'Become a Driver'}
+            </h1>
+            <p style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
+              {isReapplying ? 'Submit a new application for review' : 'Complete this application to start offering rides'}
+            </p>
           </div>
 
-          <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+          {isReapplying && (
+            <div style={{
+              backgroundColor: wasRevoked ? '#fef2f2' : '#fef3c7',
+              border: `1px solid ${wasRevoked ? '#fca5a5' : '#fde047'}`,
+              borderRadius: '16px', padding: '20px', marginBottom: '24px',
+            }}>
+              <p style={{ fontSize: '15px', fontWeight: '600', color: wasRevoked ? '#991b1b' : '#92400e', margin: '0 0 6px 0' }}>
+                {wasRevoked ? 'Your driver status was revoked' : 'Your previous application was rejected'}
+              </p>
+              {existingApplication?.admin_notes && (
+                <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>
+                  Reason: {existingApplication.admin_notes.replace('REVOKED: ', '')}
+                </p>
+              )}
+            </div>
+          )}
+
+          <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: isMobile ? '24px' : '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
             <form onSubmit={handleSubmit}>
               {/* Personal Details */}
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Personal Details</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>First Name *</label>
                   <input name="first_name" type="text" value={formData.first_name} onChange={handleChange} style={inputStyle('first_name')} />
@@ -243,7 +303,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                   {errors.surname && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.surname}</p>}
                 </div>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Age Group *</label>
                   <select name="age_group" value={formData.age_group} onChange={handleChange} style={{ ...inputStyle('age_group'), backgroundColor: 'white' }}>
@@ -263,7 +323,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
               {/* Vehicle & Driving */}
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px', marginTop: '30px' }}>Vehicle & Driving</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Car Make *</label>
                   <input name="car_make" type="text" value={formData.car_make} onChange={handleChange} placeholder="e.g., Toyota" style={inputStyle('car_make')} />
@@ -288,21 +348,20 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                   { name: 'has_drivers_license', label: 'I have a valid UK driving licence' },
                   { name: 'car_insured', label: 'My car is fully insured' },
                   { name: 'has_mot', label: 'My car has a valid MOT certificate' },
-                  { name: 'dbs_check_acknowledged', label: 'I acknowledge that a DBS check may be required' },
                 ].map(({ name, label }) => (
                   <label key={name} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
                     <input type="checkbox" name={name} checked={(formData as any)[name]} onChange={handleChange} style={{ width: '20px', height: '20px', accentColor: '#1A9D9D' }} />
                     <span style={{ fontSize: '14px', color: '#1F2937' }}>{label} *</span>
                   </label>
                 ))}
-                {(errors.has_drivers_license || errors.car_insured || errors.has_mot || errors.dbs_check_acknowledged) && (
+                {(errors.has_drivers_license || errors.car_insured || errors.has_mot) && (
                   <p style={{ color: '#ef4444', fontSize: '14px' }}>All compliance checks must be confirmed</p>
                 )}
               </div>
 
               {/* Emergency Contact */}
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px', marginTop: '30px' }}>Emergency Contact</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '30px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Contact Name *</label>
                   <input name="emergency_contact_name" type="text" value={formData.emergency_contact_name} onChange={handleChange} style={inputStyle('emergency_contact_name')} />
@@ -312,6 +371,27 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Contact Phone *</label>
                   <input name="emergency_contact_phone" type="tel" value={formData.emergency_contact_phone} onChange={handleChange} style={inputStyle('emergency_contact_phone')} />
                   {errors.emergency_contact_phone && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.emergency_contact_phone}</p>}
+                </div>
+              </div>
+
+              {/* Bank Details */}
+              <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '8px', marginTop: '30px' }}>Bank Details</h3>
+              <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>Your payout for completed rides will be sent to this account.</p>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                <div style={{ gridColumn: '1 / -1' }}>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Account Name *</label>
+                  <input name="bank_account_name" type="text" value={formData.bank_account_name} onChange={handleChange} placeholder="Name on bank account" style={inputStyle('bank_account_name')} />
+                  {errors.bank_account_name && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.bank_account_name}</p>}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Account Number *</label>
+                  <input name="bank_account_number" type="text" value={formData.bank_account_number} onChange={handleChange} placeholder="8 digits" maxLength={8} style={inputStyle('bank_account_number')} />
+                  {errors.bank_account_number && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.bank_account_number}</p>}
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Sort Code *</label>
+                  <input name="bank_sort_code" type="text" value={formData.bank_sort_code} onChange={handleChange} placeholder="e.g., 12-34-56" maxLength={8} style={inputStyle('bank_sort_code')} />
+                  {errors.bank_sort_code && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.bank_sort_code}</p>}
                 </div>
               </div>
 

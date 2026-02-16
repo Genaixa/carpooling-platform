@@ -3,9 +3,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, Profile, Ride, Review } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
-import TravelStatusBadge from '../components/TravelStatusBadge';
 import StarRating from '../components/StarRating';
 import ReviewCard from '../components/ReviewCard';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 
 interface PublicProfileProps {
@@ -14,7 +14,8 @@ interface PublicProfileProps {
 }
 
 export default function PublicProfile({ onNavigate, userId }: PublicProfileProps) {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [rides, setRides] = useState<Ride[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -63,10 +64,6 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
   const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
   const formatMemberSince = (dateString: string) => new Date(dateString).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' });
 
-  const handleSignOut = async () => {
-    try { await signOut(); onNavigate('home'); } catch (e) { console.error(e); }
-  };
-
   if (loading) {
     return <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><Loading /></div>;
   }
@@ -74,15 +71,6 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
   if (error || !profile) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-        <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-                <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-              </div>
-            </div>
-          </div>
-        </nav>
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <p style={{ color: '#ef4444', marginBottom: '25px', fontSize: '18px' }}>{error || 'Profile not found'}</p>
@@ -95,43 +83,28 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      {/* Navigation */}
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px', position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-              <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Find a Ride</button>
-              <button onClick={() => onNavigate('post-ride')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Post a Ride</button>
-              {user && (
-                <>
-                  <button onClick={() => onNavigate('my-bookings')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>My Bookings</button>
-                  <button onClick={() => onNavigate('dashboard')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Dashboard</button>
-                </>
-              )}
-            </div>
-            {user && (
-              <div style={{ position: 'absolute', right: '20px' }}>
-                <button onClick={handleSignOut} style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', borderRadius: '25px', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer' }}>Sign Out</button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
-      <main style={{ maxWidth: '900px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '900px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         {/* Profile Header */}
-        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px', textAlign: 'center' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px', textAlign: 'center' }}>
           <div style={{ marginBottom: '16px' }}>
             <Avatar photoUrl={profile.profile_photo_url} name={profile.name} size="lg" />
           </div>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '12px' }}>{profile.name}</h2>
           <div style={{ marginBottom: '16px' }}>
-            <TravelStatusBadge travelStatus={profile.travel_status} gender={profile.gender} partnerName={profile.partner_name} />
+            <span style={{
+              display: 'inline-block',
+              padding: '4px 14px',
+              borderRadius: '20px',
+              fontSize: '14px',
+              fontWeight: '600',
+              backgroundColor: profile.gender === 'Female' ? '#fce7f3' : '#dbeafe',
+              color: profile.gender === 'Female' ? '#9d174d' : '#1e40af',
+              border: `1px solid ${profile.gender === 'Female' ? '#f9a8d4' : '#93c5fd'}`,
+            }}>
+              {profile.gender || 'Unknown'}
+            </span>
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '24px', fontSize: '14px', color: '#4B5563', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: isMobile ? '12px' : '24px', fontSize: '14px', color: '#4B5563', marginBottom: '16px', flexWrap: 'wrap' }}>
             <span><strong>Member since:</strong> {formatMemberSince(profile.created_at)}</span>
             <span><strong>Completed rides:</strong> {completedRidesCount}</span>
           </div>
@@ -149,7 +122,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
             <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Upcoming Rides by {profile.name}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {rides.map((ride) => (
-                <div key={ride.id} style={{ border: '1px solid #E8EBED', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div key={ride.id} style={{ border: '1px solid #E8EBED', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                   <div>
                     <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', marginBottom: '4px' }}>
                       {ride.departure_location} → {ride.arrival_location}

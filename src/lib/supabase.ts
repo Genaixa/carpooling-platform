@@ -17,6 +17,11 @@ export interface Profile {
   is_verified: boolean;
   is_admin: boolean;
   is_approved_driver: boolean;
+  address_line1: string | null;
+  address_line2: string | null;
+  city: string | null;
+  postcode: string | null;
+  country: string | null;
   average_rating: number | null;
   total_reviews: number;
   created_at: string;
@@ -41,6 +46,7 @@ export interface Ride {
   vehicle_registration: string | null;
   luggage_size: 'none' | 'small' | 'medium' | 'large' | null;
   luggage_count: number | null;
+  existing_occupants: { males: number; females: number; couples: number } | null;
   additional_notes: string | null;
   status: 'upcoming' | 'completed' | 'cancelled';
   created_at: string;
@@ -87,12 +93,26 @@ export interface DriverApplication {
   dbs_check_acknowledged: boolean;
   emergency_contact_name: string;
   emergency_contact_phone: string;
+  bank_account_name: string | null;
+  bank_account_number: string | null;
+  bank_sort_code: string | null;
   status: 'pending' | 'approved' | 'rejected';
   admin_notes: string | null;
   reviewed_by: string | null;
   reviewed_at: string | null;
   created_at: string;
   user?: Profile;
+}
+
+export interface DriverPayout {
+  id: string;
+  driver_id: string;
+  amount: number;
+  admin_id: string;
+  notes: string | null;
+  created_at: string;
+  driver?: Profile;
+  admin?: Profile;
 }
 
 export interface Review {
@@ -110,84 +130,88 @@ export interface Review {
 }
 
 /**
- * CRITICAL: Checks if a passenger can see/book a ride based on travel status + gender compatibility
- * Database uses separate travel_status ('solo'/'couple') and gender ('Male'/'Female') fields
+ * Computes the total car composition: driver (by gender) + existing occupants.
+ */
+export function getCarComposition(
+  driverGender: string | null,
+  existingOccupants: { males: number; females: number; couples: number } | null
+): { males: number; females: number; couples: number } {
+  let males = existingOccupants?.males || 0;
+  let females = existingOccupants?.females || 0;
+  const couples = existingOccupants?.couples || 0;
+
+  // Each couple is 1 man + 1 woman
+  males += couples;
+  females += couples;
+
+  if (driverGender === 'Male') {
+    males += 1;
+  } else if (driverGender === 'Female') {
+    females += 1;
+  }
+
+  return { males, females, couples };
+}
+
+/**
+ * Returns a human-readable summary of who's in the car, e.g. "2 men, 1 woman"
+ */
+export function getCarCompositionLabel(composition: { males: number; females: number; couples: number }): string {
+  const parts: string[] = [];
+  if (composition.males > 0) parts.push(`${composition.males} ${composition.males === 1 ? 'man' : 'men'}`);
+  if (composition.females > 0) parts.push(`${composition.females} ${composition.females === 1 ? 'woman' : 'women'}`);
+  if (composition.couples > 0) parts.push(`${composition.couples} ${composition.couples === 1 ? 'couple' : 'couples'}`);
+  return parts.length > 0 ? parts.join(', ') : 'No occupants listed';
+}
+
+/**
+ * CRITICAL: Checks if a passenger can book a ride based on total car composition.
+ * Each couple counts as 1 man + 1 woman (already expanded in getCarComposition).
  *
  * Rules:
- * - Couples can see ALL rides
- * - Solo Male passengers can see: Solo Male drivers + Couple drivers
- * - Solo Female passengers can see: Solo Female drivers + Couple drivers
- * - Solo males and solo females CANNOT see each other's rides
+ * - Female passenger → compatible if at least 1 female in the car
+ * - Male passenger → compatible if at least 1 male in the car
  */
 export function checkRideCompatibility(
-  passengerTravelStatus: 'solo' | 'couple',
   passengerGender: string | null,
-  driverTravelStatus: 'solo' | 'couple',
-  driverGender: string | null
+  driverGender: string | null,
+  existingOccupants?: { males: number; females: number; couples: number } | null
 ): boolean {
-  // Couples can see all rides
-  if (passengerTravelStatus === 'couple') {
-    return true;
+  const composition = getCarComposition(driverGender, existingOccupants || null);
+
+  if (passengerGender === 'Female') {
+    return composition.females >= 1;
   }
 
-  // Driver is a couple - everyone can see
-  if (driverTravelStatus === 'couple') {
-    return true;
+  if (passengerGender === 'Male') {
+    return composition.males >= 1;
   }
 
-  // Both are solo - must match gender
-  if (passengerTravelStatus === 'solo' && driverTravelStatus === 'solo') {
-    if (passengerGender === 'Male' && driverGender === 'Male') {
-      return true;
-    }
-
-    if (passengerGender === 'Female' && driverGender === 'Female') {
-      return true;
-    }
-
-    // Different genders - not compatible for safety
-    return false;
-  }
-
-  return false;
+  // Unknown gender - allow access
+  return true;
 }
 
 /**
  * Returns a human-readable reason why a ride is incompatible, or null if compatible.
  */
 export function getIncompatibilityReason(
-  passengerTravelStatus: 'solo' | 'couple',
   passengerGender: string | null,
-  driverTravelStatus: 'solo' | 'couple',
-  driverGender: string | null
+  driverGender: string | null,
+  existingOccupants?: { males: number; females: number; couples: number } | null
 ): string | null {
-  if (checkRideCompatibility(passengerTravelStatus, passengerGender, driverTravelStatus, driverGender)) {
+  if (checkRideCompatibility(passengerGender, driverGender, existingOccupants)) {
     return null;
   }
 
-  if (passengerTravelStatus === 'solo' && driverTravelStatus === 'solo') {
-    if (passengerGender === 'Male' && driverGender === 'Female') {
-      return 'This ride is not available for solo male passengers';
-    }
-    if (passengerGender === 'Female' && driverGender === 'Male') {
-      return 'This ride is not available for solo female passengers';
-    }
-    return 'This ride is not compatible with your travel status';
+  if (passengerGender === 'Female') {
+    return 'No women or couples currently in this car';
   }
 
-  return 'This ride is not compatible with your travel status';
-}
-
-export function getTravelStatusLabel(travelStatus: 'solo' | 'couple', gender: string | null, partnerName: string | null): string {
-  if (travelStatus === 'couple' && partnerName) {
-    return `Couple: ${partnerName}`;
+  if (passengerGender === 'Male') {
+    return 'No men or couples currently in this car';
   }
 
-  if (travelStatus === 'solo' && gender) {
-    return `Solo ${gender}`;
-  }
-
-  return 'Status Unknown';
+  return 'This ride is not compatible with your gender';
 }
 
 /**

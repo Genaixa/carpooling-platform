@@ -12,6 +12,12 @@ export type Page =
   | 'public-profile'
   | 'payment-success'
   | 'driver-apply'
-  | 'admin-dashboard';
+  | 'admin-dashboard'
+  | 'how-it-works'
+  | 'terms'
+  | 'contact'
+  | 'privacy-policy'
+  | 'faqs'
+  | 'register-driver';
 
 export type NavigateFn = (page: Page, rideId?: string, userId?: string) => void;

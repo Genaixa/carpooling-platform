@@ -1,15 +1,10 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason } from '../lib/supabase';
+import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarComposition, getCarCompositionLabel } from '../lib/supabase';
 import { NavigateFn } from '../lib/types';
-import { ROUTE_LOCATIONS } from '../lib/constants';
-import Button from '../components/Button';
-import TravelStatusBadge from '../components/TravelStatusBadge';
+import { useIsMobile } from '../hooks/useIsMobile';
 import Loading from '../components/Loading';
-import Avatar from '../components/Avatar';
-import { Input, Select } from '../components/Input';
 import { SkeletonCard } from '../components/SkeletonLoader';
-import ErrorAlert from '../components/ErrorAlert';
 import PaymentModal from '../components/PaymentModal';
 import LocationDropdown from '../components/LocationDropdown';
 import StarRating from '../components/StarRating';
@@ -20,28 +15,23 @@ interface HomeProps {
 }
 
 type SortOption = 'date-asc' | 'date-desc' | 'price-asc' | 'price-desc' | 'seats-desc';
-type DriverType = 'solo-male' | 'solo-female' | 'couple';
-type JourneyType = 'single' | 'return';
-
 interface RideWithCompatibility extends Ride {
   compatible: boolean;
   incompatibilityReason: string | null;
 }
 
 export default function Home({ onNavigate }: HomeProps) {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuth();
+  const isMobile = useIsMobile();
   const [allRides, setAllRides] = useState<RideWithCompatibility[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingRide, setBookingRide] = useState<string | null>(null);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<{[rideId: string]: number}>({});
 
   // Hero booking form state
-  const [journeyType, setJourneyType] = useState<JourneyType>('single');
   const [heroFrom, setHeroFrom] = useState('');
   const [heroTo, setHeroTo] = useState('');
   const [heroDate, setHeroDate] = useState('');
-  const [heroReturnDate, setHeroReturnDate] = useState('');
   const [heroTime, setHeroTime] = useState('');
   const [heroPassengers, setHeroPassengers] = useState('1');
 
@@ -53,25 +43,6 @@ export default function Home({ onNavigate }: HomeProps) {
   const [selectedRide, setSelectedRide] = useState<RideWithCompatibility | null>(null);
   const [seatsForPayment, setSeatsForPayment] = useState(1);
 
-  // Get default driver types based on user compatibility
-  const getDefaultDriverTypes = (): DriverType[] => {
-    if (!profile) return ['solo-male', 'solo-female', 'couple'];
-
-    if (profile.travel_status === 'couple') {
-      return ['solo-male', 'solo-female', 'couple'];
-    }
-
-    if (profile.gender === 'Male') {
-      return ['solo-male', 'couple'];
-    }
-
-    if (profile.gender === 'Female') {
-      return ['solo-female', 'couple'];
-    }
-
-    return ['solo-male', 'solo-female', 'couple'];
-  };
-
   // Load filters - always return empty/unfiltered by default
   const loadFilters = () => {
     return {
@@ -82,7 +53,6 @@ export default function Home({ onNavigate }: HomeProps) {
       priceMin: '', // Empty = no price filter
       priceMax: '', // Empty = no price filter
       seatsNeeded: '',
-      driverTypes: getDefaultDriverTypes(),
       sortBy: 'date-asc' as SortOption,
     };
   };
@@ -95,7 +65,6 @@ export default function Home({ onNavigate }: HomeProps) {
   const [priceMin, setPriceMin] = useState('');
   const [priceMax, setPriceMax] = useState('');
   const [seatsNeeded, setSeatsNeeded] = useState('');
-  const [driverTypes, setDriverTypes] = useState<DriverType[]>(getDefaultDriverTypes());
   const [sortBy, setSortBy] = useState<SortOption>('date-asc');
 
   // Debug: Log profile changes (commented out for production)
@@ -108,23 +77,14 @@ export default function Home({ onNavigate }: HomeProps) {
       id: profile?.id,
       name: profile?.name,
       email: profile?.email,
-      travel_status: profile?.travel_status,
       gender: profile?.gender,
-      partner_name: profile?.partner_name
+      gender: profile?.gender
     });
     */
   }, [user, profile]);
 
   useEffect(() => {
     loadRides();
-  }, [profile]);
-
-  // Update driver types when profile changes
-  useEffect(() => {
-    if (profile) {
-      const defaultTypes = getDefaultDriverTypes();
-      setDriverTypes(defaultTypes);
-    }
   }, [profile]);
 
   // Seat selection helper functions
@@ -148,7 +108,7 @@ export default function Home({ onNavigate }: HomeProps) {
         .from('rides')
         .select(`
           *,
-          driver:profiles(id, name, travel_status, gender, partner_name, profile_photo_url, average_rating, total_reviews, is_approved_driver)
+          driver:profiles(id, name, gender, profile_photo_url, average_rating, total_reviews, is_approved_driver)
         `)
         .eq('status', 'upcoming')
         .gt('seats_available', 0)
@@ -169,18 +129,17 @@ export default function Home({ onNavigate }: HomeProps) {
           compatible = false;
           incompatibilityReason = 'Driver information unavailable';
         } else if (profile) {
+          const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
           compatible = checkRideCompatibility(
-            profile.travel_status,
             profile.gender,
-            ride.driver.travel_status,
-            ride.driver.gender
+            ride.driver.gender,
+            occupants
           );
           if (!compatible) {
             incompatibilityReason = getIncompatibilityReason(
-              profile.travel_status,
               profile.gender,
-              ride.driver.travel_status,
-              ride.driver.gender
+              ride.driver.gender,
+              occupants
             );
           }
         }
@@ -262,30 +221,6 @@ export default function Home({ onNavigate }: HomeProps) {
       }
     }
 
-    // Filter by driver type
-    if (driverTypes.length > 0 && driverTypes.length < 3) {
-      filtered = filtered.filter((ride) => {
-        if (!ride.driver) return false;
-        const driverTravelStatus = ride.driver.travel_status;
-        const driverGender = ride.driver.gender;
-
-        if (driverTravelStatus === 'couple') {
-          return driverTypes.includes('couple');
-        }
-
-        if (driverTravelStatus === 'solo') {
-          if (driverGender === 'Male') {
-            return driverTypes.includes('solo-male');
-          }
-          if (driverGender === 'Female') {
-            return driverTypes.includes('solo-female');
-          }
-        }
-
-        return false;
-      });
-    }
-
     // Sort rides
     filtered.sort((a, b) => {
       switch (sortBy) {
@@ -305,7 +240,27 @@ export default function Home({ onNavigate }: HomeProps) {
     });
 
     return filtered;
-  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, driverTypes, sortBy]);
+  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy]);
+
+  // Group rides by destination, sorted chronologically within groups,
+  // groups ordered by their earliest ride's departure time
+  const groupedRides = useMemo(() => {
+    const groups: Record<string, RideWithCompatibility[]> = {};
+    // First sort all rides chronologically (soonest first)
+    const chronological = [...rides].sort(
+      (a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
+    );
+    chronological.forEach((ride) => {
+      const dest = ride.arrival_location;
+      if (!groups[dest]) groups[dest] = [];
+      groups[dest].push(ride);
+    });
+    // Sort groups by the earliest ride in each group
+    const entries = Object.entries(groups).sort(
+      ([, a], [, b]) => new Date(a[0].date_time).getTime() - new Date(b[0].date_time).getTime()
+    );
+    return entries;
+  }, [rides]);
 
   // Handle hero form submission
   const handleHeroSearch = () => {
@@ -313,11 +268,7 @@ export default function Home({ onNavigate }: HomeProps) {
     setSearchTo(heroTo);
     if (heroDate) {
       setDateMin(heroDate);
-      if (journeyType === 'return' && heroReturnDate) {
-        setDateMax(heroReturnDate);
-      } else if (journeyType === 'single') {
-        setDateMax(heroDate);
-      }
+      setDateMax(heroDate);
     }
     if (heroPassengers) {
       setSeatsNeeded(heroPassengers);
@@ -374,19 +325,8 @@ export default function Home({ onNavigate }: HomeProps) {
     setPriceMin('');
     setPriceMax('');
     setSeatsNeeded('');
-    setDriverTypes(getDefaultDriverTypes());
     setSortBy('date-asc');
     toast.success('All filters cleared');
-  };
-
-  // Toggle driver type
-  const toggleDriverType = (type: DriverType) => {
-    setDriverTypes((prev) => {
-      if (prev.includes(type)) {
-        return prev.filter((t) => t !== type);
-      }
-      return [...prev, type];
-    });
   };
 
   // Get active filter badges
@@ -441,19 +381,6 @@ export default function Home({ onNavigate }: HomeProps) {
       });
     }
 
-    if (driverTypes.length < 3) {
-      const typeLabels = driverTypes.map((t) => {
-        if (t === 'solo-male') return 'Solo Male';
-        if (t === 'solo-female') return 'Solo Female';
-        return 'Couple';
-      }).join(', ');
-      filters.push({
-        key: 'driver',
-        label: `Driver: ${typeLabels}`,
-        onRemove: () => setDriverTypes(getDefaultDriverTypes()),
-      });
-    }
-
     return filters;
   };
 
@@ -502,16 +429,6 @@ export default function Home({ onNavigate }: HomeProps) {
     setBookingRide(null);
   };
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      onNavigate('home');
-    } catch (error) {
-      console.error('Error signing out:', error);
-      toast.error('Error signing out');
-    }
-  };
-
   // Helper to get luggage label
   const getLuggageLabel = (size: string) => {
     switch (size) {
@@ -525,436 +442,11 @@ export default function Home({ onNavigate }: HomeProps) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      {/* Navigation Bar */}
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px', position: 'relative' }}>
-            {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-              <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-            </div>
-
-            {/* Desktop Navigation */}
-            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              <button
-                onClick={() => document.getElementById('rides-section')?.scrollIntoView({ behavior: 'smooth' })}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#4B5563',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  fontWeight: '500',
-                  transition: 'color 0.3s'
-                }}
-              >
-                Find a Ride
-              </button>
-              {user && profile?.is_approved_driver ? (
-                <button
-                  onClick={() => onNavigate('post-ride')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#4B5563',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'color 0.3s'
-                  }}
-                >
-                  Post a Ride
-                </button>
-              ) : user ? (
-                <button
-                  onClick={() => onNavigate('driver-apply')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#4B5563',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'color 0.3s'
-                  }}
-                >
-                  Become a Driver
-                </button>
-              ) : (
-                <button
-                  onClick={() => onNavigate('post-ride')}
-                  style={{
-                    background: 'none',
-                    border: 'none',
-                    color: '#4B5563',
-                    fontSize: '16px',
-                    cursor: 'pointer',
-                    fontWeight: '500',
-                    transition: 'color 0.3s'
-                  }}
-                >
-                  Post a Ride
-                </button>
-              )}
-              <button
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  color: '#4B5563',
-                  fontSize: '16px',
-                  cursor: 'pointer',
-                  fontWeight: '500',
-                  transition: 'color 0.3s'
-                }}
-              >
-                How it Works
-              </button>
-              {user && (
-                <>
-                  <button
-                    onClick={() => onNavigate('my-bookings')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#4B5563',
-                      fontSize: '16px',
-                      cursor: 'pointer',
-                      fontWeight: '500',
-                      transition: 'color 0.3s'
-                    }}
-                  >
-                    My Bookings
-                  </button>
-                  <button
-                    onClick={() => onNavigate('dashboard')}
-                    style={{
-                      background: 'none',
-                      border: 'none',
-                      color: '#4B5563',
-                      fontSize: '16px',
-                      cursor: 'pointer',
-                      fontWeight: '500',
-                      transition: 'color 0.3s'
-                    }}
-                  >
-                    Dashboard
-                  </button>
-                  {profile?.is_admin && (
-                    <button
-                      onClick={() => onNavigate('admin-dashboard')}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#1A9D9D',
-                        fontSize: '16px',
-                        cursor: 'pointer',
-                        fontWeight: '600',
-                        transition: 'color 0.3s'
-                      }}
-                    >
-                      Admin
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-
-            {/* Auth Buttons */}
-            {user ? (
-              <div style={{ position: 'absolute', right: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                {profile && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Avatar
-                      photoUrl={profile.profile_photo_url}
-                      name={profile.name}
-                      size="sm"
-                    />
-                    <span style={{ fontSize: '14px', color: '#4B5563', fontWeight: '500' }}>{profile.name}</span>
-                  </div>
-                )}
-                <button
-                  onClick={handleSignOut}
-                  style={{
-                    padding: '10px 24px',
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                    color: 'white',
-                    borderRadius: '25px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
-                    transition: 'transform 0.3s'
-                  }}
-                >
-                  Sign Out
-                </button>
-              </div>
-            ) : (
-              <div style={{ position: 'absolute', right: '20px', display: 'flex', gap: '15px' }}>
-                <button
-                  onClick={() => onNavigate('login')}
-                  style={{
-                    padding: '10px 24px',
-                    background: 'none',
-                    color: '#1A9D9D',
-                    border: '2px solid #1A9D9D',
-                    borderRadius: '25px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.3s'
-                  }}
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => onNavigate('register')}
-                  style={{
-                    padding: '10px 24px',
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                    color: 'white',
-                    borderRadius: '25px',
-                    fontSize: '16px',
-                    fontWeight: '600',
-                    border: 'none',
-                    cursor: 'pointer',
-                    boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
-                    transition: 'transform 0.3s'
-                  }}
-                >
-                  Sign Up
-                </button>
-              </div>
-            )}
-
-            {/* Mobile Menu Button */}
-            <button
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{
-                display: 'none',
-                padding: '8px',
-                color: '#6B7280',
-                background: 'none',
-                border: 'none',
-                cursor: 'pointer'
-              }}
-            >
-              <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {mobileMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
-            </button>
-          </div>
-
-          {/* Mobile Menu */}
-          {mobileMenuOpen && (
-            <div style={{
-              padding: '16px 0',
-              borderTop: '1px solid #E8EBED',
-              backgroundColor: 'white'
-            }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <button
-                  onClick={() => {
-                    document.getElementById('rides-section')?.scrollIntoView({ behavior: 'smooth' });
-                    setMobileMenuOpen(false);
-                  }}
-                  style={{
-                    textAlign: 'left',
-                    color: '#4B5563',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    padding: '8px 0'
-                  }}
-                >
-                  Find a Ride
-                </button>
-                {user && profile?.is_approved_driver ? (
-                  <button
-                    onClick={() => {
-                      onNavigate('post-ride');
-                      setMobileMenuOpen(false);
-                    }}
-                    style={{
-                      textAlign: 'left',
-                      color: '#4B5563',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      padding: '8px 0'
-                    }}
-                  >
-                    Post a Ride
-                  </button>
-                ) : user ? (
-                  <button
-                    onClick={() => {
-                      onNavigate('driver-apply');
-                      setMobileMenuOpen(false);
-                    }}
-                    style={{
-                      textAlign: 'left',
-                      color: '#4B5563',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      padding: '8px 0'
-                    }}
-                  >
-                    Become a Driver
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      onNavigate('post-ride');
-                      setMobileMenuOpen(false);
-                    }}
-                    style={{
-                      textAlign: 'left',
-                      color: '#4B5563',
-                      background: 'none',
-                      border: 'none',
-                      fontSize: '14px',
-                      cursor: 'pointer',
-                      padding: '8px 0'
-                    }}
-                  >
-                    Post a Ride
-                  </button>
-                )}
-                <button
-                  style={{
-                    textAlign: 'left',
-                    color: '#4B5563',
-                    background: 'none',
-                    border: 'none',
-                    fontSize: '14px',
-                    cursor: 'pointer',
-                    padding: '8px 0'
-                  }}
-                >
-                  How it Works
-                </button>
-                {user ? (
-                  <>
-                    <button
-                      onClick={() => onNavigate('my-bookings')}
-                      style={{
-                        textAlign: 'left',
-                        color: '#4B5563',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: '8px 0'
-                      }}
-                    >
-                      My Bookings
-                    </button>
-                    <button
-                      onClick={() => onNavigate('dashboard')}
-                      style={{
-                        textAlign: 'left',
-                        color: '#4B5563',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: '8px 0'
-                      }}
-                    >
-                      Dashboard
-                    </button>
-                    {profile?.is_admin && (
-                      <button
-                        onClick={() => {
-                          onNavigate('admin-dashboard');
-                          setMobileMenuOpen(false);
-                        }}
-                        style={{
-                          textAlign: 'left',
-                          color: '#1A9D9D',
-                          background: 'none',
-                          border: 'none',
-                          fontSize: '14px',
-                          cursor: 'pointer',
-                          fontWeight: '600',
-                          padding: '8px 0'
-                        }}
-                      >
-                        Admin
-                      </button>
-                    )}
-                    <button
-                      onClick={handleSignOut}
-                      style={{
-                        textAlign: 'left',
-                        color: '#4B5563',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: '8px 0'
-                      }}
-                    >
-                      Sign Out
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <button
-                      onClick={() => onNavigate('login')}
-                      style={{
-                        textAlign: 'left',
-                        color: '#4B5563',
-                        background: 'none',
-                        border: 'none',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: '8px 0'
-                      }}
-                    >
-                      Sign In
-                    </button>
-                    <button
-                      onClick={() => onNavigate('register')}
-                      style={{
-                        padding: '10px 16px',
-                        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                        color: 'white',
-                        borderRadius: '25px',
-                        fontSize: '14px',
-                        fontWeight: '600',
-                        border: 'none',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
-                        textAlign: 'center',
-                        marginTop: '8px'
-                      }}
-                    >
-                      Register
-                    </button>
-                  </>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      </nav>
-
       {/* Hero Section with Background */}
       <section style={{
         background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
         color: 'white',
-        padding: '64px 20px',
+        padding: isMobile ? '32px 16px' : '64px 20px',
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -966,11 +458,11 @@ export default function Home({ onNavigate }: HomeProps) {
         <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 10 }}>
           {/* Hero Tagline */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h2 style={{ fontSize: '36px', fontWeight: 'bold', marginBottom: '16px', letterSpacing: '-0.5px' }}>
-              If you know, you go Carpooling
+            <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '-0.5px' }}>
+              Chap A Ride - Share a Ride
             </h2>
-            <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.9)', maxWidth: '600px', margin: '0 auto' }}>
-              Affordable rides across the UK. Low fares from £5.
+            <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(255, 255, 255, 0.9)', maxWidth: '600px', margin: '0 auto' }}>
+              Affordable Rides Across the UK
             </p>
           </div>
 
@@ -978,82 +470,57 @@ export default function Home({ onNavigate }: HomeProps) {
           <div style={{ maxWidth: '900px', margin: '0 auto' }}>
             <div style={{
               backgroundColor: 'white',
-              borderRadius: '20px',
-              padding: '32px',
+              borderRadius: isMobile ? '16px' : '20px',
+              padding: isMobile ? '20px' : '32px',
               boxShadow: '0 20px 60px rgba(0,0,0,0.15)'
             }}>
-              {/* Journey Type Tabs - Pills Style */}
-              <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
-                <button
-                  onClick={() => setJourneyType('single')}
-                  style={{
-                    padding: '10px 24px',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    borderRadius: '50px',
-                    transition: 'all 0.3s',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: journeyType === 'single' ? '#1F2937' : '#F3F4F6',
-                    color: journeyType === 'single' ? 'white' : '#374151'
-                  }}
-                >
-                  Single
-                </button>
-                <button
-                  onClick={() => setJourneyType('return')}
-                  style={{
-                    padding: '10px 24px',
-                    fontWeight: '600',
-                    fontSize: '14px',
-                    borderRadius: '50px',
-                    transition: 'all 0.3s',
-                    border: 'none',
-                    cursor: 'pointer',
-                    backgroundColor: journeyType === 'return' ? '#1F2937' : '#F3F4F6',
-                    color: journeyType === 'return' ? 'white' : '#374151'
-                  }}
-                >
-                  Return
-                </button>
-              </div>
-
               {/* Form Fields */}
               <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
                 {/* From/To Locations Group */}
                 <div style={{ position: 'relative' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: isMobile ? '8px' : '16px' }}>
                     <LocationDropdown
                       value={heroFrom}
                       onChange={setHeroFrom}
                       label="From"
                       placeholder="Select departure location"
                     />
-                    {/* Floating Swap Button */}
-                    <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
-                      <button
-                        onClick={swapLocations}
-                        style={{
-                          backgroundColor: '#1A9D9D',
-                          borderRadius: '50%',
-                          width: '32px',
-                          height: '32px',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          transition: 'all 0.3s',
-                          boxShadow: '0 4px 12px rgba(26, 157, 157, 0.3)',
-                          border: '4px solid white',
-                          borderWidth: '4px',
-                          cursor: 'pointer'
-                        }}
-                        title="Swap locations"
-                      >
-                        <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                      </button>
-                    </div>
+                    {/* Swap Button */}
+                    {isMobile ? (
+                      <div style={{ display: 'flex', justifyContent: 'center', margin: '-4px 0' }}>
+                        <button
+                          onClick={swapLocations}
+                          style={{
+                            backgroundColor: '#1A9D9D', borderRadius: '50%',
+                            width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: '0 4px 12px rgba(26, 157, 157, 0.3)', border: '3px solid white', cursor: 'pointer',
+                            transform: 'rotate(90deg)',
+                          }}
+                          title="Swap locations"
+                        >
+                          <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                        </button>
+                      </div>
+                    ) : (
+                      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%, -50%)', zIndex: 10 }}>
+                        <button
+                          onClick={swapLocations}
+                          style={{
+                            backgroundColor: '#1A9D9D', borderRadius: '50%',
+                            width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            transition: 'all 0.3s', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.3)',
+                            border: '4px solid white', cursor: 'pointer',
+                          }}
+                          title="Swap locations"
+                        >
+                          <svg style={{ width: '16px', height: '16px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
                     <LocationDropdown
                       value={heroTo}
                       onChange={setHeroTo}
@@ -1064,10 +531,10 @@ export default function Home({ onNavigate }: HomeProps) {
                 </div>
 
                 {/* Date and Time Group */}
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                      Outbound Date
+                      Date
                     </label>
                     <input
                       type="date"
@@ -1089,32 +556,6 @@ export default function Home({ onNavigate }: HomeProps) {
                       onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                     />
                   </div>
-                  {journeyType === 'return' && (
-                    <div>
-                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                        Return Date
-                      </label>
-                      <input
-                        type="date"
-                        value={heroReturnDate}
-                        onChange={(e) => setHeroReturnDate(e.target.value)}
-                        min={heroDate || getTodayDate()}
-                        style={{
-                          width: '100%',
-                          padding: '12px 16px',
-                          border: '2px solid #E5E7EB',
-                          borderRadius: '12px',
-                          outline: 'none',
-                          fontSize: '16px',
-                          fontWeight: '500',
-                          color: '#111827',
-                          transition: 'border-color 0.3s'
-                        }}
-                        onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
-                        onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-                      />
-                    </div>
-                  )}
                   <div>
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
                       Time
@@ -1213,7 +654,7 @@ export default function Home({ onNavigate }: HomeProps) {
       {/* Feature Cards Section */}
       <section style={{ padding: '48px 20px', backgroundColor: '#F8FAFB' }}>
         <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '24px' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr 1fr', gap: isMobile ? '12px' : '24px' }}>
             {/* Feature Card 1 */}
             <div style={{
               backgroundColor: 'white',
@@ -1248,7 +689,7 @@ export default function Home({ onNavigate }: HomeProps) {
               </div>
               <h3 style={{ fontSize: '18px', fontWeight: 'bold', color: '#1F2937', marginBottom: '8px' }}>Low Fares</h3>
               <p style={{ fontSize: '14px', color: '#4B5563' }}>
-                Affordable rides starting from just £5. Save money on your journey.
+                Affordable rides at great prices. Save money on every journey.
               </p>
             </div>
 
@@ -1369,353 +810,391 @@ export default function Home({ onNavigate }: HomeProps) {
         </div>
       </section>
 
+      {/* Become a Driver CTA */}
+      {(!user || (user && profile && !profile.is_approved_driver)) && (
+        <section style={{
+          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+          padding: isMobile ? '40px 16px' : '56px 20px',
+        }}>
+          <div style={{
+            maxWidth: '800px',
+            margin: '0 auto',
+            display: 'flex',
+            flexDirection: isMobile ? 'column' : 'row',
+            alignItems: 'center',
+            gap: isMobile ? '24px' : '40px',
+          }}>
+            <div style={{
+              width: isMobile ? '64px' : '80px',
+              height: isMobile ? '64px' : '80px',
+              backgroundColor: 'rgba(255,255,255,0.2)',
+              borderRadius: '50%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <svg style={{ width: isMobile ? '32px' : '40px', height: isMobile ? '32px' : '40px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
+            </div>
+            <div style={{ flex: 1, textAlign: isMobile ? 'center' : 'left' }}>
+              <h2 style={{
+                fontSize: isMobile ? '24px' : '32px',
+                fontWeight: 'bold',
+                color: 'white',
+                marginBottom: '8px',
+              }}>
+                Want to drive?
+              </h2>
+              <p style={{
+                fontSize: isMobile ? '15px' : '17px',
+                color: 'rgba(255,255,255,0.9)',
+                lineHeight: '1.6',
+                margin: 0,
+              }}>
+                Earn money by sharing your journey. Post your route, set your price, and pick up passengers heading your way.
+              </p>
+            </div>
+            <button
+              onClick={() => onNavigate(user ? 'driver-apply' : 'register-driver')}
+              style={{
+                padding: isMobile ? '14px 32px' : '16px 40px',
+                backgroundColor: 'white',
+                color: '#1A9D9D',
+                borderRadius: '50px',
+                fontSize: isMobile ? '16px' : '18px',
+                fontWeight: '700',
+                border: 'none',
+                cursor: 'pointer',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                whiteSpace: 'nowrap',
+                flexShrink: 0,
+              }}
+            >
+              {user ? 'Become a Driver' : 'Sign Up to Drive'}
+            </button>
+          </div>
+        </section>
+      )}
+
       {/* Rides Section */}
       <main id="rides-section" style={{
-        maxWidth: '1400px',
+        maxWidth: '900px',
         margin: '0 auto',
-        padding: '32px 20px',
-        backgroundColor: '#F8FAFB',
-        minHeight: '100vh'
+        padding: '48px 20px 64px',
       }}>
         {/* Header */}
-        <div style={{ marginBottom: '24px' }}>
-          <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '4px' }}>
+        <div style={{ marginBottom: '32px', textAlign: 'center' }}>
+          <h2 style={{ fontSize: '32px', fontWeight: 'bold', color: '#1F2937', marginBottom: '8px' }}>
             Available Rides
           </h2>
-          {profile && (
-            <p style={{ fontSize: '14px', color: '#4B5563' }}>
-              Showing all rides - incompatible rides are greyed out
-              {profile && ` (You are ${profile.travel_status} ${profile.gender || ''})`}
-            </p>
-          )}
+          <p style={{ fontSize: '15px', color: '#6B7280' }}>
+            {rides.length} {rides.length === 1 ? 'ride' : 'rides'} found
+            {profile && <span> &middot; Incompatible rides are greyed out</span>}
+          </p>
           {!user && (
             <div style={{
-              marginTop: '12px',
-              backgroundColor: 'white',
-              border: '1px solid #1A9D9D',
-              borderRadius: '12px',
-              boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-              padding: '12px'
+              marginTop: '16px',
+              background: 'linear-gradient(135deg, rgba(26,157,157,0.08) 0%, rgba(139,195,74,0.08) 100%)',
+              border: '1px solid rgba(26,157,157,0.2)',
+              borderRadius: '16px',
+              padding: '14px 20px',
+              display: 'inline-block'
             }}>
-              <p style={{ fontSize: '14px', color: '#1F2937', fontWeight: '500' }}>
-                Sign in to see rides compatible with your travel status and book rides.
+              <p style={{ fontSize: '14px', color: '#1F2937', fontWeight: '500', margin: 0 }}>
+                Sign in to see compatible rides and book your journey
               </p>
             </div>
           )}
         </div>
 
-        {/* Main Content: Sidebar + Rides List */}
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Rides List - Right Side */}
-          <div style={{ flex: 1 }}>
-            <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ fontSize: '14px', color: '#4B5563', fontWeight: '600' }}>
-                <span style={{ color: '#1F2937', fontWeight: 'bold' }}>{rides.length}</span> {rides.length === 1 ? 'ride' : 'rides'} found
-              </div>
+        {loading ? (
+          <div style={{ display: 'grid', gap: '20px' }}>
+            {[1, 2, 3].map((i) => (
+              <SkeletonCard key={i} />
+            ))}
+          </div>
+        ) : rides.length === 0 ? (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '24px',
+            boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+            padding: isMobile ? '40px 20px' : '64px 32px',
+            textAlign: 'center'
+          }}>
+            <div style={{ fontSize: '48px', marginBottom: '16px' }}>
+              <svg style={{ width: '48px', height: '48px', color: '#D1D5DB', margin: '0 auto' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+              </svg>
             </div>
+            <p style={{ color: '#6B7280', fontSize: '16px', marginBottom: '16px' }}>
+              {allRides.length === 0
+                ? 'No rides available at the moment.'
+                : 'No rides match your search criteria.'}
+            </p>
+            {allRides.length > 0 && (
+              <button
+                onClick={clearAllFilters}
+                style={{
+                  fontSize: '15px',
+                  color: 'white',
+                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  border: 'none',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  padding: '12px 28px',
+                  borderRadius: '50px'
+                }}
+              >
+                Clear All Filters
+              </button>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
+            {groupedRides.map(([destination, destRides]) => (
+              <div
+                key={destination}
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: '20px',
+                  boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+                  overflow: 'hidden',
+                }}
+              >
+                {/* Destination Header */}
+                <div style={{
+                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  padding: isMobile ? '16px 20px' : '18px 28px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <svg style={{ width: '20px', height: '20px', color: 'white', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '700', color: 'white', margin: 0 }}>
+                      {destination}
+                    </h3>
+                  </div>
+                  <span style={{
+                    fontSize: '13px',
+                    color: 'rgba(255,255,255,0.9)',
+                    fontWeight: '600',
+                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    padding: '4px 12px',
+                    borderRadius: '20px',
+                  }}>
+                    {destRides.length} {destRides.length === 1 ? 'ride' : 'rides'}
+                  </span>
+                </div>
 
-            {loading ? (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {[1, 2, 3, 4, 5, 6].map((i) => (
-                  <SkeletonCard key={i} />
-                ))}
-              </div>
-            ) : rides.length === 0 ? (
-              <div style={{
-                backgroundColor: 'white',
-                borderRadius: '20px',
-                border: '1px solid #E8EBED',
-                boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-                padding: '48px',
-                textAlign: 'center'
-              }}>
-                <p style={{ color: '#6B7280', marginBottom: '16px' }}>
-                  {allRides.length === 0
-                    ? 'No rides available at the moment.'
-                    : 'No rides match your search criteria. Try adjusting your filters.'}
-                </p>
-                {allRides.length > 0 && (
-                  <button
-                    onClick={clearAllFilters}
-                    style={{
-                      marginTop: '16px',
-                      fontSize: '14px',
-                      color: '#1A9D9D',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      fontWeight: '500'
-                    }}
-                  >
-                    Clear All Filters
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div style={{ display: 'grid', gap: '16px' }}>
-                {rides.map((ride) => (
-                  <div
-                    key={ride.id}
-                    style={{
-                      backgroundColor: 'white',
-                      borderRadius: '20px',
-                      border: '1px solid #E8EBED',
-                      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-                      padding: '24px',
-                      transition: 'transform 0.3s, box-shadow 0.3s',
-                      opacity: ride.compatible ? 1 : 0.5,
-                      position: 'relative',
-                    }}
-                    onMouseOver={(e) => {
-                      if (ride.compatible) {
-                        e.currentTarget.style.transform = 'translateY(-4px)';
-                        e.currentTarget.style.boxShadow = '0 8px 25px rgba(0,0,0,0.1)';
-                      }
-                    }}
-                    onMouseOut={(e) => {
-                      e.currentTarget.style.transform = 'translateY(0)';
-                      e.currentTarget.style.boxShadow = '0 4px 20px rgba(0,0,0,0.06)';
-                    }}
-                  >
-                    {/* Incompatibility Banner */}
-                    {!ride.compatible && ride.incompatibilityReason && (
-                      <div style={{
-                        backgroundColor: '#FEF3C7',
-                        border: '1px solid #F59E0B',
-                        borderRadius: '12px',
-                        padding: '10px 16px',
-                        marginBottom: '16px',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                      }}>
-                        <svg style={{ width: '16px', height: '16px', color: '#D97706', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                        <span style={{ fontSize: '13px', color: '#92400E', fontWeight: '500' }}>
-                          {ride.incompatibilityReason}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Grid Layout: Driver Info | Journey Details | Price/CTA */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '24px' }}>
-                      {/* Driver Info - Top */}
-                      {ride.driver && (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <Avatar
-                              photoUrl={ride.driver.profile_photo_url}
-                              name={ride.driver.name}
-                              size="sm"
-                            />
-                            <div>
-                              <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937' }}>
-                                <button
-                                  onClick={() => onNavigate('public-profile', undefined, ride.driver.id)}
-                                  style={{
-                                    color: '#1A9D9D',
-                                    background: 'none',
-                                    border: 'none',
-                                    cursor: 'pointer',
-                                    fontSize: '14px',
-                                    fontWeight: '600'
-                                  }}
-                                >
-                                  {ride.driver.name}
-                                </button>
-                              </p>
-                              <TravelStatusBadge
-                                travelStatus={ride.driver.travel_status}
-                                gender={ride.driver.gender}
-                                partnerName={ride.driver.partner_name}
-                                className="text-xs mt-1"
-                              />
-                              {/* Driver Rating */}
-                              {ride.driver.average_rating != null && ride.driver.average_rating > 0 && (
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                                  <StarRating rating={ride.driver.average_rating} size="sm" />
-                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                                    ({ride.driver.average_rating.toFixed(1)})
-                                  </span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
+                {/* Rides within this destination */}
+                <div>
+                  {destRides.map((ride, rideIdx) => (
+                    <div
+                      key={ride.id}
+                      style={{
+                        padding: isMobile ? '16px 20px' : '20px 28px',
+                        borderBottom: rideIdx < destRides.length - 1 ? '1px solid #F3F4F6' : 'none',
+                        opacity: ride.compatible ? 1 : 0.5,
+                        position: 'relative',
+                        transition: 'background-color 0.2s',
+                      }}
+                      onMouseOver={(e) => { if (ride.compatible) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                    >
+                      {/* Incompatibility notice */}
+                      {!ride.compatible && ride.incompatibilityReason && (
+                        <div style={{
+                          display: 'flex', alignItems: 'center', gap: '6px',
+                          marginBottom: '10px', padding: '6px 12px',
+                          backgroundColor: '#FEF3C7', borderRadius: '8px',
+                          width: 'fit-content',
+                        }}>
+                          <svg style={{ width: '14px', height: '14px', color: '#D97706', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                          </svg>
+                          <span style={{ fontSize: '12px', color: '#92400E', fontWeight: '500' }}>{ride.incompatibilityReason}</span>
                         </div>
                       )}
 
-                      {/* Journey Details - Center */}
-                      <div>
-                        <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1F2937', marginBottom: '8px' }}>
-                          {ride.departure_location} → {ride.arrival_location}
-                        </h3>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '14px', color: '#4B5563' }}>
-                          <p>
-                            <span style={{ fontWeight: '600', color: '#1F2937' }}>Date & Time:</span>{' '}
-                            {new Date(ride.date_time).toLocaleString()}
-                          </p>
-                          <p>
-                            <span style={{ fontWeight: '600', color: '#1F2937' }}>Available Seats:</span>{' '}
-                            {ride.seats_available}
-                          </p>
-                          {ride.departure_spot && (
-                            <p>
-                              <span style={{ fontWeight: '600', color: '#1F2937' }}>Pickup:</span> {ride.departure_spot}
-                            </p>
-                          )}
-                          {ride.arrival_spot && (
-                            <p>
-                              <span style={{ fontWeight: '600', color: '#1F2937' }}>Drop-off:</span> {ride.arrival_spot}
-                            </p>
-                          )}
-                          {/* Luggage Info */}
-                          {ride.luggage_size && ride.luggage_size !== 'none' && (
-                            <p>
-                              <span style={{ fontWeight: '600', color: '#1F2937' }}>Luggage:</span>{' '}
-                              {getLuggageLabel(ride.luggage_size)}
-                              {ride.luggage_count != null && ride.luggage_count > 0 && (
-                                <span> - {ride.luggage_count} item{ride.luggage_count !== 1 ? 's' : ''} allowed</span>
-                              )}
-                            </p>
-                          )}
-                          {ride.additional_notes && (
-                            <p style={{ fontSize: '12px', color: '#6B7280', fontStyle: 'italic', marginTop: '4px' }}>
-                              {ride.additional_notes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Price & CTA - Bottom */}
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid #F3F4F6', paddingTop: '16px' }}>
-                        <div>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <div>
-                              <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937' }}>£{ride.price_per_seat}</p>
-                              <p style={{ fontSize: '12px', color: '#4B5563' }}>per seat</p>
-                              <p style={{ fontSize: '14px', color: '#4B5563', marginTop: '4px' }}>
-                                Total for {getSelectedSeats(ride.id)} seat{getSelectedSeats(ride.id) !== 1 ? 's' : ''}:
-                                <span style={{ fontWeight: 'bold', color: '#1F2937' }}> £{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}</span>
-                              </p>
-                            </div>
+                      {/* Main row: From + details + price + actions */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: isMobile ? 'flex-start' : 'center',
+                        gap: isMobile ? '12px' : '20px',
+                        flexDirection: isMobile ? 'column' : 'row',
+                      }}>
+                        {/* Left: Route + schedule */}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          {/* From → To */}
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>
+                              {ride.departure_location}
+                            </span>
+                            <svg style={{ width: '16px', height: '16px', color: '#9CA3AF', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
+                            </svg>
+                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>
+                              {ride.arrival_location}
+                            </span>
                           </div>
 
-                          {/* Seat Selector - Numeric Input */}
-                          {ride.seats_available > 1 && (
-                            <div style={{ width: '100%', marginTop: '12px' }}>
-                              <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#1F2937', marginBottom: '4px' }}>
-                                Seats to book:
-                              </label>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <button
-                                  onClick={() => {
-                                    const current = getSelectedSeats(ride.id);
-                                    if (current > 1) handleSeatChange(ride.id, current - 1);
-                                  }}
-                                  style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: '#F3F4F6',
-                                    borderRadius: '12px',
-                                    color: '#374151',
-                                    border: 'none',
-                                    cursor: 'pointer'
-                                  }}
-                                  disabled={getSelectedSeats(ride.id) <= 1}
-                                >
-                                  −
-                                </button>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max={ride.seats_available}
-                                  value={getSelectedSeats(ride.id)}
-                                  onChange={(e) => {
-                                    const value = parseInt(e.target.value);
-                                    if (!isNaN(value) && value >= 1 && value <= ride.seats_available) {
-                                      handleSeatChange(ride.id, value);
-                                    }
-                                  }}
-                                  style={{
-                                    flex: 1,
-                                    padding: '8px 12px',
-                                    border: '1px solid #D1D5DB',
-                                    borderRadius: '12px',
-                                    textAlign: 'center',
-                                    color: '#111827',
-                                    fontSize: '14px'
-                                  }}
-                                />
-                                <button
-                                  onClick={() => {
-                                    const current = getSelectedSeats(ride.id);
-                                    if (current < ride.seats_available) handleSeatChange(ride.id, current + 1);
-                                  }}
-                                  style={{
-                                    width: '32px',
-                                    height: '32px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    backgroundColor: '#F3F4F6',
-                                    borderRadius: '12px',
-                                    color: '#374151',
-                                    border: 'none',
-                                    cursor: 'pointer'
-                                  }}
-                                  disabled={getSelectedSeats(ride.id) >= ride.seats_available}
-                                >
-                                  +
-                                </button>
-                              </div>
-                              <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px', textAlign: 'center' }}>
-                                Max: {ride.seats_available} seats
-                              </p>
+                          {/* Meta pills */}
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              fontSize: '13px', color: '#374151', fontWeight: '500',
+                              backgroundColor: '#F3F4F6', padding: '3px 10px', borderRadius: '6px',
+                            }}>
+                              <svg style={{ width: '13px', height: '13px', color: '#6B7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              {new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                            </span>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              fontSize: '13px', color: '#374151', fontWeight: '600',
+                              backgroundColor: '#F3F4F6', padding: '3px 10px', borderRadius: '6px',
+                            }}>
+                              <svg style={{ width: '13px', height: '13px', color: '#6B7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            <span style={{
+                              display: 'inline-flex', alignItems: 'center', gap: '4px',
+                              fontSize: '13px', color: '#374151', fontWeight: '500',
+                              backgroundColor: '#F0FDFA', padding: '3px 10px', borderRadius: '6px',
+                            }}>
+                              <svg style={{ width: '13px', height: '13px', color: '#1A9D9D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                              </svg>
+                              {ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''}
+                            </span>
+                            {ride.luggage_size && ride.luggage_size !== 'none' && (
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', gap: '4px',
+                                fontSize: '13px', color: '#374151', fontWeight: '500',
+                                backgroundColor: '#F3F4F6', padding: '3px 10px', borderRadius: '6px',
+                              }}>
+                                {getLuggageLabel(ride.luggage_size)}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Driver row */}
+                          {ride.driver && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
+                              <button
+                                onClick={() => onNavigate('public-profile', undefined, ride.driver.id)}
+                                style={{ color: '#1A9D9D', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: 0 }}
+                              >
+                                {ride.driver.name}
+                              </button>
+                              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
+                              <span style={{ fontSize: '12px', color: '#6B7280' }}>
+                                {getCarCompositionLabel(getCarComposition(ride.driver.gender, ride.existing_occupants as { males: number; females: number; couples: number } | null))}
+                              </span>
+                              {ride.driver.average_rating != null && ride.driver.average_rating > 0 && (
+                                <>
+                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <StarRating rating={ride.driver.average_rating} size="sm" />
+                                    <span style={{ fontSize: '12px', color: '#6B7280' }}>{ride.driver.average_rating.toFixed(1)}</span>
+                                  </div>
+                                </>
+                              )}
                             </div>
                           )}
                         </div>
 
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%' }}>
-                          <Button
+                        {/* Right: Price + actions */}
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: isMobile ? '10px' : '16px',
+                          flexShrink: 0,
+                          flexWrap: 'wrap',
+                          width: isMobile ? '100%' : 'auto',
+                          justifyContent: isMobile ? 'space-between' : 'flex-end',
+                        }}>
+                          {/* Price */}
+                          <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
+                            <span style={{ fontSize: '22px', fontWeight: '800', color: '#1F2937' }}>
+                              £{ride.price_per_seat.toFixed(2)}
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#6B7280', marginLeft: '4px' }}>/ seat</span>
+                          </div>
+
+                          {/* Seat selector */}
+                          {ride.seats_available > 1 && (
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button
+                                onClick={() => { const c = getSelectedSeats(ride.id); if (c > 1) handleSeatChange(ride.id, c - 1); }}
+                                disabled={getSelectedSeats(ride.id) <= 1}
+                                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
+                              >-</button>
+                              <span style={{ width: '24px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1F2937' }}>
+                                {getSelectedSeats(ride.id)}
+                              </span>
+                              <button
+                                onClick={() => { const c = getSelectedSeats(ride.id); if (c < ride.seats_available) handleSeatChange(ride.id, c + 1); }}
+                                disabled={getSelectedSeats(ride.id) >= ride.seats_available}
+                                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
+                              >+</button>
+                            </div>
+                          )}
+
+                          {/* Total if multi-seat */}
+                          {getSelectedSeats(ride.id) > 1 && (
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#1A9D9D' }}>
+                              = £{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}
+                            </span>
+                          )}
+
+                          {/* Book */}
+                          <button
                             onClick={() => handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id))}
                             disabled={bookingRide === ride.id || !user || !ride.compatible}
-                            style={{ width: '100%' }}
+                            style={{
+                              padding: '8px 22px', borderRadius: '50px', border: 'none',
+                              fontWeight: '700', fontSize: '13px',
+                              cursor: (bookingRide === ride.id || !user || !ride.compatible) ? 'not-allowed' : 'pointer',
+                              background: (!user || !ride.compatible) ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                              color: 'white',
+                              boxShadow: (!user || !ride.compatible) ? 'none' : '0 3px 10px rgba(26,157,157,0.2)',
+                              transition: 'all 0.3s', whiteSpace: 'nowrap',
+                            }}
                           >
-                            {!ride.compatible
-                              ? 'Not Available'
-                              : bookingRide === ride.id
-                              ? `Booking ${getSelectedSeats(ride.id)} seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}...`
-                              : user
-                              ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}`
-                              : 'Sign in to Book'}
-                          </Button>
+                            {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Sign in'}
+                          </button>
+
+                          {/* Details */}
                           <button
                             onClick={() => onNavigate('ride-details', ride.id)}
                             style={{
-                              fontSize: '14px',
-                              color: '#1A9D9D',
-                              background: 'none',
-                              border: 'none',
-                              cursor: 'pointer',
-                              fontWeight: '600',
-                              textAlign: 'center'
+                              fontSize: '13px', color: '#6B7280', background: 'none',
+                              border: '1px solid #E5E7EB', borderRadius: '50px',
+                              cursor: 'pointer', fontWeight: '600', padding: '8px 16px',
+                              whiteSpace: 'nowrap', transition: 'all 0.3s',
                             }}
                           >
-                            View Details
+                            Details
                           </button>
                         </div>
                       </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            )}
+            ))}
           </div>
-        </div>
+        )}
       </main>
 
       {/* Square Payment Modal */}

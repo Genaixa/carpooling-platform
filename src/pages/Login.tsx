@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 
 interface LoginProps {
@@ -8,10 +10,34 @@ interface LoginProps {
 
 export default function Login({ onNavigate }: LoginProps) {
   const { signIn } = useAuth();
+  const isMobile = useIsMobile();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [resetSent, setResetSent] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [resetLoading, setResetLoading] = useState(false);
+
+  const handleForgotPassword = async () => {
+    if (!email.trim()) {
+      setError('Please enter your email address first, then click Forgot password.');
+      return;
+    }
+    setResetLoading(true);
+    setError('');
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      setResetSent(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email.');
+    } finally {
+      setResetLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -30,52 +56,10 @@ export default function Login({ onNavigate }: LoginProps) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      {/* Navigation - Centered Menu */}
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px', position: 'relative' }}>
-            {/* Logo */}
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-              <img 
-                src="/ChapaRideLogo.jpg" 
-                alt="ChapaRide Logo" 
-                style={{ 
-                  height: '75px', 
-                  width: 'auto',
-                  objectFit: 'contain'
-                }} 
-              />
-            </div>
-            
-            {/* Centered Menu Items */}
-            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500', transition: 'color 0.3s' }}>Find a Ride</button>
-              <button onClick={() => onNavigate('post-ride')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500', transition: 'color 0.3s' }}>Post a Ride</button>
-            </div>
-
-            {/* Register Button - Absolute Right */}
-            <div style={{ position: 'absolute', right: '20px' }}>
-              <button onClick={() => onNavigate('register')} style={{ 
-                padding: '12px 28px', 
-                background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-                color: 'white', 
-                borderRadius: '25px', 
-                fontSize: '16px', 
-                fontWeight: 'bold', 
-                border: 'none', 
-                cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
-                transition: 'transform 0.3s'
-              }}>Register</button>
-            </div>
-          </div>
-        </div>
-      </nav>
-
       {/* Hero Section with Form */}
       <section style={{ 
         background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
-        padding: '60px 20px 100px',
+        padding: isMobile ? '32px 16px 60px' : '60px 20px 100px',
         position: 'relative',
         overflow: 'hidden'
       }}>
@@ -93,14 +77,14 @@ export default function Login({ onNavigate }: LoginProps) {
         <div style={{ maxWidth: '500px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           {/* Hero Text */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h1 style={{ 
-              fontSize: '48px', 
-              fontWeight: 'bold', 
-              color: 'white', 
-              marginBottom: '15px',
+            <h1 style={{
+              fontSize: isMobile ? '28px' : '48px',
+              fontWeight: 'bold',
+              color: 'white',
+              marginBottom: '12px',
               textShadow: '2px 2px 4px rgba(0,0,0,0.2)'
             }}>Welcome back</h1>
-            <p style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
+            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
               Sign in to your ChapaRide account
             </p>
           </div>
@@ -109,7 +93,7 @@ export default function Login({ onNavigate }: LoginProps) {
           <div style={{ 
             backgroundColor: 'white', 
             borderRadius: '24px', 
-            padding: '40px', 
+            padding: isMobile ? '24px' : '40px',
             boxShadow: '0 20px 60px rgba(0,0,0,0.15)',
             animation: 'floatUp 0.7s ease-out'
           }}>
@@ -146,25 +130,81 @@ export default function Login({ onNavigate }: LoginProps) {
                 />
               </div>
 
-              <div style={{ marginBottom: '30px' }}>
+              <div style={{ marginBottom: '16px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Password</label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  placeholder="Enter your password"
-                  style={{ 
-                    width: '100%', 
-                    padding: '14px', 
-                    fontSize: '16px', 
-                    border: '2px solid #E8EBED', 
-                    borderRadius: '12px', 
-                    backgroundColor: 'white',
-                    transition: 'border-color 0.3s'
-                  }}
-                />
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    required
+                    placeholder="Enter your password"
+                    style={{
+                      width: '100%',
+                      padding: '14px',
+                      paddingRight: '50px',
+                      fontSize: '16px',
+                      border: '2px solid #E8EBED',
+                      borderRadius: '12px',
+                      backgroundColor: 'white',
+                      transition: 'border-color 0.3s'
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '14px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '14px',
+                      color: '#6B7280',
+                      fontWeight: '600',
+                      padding: 0,
+                    }}
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </button>
+                </div>
               </div>
+
+              <div style={{ marginBottom: '30px', textAlign: 'right' }}>
+                <button
+                  type="button"
+                  onClick={handleForgotPassword}
+                  disabled={resetLoading}
+                  style={{
+                    background: 'none',
+                    border: 'none',
+                    color: '#1A9D9D',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: resetLoading ? 'not-allowed' : 'pointer',
+                    textDecoration: 'underline',
+                    padding: 0,
+                  }}
+                >
+                  {resetLoading ? 'Sending...' : 'Forgot password?'}
+                </button>
+              </div>
+
+              {resetSent && (
+                <div style={{
+                  backgroundColor: '#dcfce7',
+                  border: '1px solid #86efac',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                }}>
+                  <p style={{ color: '#166534', margin: 0, fontSize: '14px' }}>
+                    Password reset email sent! Check your inbox and follow the link to reset your password.
+                  </p>
+                </div>
+              )}
 
               <button
                 type="submit"

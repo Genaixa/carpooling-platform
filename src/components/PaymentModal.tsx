@@ -1,4 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
+import { useIsMobile } from '../hooks/useIsMobile';
+
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
 
 declare global {
   interface Window {
@@ -17,9 +20,11 @@ interface PaymentModalProps {
 }
 
 export default function PaymentModal({ amount, rideId, userId, seatsToBook, rideName, onSuccess, onCancel }: PaymentModalProps) {
+  const isMobile = useIsMobile();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [cardReady, setCardReady] = useState(false);
+  const [passengerAgreed, setPassengerAgreed] = useState(false);
   const cardRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
@@ -102,7 +107,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
 
       const sourceId = result.token;
 
-      const response = await fetch('/api/create-payment', {
+      const response = await fetch(`${API_URL}/api/create-payment`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -132,7 +137,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
       display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50,
     }}>
       <div style={{
-        backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+        backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '20px' : '32px',
         maxWidth: '480px', width: '100%', margin: '16px', boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
       }}>
         <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', marginBottom: '8px' }}>
@@ -155,6 +160,43 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
           <p style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: '8px 0 0' }}>
             £{amount.toFixed(2)}
           </p>
+        </div>
+
+        {/* Passenger Responsibility Declaration */}
+        <div style={{
+          backgroundColor: '#f0fdf4',
+          border: '1px solid #bbf7d0',
+          borderRadius: '12px',
+          padding: '14px',
+          marginBottom: '16px',
+          fontSize: '12px',
+          lineHeight: '1.5',
+          color: '#374151',
+        }}>
+          <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+            Passenger Responsibility
+          </p>
+          <p style={{ margin: '0 0 10px 0' }}>
+            By booking this ride, I agree to arrive at the pick-up point on time, pay my share of costs as agreed, behave respectfully, and understand that ChapaRide is only a platform and my safety is my responsibility.
+          </p>
+          <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+            <input
+              type="checkbox"
+              checked={passengerAgreed}
+              onChange={(e) => setPassengerAgreed(e.target.checked)}
+              style={{
+                width: '18px',
+                height: '18px',
+                marginTop: '1px',
+                flexShrink: 0,
+                accentColor: '#1A9D9D',
+                cursor: 'pointer',
+              }}
+            />
+            <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+              I have read, understood, and agree to the above.
+            </span>
+          </label>
         </div>
 
         <form onSubmit={handleSubmit}>
@@ -196,13 +238,13 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
             </button>
             <button
               type="submit"
-              disabled={processing || !cardReady}
+              disabled={processing || !cardReady || !passengerAgreed}
               style={{
                 flex: 1, padding: '14px', border: 'none', borderRadius: '12px',
-                background: processing || !cardReady ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                background: processing || !cardReady || !passengerAgreed ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
                 color: 'white', fontSize: '16px', fontWeight: '600',
-                cursor: processing || !cardReady ? 'not-allowed' : 'pointer',
-                boxShadow: processing || !cardReady ? 'none' : '0 4px 12px rgba(26, 157, 157, 0.15)',
+                cursor: processing || !cardReady || !passengerAgreed ? 'not-allowed' : 'pointer',
+                boxShadow: processing || !cardReady || !passengerAgreed ? 'none' : '0 4px 12px rgba(26, 157, 157, 0.15)',
               }}
             >
               {processing ? 'Processing...' : `Pay £${amount.toFixed(2)}`}

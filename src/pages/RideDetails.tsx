@@ -4,8 +4,8 @@ import { supabase, Ride, Profile, Booking, isContactVisible } from '../lib/supab
 import { LUGGAGE_OPTIONS } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
-import TravelStatusBadge from '../components/TravelStatusBadge';
 import StarRating from '../components/StarRating';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 
 interface RideDetailsProps {
@@ -14,7 +14,8 @@ interface RideDetailsProps {
 }
 
 export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
-  const { user, profile, signOut } = useAuth();
+  const { user, profile } = useAuth();
+  const isMobile = useIsMobile();
   const [ride, setRide] = useState<(Ride & { driver?: Profile }) | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -50,10 +51,6 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
     }
   };
 
-  const handleSignOut = async () => {
-    try { await signOut(); onNavigate('home'); } catch (e) { console.error(e); }
-  };
-
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
   const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
@@ -69,15 +66,6 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
   if (!ride) {
     return (
       <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-        <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-          <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-                <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-              </div>
-            </div>
-          </div>
-        </nav>
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '20px', color: '#4B5563', marginBottom: '25px' }}>Ride not found</p>
@@ -95,49 +83,23 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      {/* Navigation */}
-      <nav style={{ backgroundColor: 'white', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-        <div style={{ maxWidth: '1400px', margin: '0 auto', padding: '0 20px' }}>
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '90px', gap: '60px', position: 'relative' }}>
-            <div style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }} onClick={() => onNavigate('home')}>
-              <img src="/ChapaRideLogo.jpg" alt="ChapaRide Logo" style={{ height: '75px', width: 'auto', objectFit: 'contain' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '30px', alignItems: 'center' }}>
-              <button onClick={() => onNavigate('home')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Find a Ride</button>
-              <button onClick={() => onNavigate('post-ride')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Post a Ride</button>
-              {user && (
-                <>
-                  <button onClick={() => onNavigate('my-bookings')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>My Bookings</button>
-                  <button onClick={() => onNavigate('dashboard')} style={{ background: 'none', border: 'none', color: '#4B5563', fontSize: '16px', cursor: 'pointer', fontWeight: '500' }}>Dashboard</button>
-                </>
-              )}
-            </div>
-            {user && (
-              <div style={{ position: 'absolute', right: '20px' }}>
-                <button onClick={handleSignOut} style={{ padding: '10px 24px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', borderRadius: '25px', fontSize: '16px', fontWeight: '600', border: 'none', cursor: 'pointer' }}>Sign Out</button>
-              </div>
-            )}
-          </div>
-        </div>
-      </nav>
-
       {/* Page Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: '40px 20px' }}>
+      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '42px', fontWeight: 'bold', color: 'white', marginBottom: '0', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Ride Details</h1>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '0', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Ride Details</h1>
         </div>
       </div>
 
-      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: '40px 20px' }}>
+      <main style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         <button onClick={() => onNavigate('home')} style={{ marginBottom: '30px', padding: '10px 20px', background: 'none', border: '2px solid #1A9D9D', color: '#1A9D9D', borderRadius: '10px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
           ← Back to Rides
         </button>
 
-        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #1A9D9D' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #1A9D9D' }}>
           {/* Route Information */}
           <div style={{ marginBottom: '30px' }}>
             <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Route</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
               <div>
                 <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>From</p>
                 <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.departure_location}</p>
@@ -174,10 +136,8 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
             <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
               <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Driver</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>
-                <Avatar photoUrl={driver.profile_photo_url} name={driver.name} size="md" />
                 <div>
-                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>{driver.name}</p>
-                  <TravelStatusBadge travelStatus={driver.travel_status} gender={driver.gender} partnerName={driver.partner_name} />
+                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>{driver.name} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span></p>
                   {driver.average_rating && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                       <StarRating rating={driver.average_rating} size="sm" />
@@ -192,7 +152,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
           {/* Booking Information */}
           <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
             <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Booking Information</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
               <div>
                 <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Available Seats</p>
                 <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.seats_available} of {ride.seats_total}</p>

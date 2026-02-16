@@ -12,8 +12,6 @@ interface EditProfileProps {
   onNavigate: NavigateFn;
 }
 
-type TravelStatusOption = 'solo-male' | 'solo-female' | 'couple';
-
 export default function EditProfile({ onNavigate }: EditProfileProps) {
   const { user, profile, updateProfile, loading: authLoading } = useAuth();
   const [loading, setLoading] = useState(true);
@@ -24,11 +22,14 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
   const [formData, setFormData] = useState({
     name: '',
     phone: '',
+    address_line1: '',
+    address_line2: '',
+    city: '',
+    postcode: '',
+    country: '',
     email: '',
     bio: '',
-    travelStatusOption: 'solo-male' as TravelStatusOption,
     gender: 'Male' as 'Male' | 'Female',
-    partner_name: '',
     vehicle_make: '',
     vehicle_model: '',
     vehicle_color: '',
@@ -48,26 +49,17 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
   // Load profile data
   useEffect(() => {
     if (profile && user) {
-      // Determine travel status option from profile
-      let travelStatusOption: TravelStatusOption = 'solo-male';
-      if (profile.travel_status === 'couple') {
-        travelStatusOption = 'couple';
-      } else if (profile.travel_status === 'solo') {
-        if (profile.gender === 'Female') {
-          travelStatusOption = 'solo-female';
-        } else {
-          travelStatusOption = 'solo-male';
-        }
-      }
-
       setFormData({
         name: profile.name || '',
         phone: profile.phone || '',
+        address_line1: profile.address_line1 || '',
+        address_line2: profile.address_line2 || '',
+        city: profile.city || '',
+        postcode: profile.postcode || '',
+        country: profile.country || '',
         email: profile.email || '',
         bio: (profile as any).bio || '',
-        travelStatusOption,
         gender: (profile.gender || 'Male') as 'Male' | 'Female',
-        partner_name: profile.partner_name || '',
         vehicle_make: (profile as any).vehicle_make || '',
         vehicle_model: (profile as any).vehicle_model || '',
         vehicle_color: (profile as any).vehicle_color || '',
@@ -96,15 +88,6 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
     }
   };
 
-  const handleTravelStatusChange = (option: TravelStatusOption) => {
-    setFormData((prev) => ({
-      ...prev,
-      travelStatusOption: option,
-      // Auto-set gender for solo options
-      gender: option === 'solo-female' ? 'Female' : option === 'solo-male' ? 'Male' : prev.gender,
-    }));
-  };
-
   const validateForm = (): boolean => {
     const newErrors: Record<string, string> = {};
 
@@ -120,9 +103,6 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
       newErrors.gender = 'Gender is required';
     }
 
-    if (formData.travelStatusOption === 'couple' && !formData.partner_name.trim()) {
-      newErrors.partner_name = 'Partner name is required for couples';
-    }
 
     if (formData.bio && formData.bio.length > 200) {
       newErrors.bio = 'Bio must be 200 characters or less';
@@ -149,18 +129,16 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
     setSubmitting(true);
 
     try {
-      // Derive travel_status and gender from travelStatusOption
-      const travel_status = formData.travelStatusOption === 'couple' ? 'couple' : 'solo';
-      const gender = formData.travelStatusOption === 'couple' 
-        ? (formData.gender as 'Male' | 'Female')
-        : (formData.travelStatusOption === 'solo-female' ? 'Female' : 'Male');
-
       const updateData: any = {
         name: formData.name.trim(),
         phone: formData.phone.trim(),
-        travel_status,
-        gender,
-        partner_name: formData.travelStatusOption === 'couple' ? formData.partner_name.trim() : null,
+        address_line1: formData.address_line1.trim() || null,
+        address_line2: formData.address_line2.trim() || null,
+        city: formData.city.trim() || null,
+        postcode: formData.postcode.trim() || null,
+        country: formData.country.trim() || null,
+        travel_status: 'solo',
+        gender: formData.gender,
         bio: formData.bio.trim() || null,
         vehicle_make: formData.vehicle_make.trim() || null,
         vehicle_model: formData.vehicle_model.trim() || null,
@@ -240,6 +218,50 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
               placeholder="Enter your phone number"
             />
 
+            {/* Address */}
+            <Input
+              label="Address Line 1"
+              name="address_line1"
+              type="text"
+              value={formData.address_line1}
+              onChange={handleChange}
+              placeholder="123 High Street"
+            />
+            <Input
+              label="Address Line 2"
+              name="address_line2"
+              type="text"
+              value={formData.address_line2}
+              onChange={handleChange}
+              placeholder="Flat 4, Building Name (optional)"
+            />
+            <Input
+              label="City / Town"
+              name="city"
+              type="text"
+              value={formData.city}
+              onChange={handleChange}
+              placeholder="London"
+            />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Input
+                label="Postcode"
+                name="postcode"
+                type="text"
+                value={formData.postcode}
+                onChange={handleChange}
+                placeholder="SW1A 1AA"
+              />
+              <Input
+                label="Country"
+                name="country"
+                type="text"
+                value={formData.country}
+                onChange={handleChange}
+                placeholder="United Kingdom"
+              />
+            </div>
+
             {/* Email (disabled) */}
             <Input
               label="Email"
@@ -267,62 +289,6 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
               </p>
             </div>
 
-            {/* Travel Status - Radio Buttons */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Travel Status <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-2">
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="travelStatusOption"
-                    value="solo-male"
-                    checked={formData.travelStatusOption === 'solo-male'}
-                    onChange={() => handleTravelStatusChange('solo-male')}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700">Solo Male</span>
-                </label>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="travelStatusOption"
-                    value="solo-female"
-                    checked={formData.travelStatusOption === 'solo-female'}
-                    onChange={() => handleTravelStatusChange('solo-female')}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700">Solo Female</span>
-                </label>
-                <label className="flex items-center space-x-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="travelStatusOption"
-                    value="couple"
-                    checked={formData.travelStatusOption === 'couple'}
-                    onChange={() => handleTravelStatusChange('couple')}
-                    className="w-4 h-4 text-blue-600 focus:ring-blue-500"
-                  />
-                  <span className="text-gray-700">Couple</span>
-                </label>
-              </div>
-            </div>
-
-            {/* Partner Name (only if Couple) */}
-            {formData.travelStatusOption === 'couple' && (
-              <Input
-                label="Partner Name"
-                name="partner_name"
-                type="text"
-                value={formData.partner_name}
-                onChange={handleChange}
-                required
-                error={errors.partner_name}
-                placeholder="Enter your partner's name"
-              />
-            )}
-
             {/* Gender */}
             <Select
               label="Gender"
@@ -331,18 +297,11 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
               onChange={handleChange}
               required
               error={errors.gender}
-              disabled={formData.travelStatusOption !== 'couple'}
-              className={formData.travelStatusOption !== 'couple' ? 'bg-gray-100 cursor-not-allowed' : ''}
               options={[
                 { value: 'Male', label: 'Male' },
                 { value: 'Female', label: 'Female' },
               ]}
             />
-            {formData.travelStatusOption !== 'couple' && (
-              <p className="text-sm text-gray-500 mt-1">
-                Gender is automatically set based on your travel status selection.
-              </p>
-            )}
 
             {/* Driver Details Section - Collapsible */}
             <div className="border-t pt-6">
