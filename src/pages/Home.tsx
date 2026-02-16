@@ -459,7 +459,7 @@ export default function Home({ onNavigate }: HomeProps) {
           {/* Hero Tagline */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '-0.5px' }}>
-              Chap A Ride - Share a Ride
+              Chap A Ride - Share A Ride
             </h2>
             <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(255, 255, 255, 0.9)', maxWidth: '600px', margin: '0 auto' }}>
               Affordable Rides Across the UK
