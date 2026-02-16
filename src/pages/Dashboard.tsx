@@ -379,7 +379,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   transition: 'all 0.2s ease',
                 }}
               >
-                Financial Report
+                Cost-Sharing Report
               </button>
             </div>
 
@@ -499,7 +499,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </>
             )}
 
-            {/* === Financial Report View === */}
+            {/* === Cost-Sharing Report View === */}
             {dashView === 'financials' && (() => {
               // Build flat list of booking rows with ride info
               const allRows: Array<{
@@ -618,12 +618,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
               return (
                 <>
-                  <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '20px' }}>Financial Report</h2>
+                  <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '20px' }}>Cost-Sharing Report</h2>
 
                   {/* Grand Total Summary Cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
                     <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #1A9D9D' }}>
-                      <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '6px', fontWeight: '500' }}>Your Earnings</p>
+                      <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '6px', fontWeight: '500' }}>Your Share</p>
                       <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#1A9D9D', margin: 0 }}>£{totalEarnings.toFixed(2)}</p>
                     </div>
                     <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #f59e0b' }}>
@@ -631,7 +631,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#f59e0b', margin: 0 }}>£{totalCommission.toFixed(2)}</p>
                     </div>
                     <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #3b82f6' }}>
-                      <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '6px', fontWeight: '500' }}>Total Revenue (from passengers)</p>
+                      <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '6px', fontWeight: '500' }}>Total Contributions (from passengers)</p>
                       <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#3b82f6', margin: 0 }}>£{totalRevenue.toFixed(2)}</p>
                     </div>
                   </div>
@@ -695,9 +695,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                             <th onClick={() => handleSort('route')} style={thStyle}>Route{sortIndicator('route')}</th>
                             <th onClick={() => handleSort('passenger')} style={thStyle}>Passenger{sortIndicator('passenger')}</th>
                             <th onClick={() => handleSort('seats')} style={{ ...thStyle, textAlign: 'center' }}>Seats{sortIndicator('seats')}</th>
-                            <th onClick={() => handleSort('revenue')} style={{ ...thStyle, textAlign: 'right' }}>Revenue{sortIndicator('revenue')}</th>
+                            <th onClick={() => handleSort('revenue')} style={{ ...thStyle, textAlign: 'right' }}>Contribution{sortIndicator('revenue')}</th>
                             <th onClick={() => handleSort('commission')} style={{ ...thStyle, textAlign: 'right' }}>Commission{sortIndicator('commission')}</th>
-                            <th onClick={() => handleSort('earnings')} style={{ ...thStyle, textAlign: 'right' }}>Your Earnings{sortIndicator('earnings')}</th>
+                            <th onClick={() => handleSort('earnings')} style={{ ...thStyle, textAlign: 'right' }}>Your Share{sortIndicator('earnings')}</th>
                           </tr>
                         </thead>
                         <tbody>
