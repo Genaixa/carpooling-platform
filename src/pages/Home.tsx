@@ -853,7 +853,7 @@ export default function Home({ onNavigate }: HomeProps) {
                 lineHeight: '1.6',
                 margin: 0,
               }}>
-                Earn money by sharing your journey. Post your route, set your price, and pick up passengers heading your way.
+                Share the cost of your journey. Post your route, set your contribution, and pick up passengers heading your way.
               </p>
             </div>
             <button
