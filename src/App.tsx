@@ -33,7 +33,28 @@ function AppContent() {
   const [publicProfileUserId, setPublicProfileUserId] = useState<string | null>(null);
   const [signupIntent, setSignupIntent] = useState<'passenger' | 'driver'>('passenger');
 
-  const handleNavigate = (page: Page, rideId?: string, userId?: string) => {
+  // Build a hash string from page + optional IDs
+  const buildHash = (page: Page, rideId?: string, userId?: string): string => {
+    if (page === 'edit-ride' && rideId) return `#edit-ride/${rideId}`;
+    if (page === 'ride-details' && rideId) return `#ride-details/${rideId}`;
+    if (page === 'public-profile' && userId) return `#public-profile/${userId}`;
+    if (page === 'register-driver') return '#register-driver';
+    return `#${page}`;
+  };
+
+  // Parse the current hash into page + IDs
+  const parseHash = (hash: string): { page: Page; rideId?: string; userId?: string } => {
+    const clean = hash.replace('#', '') || 'home';
+    if (clean.startsWith('edit-ride/')) return { page: 'edit-ride', rideId: clean.split('/')[1] };
+    if (clean.startsWith('ride-details/')) return { page: 'ride-details', rideId: clean.split('/')[1] };
+    if (clean.startsWith('public-profile/')) return { page: 'public-profile', userId: clean.split('/')[1] };
+    if (clean === 'register-driver') return { page: 'register' as Page };
+    if (clean.startsWith('payment-success')) return { page: 'payment-success' as Page };
+    return { page: clean as Page };
+  };
+
+  // Apply a parsed route to state (without pushing history)
+  const applyRoute = (page: Page, rideId?: string, userId?: string) => {
     if (page === 'edit-ride' && rideId) {
       setEditRideId(rideId);
       setRideDetailsId(null);
@@ -49,16 +70,7 @@ function AppContent() {
       setEditRideId(null);
       setRideDetailsId(null);
       setCurrentPage('public-profile');
-    } else if (page === 'register-driver') {
-      setSignupIntent('driver');
-      setEditRideId(null);
-      setRideDetailsId(null);
-      setPublicProfileUserId(null);
-      setCurrentPage('register');
     } else {
-      if (page === 'register') {
-        setSignupIntent('passenger');
-      }
       setEditRideId(null);
       setRideDetailsId(null);
       setPublicProfileUserId(null);
@@ -66,12 +78,46 @@ function AppContent() {
     }
   };
 
-  // Detect payment-success hash on load
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.startsWith('#payment-success')) {
-      setCurrentPage('payment-success');
+  const handleNavigate = (page: Page, rideId?: string, userId?: string) => {
+    if (page === 'register-driver') {
+      setSignupIntent('driver');
+      const hash = buildHash(page, rideId, userId);
+      window.history.pushState({ page, rideId, userId }, '', hash);
+      applyRoute('register' as Page);
+    } else {
+      if (page === 'register') {
+        setSignupIntent('passenger');
+      }
+      const hash = buildHash(page, rideId, userId);
+      window.history.pushState({ page, rideId, userId }, '', hash);
+      applyRoute(page, rideId, userId);
     }
+    window.scrollTo(0, 0);
+  };
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const { page, rideId, userId } = parseHash(window.location.hash);
+      if (page === 'register' && window.location.hash === '#register-driver') {
+        setSignupIntent('driver');
+      } else if (page === 'register') {
+        setSignupIntent('passenger');
+      }
+      applyRoute(page, rideId, userId);
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
+
+  // Parse initial hash on load
+  useEffect(() => {
+    const { page, rideId, userId } = parseHash(window.location.hash);
+    if (page === 'register' && window.location.hash === '#register-driver') {
+      setSignupIntent('driver');
+    }
+    applyRoute(page, rideId, userId);
   }, []);
 
 
