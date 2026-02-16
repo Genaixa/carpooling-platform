@@ -290,6 +290,30 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           <span style={{ fontWeight: '600' }}>Amount:</span> £{booking.total_paid?.toFixed(2)}
                         </p>
                       </div>
+                      {(booking as any).third_party_passenger && (
+                        <div style={{
+                          backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px',
+                          padding: '12px', marginBottom: '15px',
+                        }}>
+                          <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>
+                            Actual Passenger (booked by {(booking.passenger as any)?.name})
+                          </p>
+                          <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 3px' }}>
+                            <span style={{ fontWeight: '600' }}>Name:</span> {(booking as any).third_party_passenger.name}
+                          </p>
+                          <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 3px' }}>
+                            <span style={{ fontWeight: '600' }}>Gender:</span> {(booking as any).third_party_passenger.gender}
+                          </p>
+                          <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 3px' }}>
+                            <span style={{ fontWeight: '600' }}>Age Group:</span> {(booking as any).third_party_passenger.age_group}
+                          </p>
+                          {(booking as any).third_party_passenger.special_needs && (
+                            <p style={{ fontSize: '13px', color: '#374151', margin: 0 }}>
+                              <span style={{ fontWeight: '600' }}>Special Needs:</span> {(booking as any).third_party_passenger.special_needs}
+                            </p>
+                          )}
+                        </div>
+                      )}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
                         <button
                           onClick={() => handleAcceptBooking(booking.id)}
