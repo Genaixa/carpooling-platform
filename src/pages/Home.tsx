@@ -35,6 +35,10 @@ export default function Home({ onNavigate }: HomeProps) {
   const [heroTime, setHeroTime] = useState('');
   const [heroPassengers, setHeroPassengers] = useState('1');
 
+  // Booking for someone else
+  const [bookingFor, setBookingFor] = useState<'myself' | 'someone-else'>('myself');
+  const [bookingForGender, setBookingForGender] = useState<'Male' | 'Female'>('Male');
+
   // Helper function to get today's date in YYYY-MM-DD format
   const getTodayDate = () => new Date().toISOString().split('T')[0];
 
@@ -120,38 +124,12 @@ export default function Home({ onNavigate }: HomeProps) {
         throw error;
       }
 
-      // Mark each ride with compatibility info instead of filtering
-      const ridesWithCompat: RideWithCompatibility[] = (data || []).map((ride) => {
-        let compatible = true;
-        let incompatibilityReason: string | null = null;
-
-        if (!ride.driver) {
-          compatible = false;
-          incompatibilityReason = 'Driver information unavailable';
-        } else if (profile) {
-          const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
-          compatible = checkRideCompatibility(
-            profile.gender,
-            ride.driver.gender,
-            occupants
-          );
-          if (!compatible) {
-            incompatibilityReason = getIncompatibilityReason(
-              profile.gender,
-              ride.driver.gender,
-              occupants
-            );
-          }
-        }
-
-        return {
-          ...ride,
-          compatible,
-          incompatibilityReason,
-        };
-      });
-
-      setAllRides(ridesWithCompat);
+      // Store raw rides - compatibility is computed reactively in useMemo
+      setAllRides((data || []).map((ride) => ({
+        ...ride,
+        compatible: true,
+        incompatibilityReason: null,
+      })));
 
     } catch (error) {
       console.error('Error loading rides:', error);
@@ -161,9 +139,37 @@ export default function Home({ onNavigate }: HomeProps) {
     }
   };
 
-  // Apply filters and sorting in real-time
+  // Effective gender for compatibility: use passenger's own gender or the specified gender
+  const effectiveGender = bookingFor === 'myself' ? (profile?.gender || null) : bookingForGender;
+
+  // Apply filters, compatibility, and sorting in real-time
   const rides = useMemo(() => {
-    let filtered = [...allRides];
+    // First compute compatibility based on effective gender
+    let filtered = allRides.map((ride) => {
+      let compatible = true;
+      let incompatibilityReason: string | null = null;
+
+      if (!ride.driver) {
+        compatible = false;
+        incompatibilityReason = 'Driver information unavailable';
+      } else if (profile || bookingFor === 'someone-else') {
+        const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
+        compatible = checkRideCompatibility(
+          effectiveGender,
+          ride.driver.gender,
+          occupants
+        );
+        if (!compatible) {
+          incompatibilityReason = getIncompatibilityReason(
+            effectiveGender,
+            ride.driver.gender,
+            occupants
+          );
+        }
+      }
+
+      return { ...ride, compatible, incompatibilityReason };
+    });
 
     // Filter by From location
     if (searchFrom.trim()) {
@@ -240,7 +246,7 @@ export default function Home({ onNavigate }: HomeProps) {
     });
 
     return filtered;
-  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy]);
+  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy, effectiveGender, bookingFor, bookingForGender, profile]);
 
   // Group rides by destination, sorted chronologically within groups,
   // groups ordered by their earliest ride's departure time
@@ -560,8 +566,7 @@ export default function Home({ onNavigate }: HomeProps) {
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
                       Time
                     </label>
-                    <input
-                      type="time"
+                    <select
                       value={heroTime}
                       onChange={(e) => setHeroTime(e.target.value)}
                       style={{
@@ -573,11 +578,18 @@ export default function Home({ onNavigate }: HomeProps) {
                         fontSize: '16px',
                         fontWeight: '500',
                         color: '#111827',
+                        backgroundColor: 'white',
                         transition: 'border-color 0.3s'
                       }}
                       onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
                       onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-                    />
+                    >
+                      <option value="">Any time</option>
+                      {Array.from({ length: 24 }, (_, i) => {
+                        const hour = i.toString().padStart(2, '0');
+                        return <option key={hour} value={`${hour}:00`}>{`${hour}:00`}</option>;
+                      })}
+                    </select>
                   </div>
                 </div>
 
@@ -617,6 +629,71 @@ export default function Home({ onNavigate }: HomeProps) {
                     </select>
                   </div>
                 </div>
+
+                {/* Booking For Someone Else */}
+                {user && profile && (
+                  <div style={{ display: 'grid', gridTemplateColumns: bookingFor === 'someone-else' && !isMobile ? '1fr 1fr' : '1fr', gap: '16px' }}>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                        Booking for
+                      </label>
+                      <select
+                        value={bookingFor}
+                        onChange={(e) => setBookingFor(e.target.value as 'myself' | 'someone-else')}
+                        style={{
+                          width: '100%',
+                          padding: '12px 16px',
+                          border: '2px solid #E5E7EB',
+                          borderRadius: '12px',
+                          outline: 'none',
+                          fontSize: '16px',
+                          fontWeight: '500',
+                          color: '#111827',
+                          backgroundColor: 'white',
+                          transition: 'border-color 0.3s'
+                        }}
+                        onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                        onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                      >
+                        <option value="myself">Myself</option>
+                        <option value="someone-else">Someone else</option>
+                      </select>
+                    </div>
+                    {bookingFor === 'someone-else' && (
+                      <div>
+                        <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                          Passenger's gender
+                        </label>
+                        <select
+                          value={bookingForGender}
+                          onChange={(e) => setBookingForGender(e.target.value as 'Male' | 'Female')}
+                          style={{
+                            width: '100%',
+                            padding: '12px 16px',
+                            border: '2px solid #E5E7EB',
+                            borderRadius: '12px',
+                            outline: 'none',
+                            fontSize: '16px',
+                            fontWeight: '500',
+                            color: '#111827',
+                            backgroundColor: 'white',
+                            transition: 'border-color 0.3s'
+                          }}
+                          onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                          onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                        >
+                          <option value="Male">Male</option>
+                          <option value="Female">Female</option>
+                        </select>
+                      </div>
+                    )}
+                  </div>
+                )}
+                {bookingFor === 'someone-else' && user && profile && (
+                  <p style={{ fontSize: '13px', color: '#6B7280', margin: '-8px 0 0', lineHeight: '1.4' }}>
+                    Rides will be filtered based on the passenger's gender for safety compatibility.
+                  </p>
+                )}
 
                 {/* Search Button - Prominent CTA */}
                 <button
