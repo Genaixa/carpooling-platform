@@ -102,7 +102,7 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
               { step: '1', title: 'Apply to Drive', desc: 'Complete your profile, submit a driver application and bank details for payouts. By applying, you confirm that you hold a valid driving licence, appropriate insurance, and that your vehicle is roadworthy and legally compliant.' },
               { step: '2', title: 'Post a Ride', desc: 'Once approved, post your journey with departure, destination, date, time, price per seat, available seats, and luggage capacity. You set up the amount towards your travel costs.' },
               { step: '3', title: 'Manage Bookings', desc: 'When a passenger books, you\'ll receive a notification. Accept or decline the booking from your dashboard. Accepted bookings capture the passenger\'s payment.' },
-              { step: '4', title: 'Complete & Get Paid', desc: 'After the journey, mark the ride as complete in your dashboard. The platform takes a 25% fee and the remaining 75% is paid out to your bank account.' },
+              { step: '4', title: 'Complete & Get Paid', desc: 'After the journey, mark the ride as complete in your dashboard. The platform takes a 25% fee and the remaining 75% is paid out to your bank account. You will get paid within 3–5 working days.' },
             ].map((item) => (
               <div key={item.step} style={{
                 padding: '24px', borderRadius: '16px', border: '1px solid #E8EBED',
