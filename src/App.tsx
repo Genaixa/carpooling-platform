@@ -21,6 +21,7 @@ import ContactUs from './pages/ContactUs';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import FAQs from './pages/FAQs';
 import ResetPassword from './pages/ResetPassword';
+import RideWishes from './pages/RideWishes';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import type { Page } from './lib/types';
@@ -161,6 +162,8 @@ function AppContent() {
         return <PrivacyPolicy onNavigate={handleNavigate} />;
       case 'faqs':
         return <FAQs onNavigate={handleNavigate} />;
+      case 'ride-wishes':
+        return <RideWishes onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }

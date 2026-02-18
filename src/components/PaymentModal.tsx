@@ -312,6 +312,15 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
               </label>
             </div>
 
+            <div style={{
+              backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px',
+              padding: '12px 14px', marginBottom: '16px', fontSize: '12px', lineHeight: '1.5', color: '#1e40af',
+            }}>
+              <p style={{ margin: 0, fontWeight: '600', fontSize: '13px' }}>
+                Your card will not be charged immediately. A temporary hold of £{amount.toFixed(2)} will be placed, and the driver will review your booking. You are only charged if the driver accepts.
+              </p>
+            </div>
+
             <form onSubmit={handleSubmit}>
               <div
                 ref={cardContainerRef}

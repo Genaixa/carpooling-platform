@@ -8,9 +8,10 @@ interface LocationDropdownProps {
   required?: boolean;
   error?: string;
   placeholder?: string;
+  exclude?: string;
 }
 
-export default function LocationDropdown({ value, onChange, label, required, error, placeholder }: LocationDropdownProps) {
+export default function LocationDropdown({ value, onChange, label, required, error, placeholder, exclude }: LocationDropdownProps) {
   const isOther = value !== '' && !ROUTE_LOCATIONS.includes(value as any);
   const [showOther, setShowOther] = useState(isOther);
 
@@ -51,7 +52,7 @@ export default function LocationDropdown({ value, onChange, label, required, err
         }}
       >
         <option value="">{placeholder || 'Select location'}</option>
-        {ROUTE_LOCATIONS.map((loc) => (
+        {ROUTE_LOCATIONS.filter(loc => !exclude || loc !== exclude).map((loc) => (
           <option key={loc} value={loc}>{loc}</option>
         ))}
         <option value="__other__">Other (type your own)</option>

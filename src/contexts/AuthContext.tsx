@@ -17,6 +17,7 @@ interface AuthContextType {
     postcode: string;
     country: string;
     gender: 'Male' | 'Female';
+    age_group: string;
   }) => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
@@ -89,6 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       postcode: string;
       country: string;
       gender: 'Male' | 'Female';
+      age_group: string;
     }
   ) => {
     const { data, error } = await supabase.auth.signUp({
@@ -114,6 +116,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             postcode: profileData.postcode,
             country: profileData.country,
             gender: profileData.gender,
+            age_group: profileData.age_group || null,
             travel_status: 'solo',
           },
         ]);

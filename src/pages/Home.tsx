@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarComposition, getCarCompositionLabel } from '../lib/supabase';
+import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarComposition, getCarCompositionLabel, getDriverAlias } from '../lib/supabase';
 import { NavigateFn } from '../lib/types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Loading from '../components/Loading';
@@ -112,7 +112,7 @@ export default function Home({ onNavigate }: HomeProps) {
         .from('rides')
         .select(`
           *,
-          driver:profiles(id, name, gender, profile_photo_url, average_rating, total_reviews, is_approved_driver)
+          driver:profiles(id, name, gender, age_group, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
         `)
         .eq('status', 'upcoming')
         .gt('seats_available', 0)
@@ -490,6 +490,7 @@ export default function Home({ onNavigate }: HomeProps) {
                       onChange={setHeroFrom}
                       label="From"
                       placeholder="Select departure location"
+                      exclude={heroTo}
                     />
                     {/* Swap Button */}
                     {isMobile ? (
@@ -532,6 +533,7 @@ export default function Home({ onNavigate }: HomeProps) {
                       onChange={setHeroTo}
                       label="To"
                       placeholder="Select destination"
+                      exclude={heroFrom}
                     />
                   </div>
                 </div>
@@ -1027,6 +1029,26 @@ export default function Home({ onNavigate }: HomeProps) {
                 Clear All Filters
               </button>
             )}
+            <div style={{ marginTop: '20px' }}>
+              <button
+                onClick={() => onNavigate('ride-wishes')}
+                style={{
+                  fontSize: '15px',
+                  color: '#1A9D9D',
+                  background: 'white',
+                  border: '2px solid #1A9D9D',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  padding: '12px 28px',
+                  borderRadius: '50px',
+                }}
+              >
+                Set Up a Ride Alert
+              </button>
+              <p style={{ color: '#9CA3AF', fontSize: '13px', marginTop: '10px' }}>
+                Get emailed when a matching ride is posted
+              </p>
+            </div>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
@@ -1171,8 +1193,23 @@ export default function Home({ onNavigate }: HomeProps) {
                                 onClick={() => onNavigate('public-profile', undefined, ride.driver.id)}
                                 style={{ color: '#1A9D9D', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: 0 }}
                               >
-                                {ride.driver.name}
+                                {getDriverAlias(ride.driver.id)}
                               </button>
+                              {(ride.driver as any).driver_tier === 'gold' && (
+                                <span style={{
+                                  display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
+                                  borderRadius: '12px', fontSize: '11px', fontWeight: '700',
+                                  backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
+                                }}>
+                                  Gold Driver
+                                </span>
+                              )}
+                              {(ride.driver as any).age_group && (
+                                <>
+                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
+                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>Age {(ride.driver as any).age_group}</span>
+                                </>
+                              )}
                               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
                               <span style={{ fontSize: '12px', color: '#6B7280' }}>
                                 {getCarCompositionLabel(getCarComposition(ride.driver.gender, ride.existing_occupants as { males: number; females: number; couples: number } | null))}
@@ -1282,6 +1319,8 @@ export default function Home({ onNavigate }: HomeProps) {
           userId={user.id}
           seatsToBook={seatsForPayment}
           rideName={`${selectedRide.departure_location} → ${selectedRide.arrival_location}`}
+          bookingForSomeoneElse={bookingFor === 'someone-else'}
+          bookingForGender={bookingForGender}
           onSuccess={handlePaymentSuccess}
           onCancel={handlePaymentCancel}
         />

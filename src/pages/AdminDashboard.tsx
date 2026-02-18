@@ -58,7 +58,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [activeDrivers, setActiveDrivers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'active-drivers' | 'finances' | 'admins'>('applications');
+  const [tab, setTab] = useState<'applications' | 'active-drivers' | 'licence-reviews' | 'finances' | 'admins'>('applications');
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
@@ -79,6 +79,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   // Admin management state
   const [allUsers, setAllUsers] = useState<{ id: string; name: string; email: string; is_admin: boolean; is_approved_driver: boolean; created_at: string }[]>([]);
   const [adminSearch, setAdminSearch] = useState('');
+
+  // Licence reviews state
+  const [pendingLicences, setPendingLicences] = useState<Profile[]>([]);
+  const [licencePhotoModal, setLicencePhotoModal] = useState<string | null>(null);
   const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null);
 
   useEffect(() => {
@@ -91,6 +95,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     if (user && profile?.is_admin) {
       if (tab === 'applications') loadApplications();
       else if (tab === 'active-drivers') loadActiveDrivers();
+      else if (tab === 'licence-reviews') loadPendingLicences();
       else if (tab === 'finances') loadFinancialData();
       else if (tab === 'admins') loadAllUsers();
     }
@@ -112,6 +117,63 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error('Failed to load active drivers');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPendingLicences = async () => {
+    try {
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('licence_status', 'pending')
+        .order('updated_at', { ascending: false });
+
+      if (error) throw error;
+      setPendingLicences(data || []);
+    } catch (err: any) {
+      console.error('Error loading pending licences:', err);
+      toast.error('Failed to load pending licences');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleApproveLicence = async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/approve-licence`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user!.id, userId }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Licence approved! Driver is now Gold.');
+      loadPendingLicences();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to approve licence');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectLicence = async (userId: string) => {
+    setActionLoading(userId);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/reject-licence`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user!.id, userId }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Licence rejected.');
+      loadPendingLicences();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to reject licence');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -416,6 +478,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           {([
             { key: 'applications' as const, label: 'Applications' },
             { key: 'active-drivers' as const, label: `Active Drivers (${activeDrivers.length || '...'})` },
+            { key: 'licence-reviews' as const, label: `Licence Reviews (${pendingLicences.length || '...'})` },
             { key: 'finances' as const, label: 'Rides & Finances' },
             { key: 'admins' as const, label: 'Manage Admins' },
           ]).map(t => (
@@ -585,6 +648,21 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         }}>
                           Active Driver
                         </span>
+                        {driver.driver_tier === 'gold' ? (
+                          <span style={{
+                            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
+                            backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
+                          }}>
+                            Gold Driver
+                          </span>
+                        ) : (
+                          <span style={{
+                            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
+                            backgroundColor: '#f3f4f6', color: '#6B7280', border: '1px solid #d1d5db',
+                          }}>
+                            Regular
+                          </span>
+                        )}
 
                         {confirmRevoke === driver.id ? (
                           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -632,6 +710,89 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             Revoke
                           </button>
                         )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ==================== LICENCE REVIEWS TAB ==================== */}
+        {tab === 'licence-reviews' && (
+          <>
+            {/* Photo modal */}
+            {licencePhotoModal && (
+              <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => setLicencePhotoModal(null)}>
+                <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '20px', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+                  <img src={licencePhotoModal} alt="Licence Photo" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '12px' }} />
+                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
+                    <button onClick={() => setLicencePhotoModal(null)} style={{ padding: '10px 24px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Close</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: '80px' }}><Loading /></div>
+            ) : pendingLicences.length === 0 ? (
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+                <p style={{ color: '#4B5563', fontSize: '20px' }}>No pending licence reviews</p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {pendingLicences.map(driver => (
+                  <div key={driver.id} style={{
+                    backgroundColor: 'white', borderRadius: '20px', padding: '24px 30px',
+                    boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #f59e0b',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                        <Avatar photoUrl={driver.profile_photo_url} name={driver.name} size="sm" />
+                        <div>
+                          <h3 style={{ fontSize: '17px', fontWeight: '600', color: '#1F2937', margin: 0 }}>{driver.name}</h3>
+                          <p style={{ fontSize: '13px', color: '#6B7280', margin: '2px 0 0 0' }}>
+                            {driver.email} | {driver.gender}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        {driver.licence_photo_url && (
+                          <button
+                            onClick={() => setLicencePhotoModal(driver.licence_photo_url)}
+                            style={{
+                              padding: '8px 16px', backgroundColor: '#eff6ff', color: '#1e40af',
+                              border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '13px',
+                              fontWeight: '600', cursor: 'pointer',
+                            }}
+                          >
+                            View Photo
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleApproveLicence(driver.id)}
+                          disabled={actionLoading === driver.id}
+                          style={{
+                            padding: '8px 16px', backgroundColor: '#dcfce7', color: '#166534',
+                            border: '1px solid #86efac', borderRadius: '8px', fontSize: '13px',
+                            fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          {actionLoading === driver.id ? 'Processing...' : 'Approve (Gold)'}
+                        </button>
+                        <button
+                          onClick={() => handleRejectLicence(driver.id)}
+                          disabled={actionLoading === driver.id}
+                          style={{
+                            padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b',
+                            border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px',
+                            fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
+                          }}
+                        >
+                          Reject
+                        </button>
                       </div>
                     </div>
                   </div>

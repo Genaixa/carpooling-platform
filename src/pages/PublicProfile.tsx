@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Profile, Ride, Review } from '../lib/supabase';
+import { supabase, Profile, Ride, Review, getDriverAlias } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import StarRating from '../components/StarRating';
@@ -87,9 +87,21 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
         {/* Profile Header */}
         <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px', textAlign: 'center' }}>
           <div style={{ marginBottom: '16px' }}>
-            <Avatar photoUrl={profile.profile_photo_url} name={profile.name} size="lg" />
+            <Avatar photoUrl={profile.profile_photo_url} name={getDriverAlias(profile.id)} size="lg" />
           </div>
-          <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '12px' }}>{profile.name}</h2>
+          <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '12px' }}>
+            {getDriverAlias(profile.id)}
+            {profile.driver_tier === 'gold' && (
+              <span style={{
+                display: 'inline-flex', alignItems: 'center', padding: '3px 10px', marginLeft: '10px',
+                borderRadius: '14px', fontSize: '13px', fontWeight: '700',
+                backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
+                verticalAlign: 'middle',
+              }}>
+                Gold Driver
+              </span>
+            )}
+          </h2>
           <div style={{ marginBottom: '16px' }}>
             <span style={{
               display: 'inline-block',
@@ -119,7 +131,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
         {/* Upcoming Rides */}
         {rides.length > 0 && (
           <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px' }}>
-            <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Upcoming Rides by {profile.name}</h3>
+            <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Upcoming Rides by {getDriverAlias(profile.id)}</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               {rides.map((ride) => (
                 <div key={ride.id} style={{ border: '1px solid #E8EBED', borderRadius: '12px', padding: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>

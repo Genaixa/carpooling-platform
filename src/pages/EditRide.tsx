@@ -273,6 +273,7 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
                     if (errors.from) setErrors((prev) => { const n = { ...prev }; delete n.from; return n; });
                   }}
                   error={errors.from}
+                  exclude={formData.to}
                 />
                 <LocationDropdown
                   label="To *"
@@ -282,6 +283,7 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
                     if (errors.to) setErrors((prev) => { const n = { ...prev }; delete n.to; return n; });
                   }}
                   error={errors.to}
+                  exclude={formData.from}
                 />
               </div>
 

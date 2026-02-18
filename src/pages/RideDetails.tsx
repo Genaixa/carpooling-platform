@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, Profile, Booking, isContactVisible } from '../lib/supabase';
+import { supabase, Ride, Profile, Booking, isContactVisible, checkRideCompatibility, getIncompatibilityReason, getDriverAlias } from '../lib/supabase';
 import { LUGGAGE_OPTIONS } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import StarRating from '../components/StarRating';
+import PaymentModal from '../components/PaymentModal';
 import { useIsMobile } from '../hooks/useIsMobile';
+import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
 
 interface RideDetailsProps {
@@ -19,6 +21,10 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
   const [ride, setRide] = useState<(Ride & { driver?: Profile }) | null>(null);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedSeats, setSelectedSeats] = useState(1);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [bookingFor, setBookingFor] = useState<'myself' | 'someone-else'>('myself');
+  const [bookingForGender, setBookingForGender] = useState<'Male' | 'Female'>('Male');
 
   useEffect(() => {
     if (rideId) loadRideDetails();
@@ -137,7 +143,19 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
               <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Driver</h2>
               <div style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>
                 <div>
-                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>{driver.name} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span></p>
+                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>
+                    {getDriverAlias(driver.id)} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
+                    {(driver as any).driver_tier === 'gold' && (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', padding: '2px 8px', marginLeft: '8px',
+                        borderRadius: '12px', fontSize: '12px', fontWeight: '700',
+                        backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
+                        verticalAlign: 'middle',
+                      }}>
+                        Gold Driver
+                      </span>
+                    )}
+                  </p>
                   {driver.average_rating && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
                       <StarRating rating={driver.average_rating} size="sm" />
@@ -201,6 +219,103 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
             </div>
           )}
 
+          {/* Book This Ride section */}
+          {!isDriver && ride.seats_available > 0 && user && (() => {
+            const effectiveGender = bookingFor === 'myself' ? (profile?.gender || null) : bookingForGender;
+            const driverGender = driver?.gender || null;
+            const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
+            const compatible = checkRideCompatibility(effectiveGender, driverGender, occupants);
+            const incompatReason = getIncompatibilityReason(effectiveGender, driverGender, occupants);
+            const alreadyBooked = bookings.some(b => b.passenger_id === user.id);
+            const totalAmount = selectedSeats * ride.price_per_seat;
+
+            return (
+              <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
+                <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Book This Ride</h2>
+
+                {/* Booking process notice */}
+                <div style={{
+                  marginBottom: '20px', padding: '16px 20px', backgroundColor: '#eff6ff',
+                  border: '1px solid #bfdbfe', borderRadius: '12px',
+                }}>
+                  <p style={{ margin: '0 0 6px', color: '#1e40af', fontSize: '14px', fontWeight: '600' }}>
+                    How booking works
+                  </p>
+                  <p style={{ margin: 0, color: '#1e40af', fontSize: '13px', lineHeight: '1.5' }}>
+                    When you book, a hold is placed on your card but you are <strong>not charged immediately</strong>. The driver will review your request and either accept or decline it. Your card is only charged once the driver accepts. If declined, the hold is released automatically.
+                  </p>
+                </div>
+
+                {alreadyBooked ? (
+                  <div style={{ padding: '16px 20px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '12px' }}>
+                    <p style={{ margin: 0, color: '#166534', fontSize: '14px', fontWeight: '600' }}>You've already booked this ride.</p>
+                  </div>
+                ) : (
+                  <>
+                    {/* Booking for */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Booking for</label>
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <button onClick={() => setBookingFor('myself')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'myself' ? '2px solid #1A9D9D' : '2px solid #E8EBED', backgroundColor: bookingFor === 'myself' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Myself</button>
+                        <button onClick={() => setBookingFor('someone-else')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'someone-else' ? '2px solid #1A9D9D' : '2px solid #E8EBED', backgroundColor: bookingFor === 'someone-else' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Someone else</button>
+                      </div>
+                      {bookingFor === 'someone-else' && (
+                        <div style={{ marginTop: '8px' }}>
+                          <label style={{ fontSize: '13px', fontWeight: '600', color: '#4B5563', marginRight: '12px' }}>Passenger gender:</label>
+                          <select value={bookingForGender} onChange={(e) => setBookingForGender(e.target.value as 'Male' | 'Female')} style={{ padding: '6px 12px', borderRadius: '8px', border: '2px solid #E8EBED', fontSize: '14px' }}>
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                          </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Seats */}
+                    <div style={{ marginBottom: '16px' }}>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Seats</label>
+                      <select value={selectedSeats} onChange={(e) => setSelectedSeats(Number(e.target.value))} style={{ padding: '10px 14px', borderRadius: '8px', border: '2px solid #E8EBED', fontSize: '16px', minWidth: '80px' }}>
+                        {Array.from({ length: ride.seats_available }, (_, i) => i + 1).map(n => (
+                          <option key={n} value={n}>{n}</option>
+                        ))}
+                      </select>
+                      <span style={{ marginLeft: '12px', fontSize: '16px', fontWeight: '700', color: '#1A9D9D' }}>
+                        Total: £{totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+
+                    {!compatible ? (
+                      <div style={{ padding: '16px 20px', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px' }}>
+                        <p style={{ margin: 0, color: '#991b1b', fontSize: '14px', fontWeight: '600' }}>{incompatReason}</p>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => setShowPaymentModal(true)}
+                        style={{
+                          padding: '14px 32px', border: 'none', borderRadius: '12px',
+                          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                          color: 'white', fontSize: '16px', fontWeight: '600', cursor: 'pointer',
+                          boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
+                        }}
+                      >
+                        Book {selectedSeats} seat{selectedSeats > 1 ? 's' : ''} — £{totalAmount.toFixed(2)}
+                      </button>
+                    )}
+                  </>
+                )}
+              </div>
+            );
+          })()}
+
+          {/* Not logged in */}
+          {!isDriver && ride.seats_available > 0 && !user && (
+            <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
+              <div style={{ padding: '20px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', textAlign: 'center' }}>
+                <p style={{ margin: '0 0 12px', color: '#1e40af', fontSize: '16px', fontWeight: '600' }}>Log in to book this ride</p>
+                <button onClick={() => onNavigate('login')} style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Log In</button>
+              </div>
+            </div>
+          )}
+
           {/* Fully Booked / Driver's own ride alerts */}
           {ride.seats_available === 0 && !isDriver && (
             <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#fef3c7', border: '1px solid #fde047', borderRadius: '12px' }}>
@@ -215,6 +330,23 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
           )}
         </div>
       </main>
+
+      {/* Payment Modal */}
+      {showPaymentModal && ride && (
+        <PaymentModal
+          amount={selectedSeats * ride.price_per_seat}
+          rideId={ride.id}
+          rideName={`${ride.departure_location} → ${ride.arrival_location}`}
+          userId={user!.id}
+          seatsToBook={selectedSeats}
+          onSuccess={() => {
+            setShowPaymentModal(false);
+            toast.success('Booking request sent! The driver will review it.');
+            loadRideDetails();
+          }}
+          onCancel={() => setShowPaymentModal(false)}
+        />
+      )}
 
       <style>{`button:hover:not(:disabled) { transform: translateY(-2px); }`}</style>
     </div>

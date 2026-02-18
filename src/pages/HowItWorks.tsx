@@ -124,6 +124,51 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
           </div>
         </div>
 
+        {/* Ride Alerts */}
+        <div style={{ marginBottom: '56px' }}>
+          <h2 style={{
+            fontSize: isMobile ? '22px' : '28px', fontWeight: 'bold', color: '#1A9D9D', marginBottom: '24px',
+            display: 'flex', alignItems: 'center', gap: '12px'
+          }}>
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              width: '40px', height: '40px', borderRadius: '50%',
+              background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+              color: 'white', flexShrink: 0
+            }}>
+              <svg style={{ width: '20px', height: '20px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </span>
+            Ride Alerts
+          </h2>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
+            {[
+              { step: '1', title: 'Set Up an Alert', desc: 'Can\'t find a ride that suits you? Go to Ride Alerts and tell us your departure, destination, date, preferred time, and number of passengers.' },
+              { step: '2', title: 'Get Notified by Email', desc: 'When a driver posts a ride that matches your alert, we\'ll send you an email straightaway so you can book it before seats fill up.' },
+              { step: '3', title: 'Manage Your Alerts', desc: 'View all your active alerts on the Ride Alerts page. Remove any you no longer need. Past-date alerts are automatically marked as expired.' },
+              { step: '4', title: 'Ride Alerts', desc: 'Are you travelling? Why not check if anyone wants a ride and share the cost.' },
+            ].map((item) => (
+              <div key={item.step} style={{
+                padding: '24px', borderRadius: '16px', border: '1px solid #E8EBED',
+                backgroundColor: 'white', position: 'relative',
+                boxShadow: '0 2px 12px rgba(0,0,0,0.04)',
+              }}>
+                <div style={{
+                  position: 'absolute', top: '-14px', left: '24px',
+                  width: '32px', height: '32px', borderRadius: '50%',
+                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  fontSize: '15px', fontWeight: 'bold',
+                  boxShadow: '0 2px 8px rgba(26,157,157,0.3)',
+                }}>{item.step}</div>
+                <h3 style={{ fontSize: '17px', fontWeight: '700', color: '#1F2937', marginBottom: '8px', marginTop: '6px' }}>{item.title}</h3>
+                <p style={{ fontSize: '14px', color: '#4B5563', lineHeight: '1.7', margin: 0 }}>{item.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
         {/* Safety & Policies */}
         <div style={{
           background: 'linear-gradient(135deg, rgba(26,157,157,0.06) 0%, rgba(139,195,74,0.06) 100%)',

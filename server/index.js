@@ -27,6 +27,7 @@ const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
@@ -97,13 +98,133 @@ app.post('/api/upload-profile-photo', upload.single('photo'), async (req, res) =
 });
 
 // ============================================================
+// DELETE PROFILE PHOTO
+// ============================================================
+
+app.delete('/api/delete-profile-photo', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    // Delete files from storage
+    const { data: existingFiles } = await supabase.storage.from('profile-photos').list('', { search: userId });
+    if (existingFiles?.length) {
+      await supabase.storage.from('profile-photos').remove(existingFiles.map(f => f.name));
+    }
+
+    // Clear URL on profile
+    await supabase.from('profiles').update({ profile_photo_url: null }).eq('id', userId);
+
+    console.log(`✓ Profile photo deleted for: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Profile photo delete error:', error);
+    res.status(500).json({ error: error.message || 'Delete failed' });
+  }
+});
+
+// ============================================================
+// LICENCE PHOTO UPLOAD (Gold Driver)
+// ============================================================
+
+app.post('/api/upload-licence-photo', upload.single('photo'), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId || !req.file) {
+      return res.status(400).json({ error: 'Missing userId or photo file' });
+    }
+
+    // Verify user is an approved driver
+    const { data: profile } = await supabase.from('profiles').select('is_approved_driver').eq('id', userId).single();
+    if (!profile?.is_approved_driver) {
+      return res.status(403).json({ error: 'Only approved drivers can upload licence photos' });
+    }
+
+    // Ensure bucket exists (private bucket for licence photos)
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === 'licence-photos');
+    if (!bucketExists) {
+      await supabase.storage.createBucket('licence-photos', { public: false });
+    }
+
+    const ext = req.file.originalname.split('.').pop();
+    const fileName = `${userId}-${Date.now()}.${ext}`;
+
+    // Delete old licence photos for this user
+    const { data: existingFiles } = await supabase.storage.from('licence-photos').list('', {
+      search: userId,
+    });
+    if (existingFiles?.length) {
+      await supabase.storage.from('licence-photos').remove(existingFiles.map(f => f.name));
+    }
+
+    // Upload new photo
+    const { error: uploadError } = await supabase.storage
+      .from('licence-photos')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    // Get signed URL (private bucket)
+    const { data: signedUrlData } = await supabase.storage.from('licence-photos').createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
+    if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL');
+
+    // Update profile
+    await supabase.from('profiles').update({
+      licence_photo_url: signedUrlData.signedUrl,
+      licence_status: 'pending',
+    }).eq('id', userId);
+
+    console.log(`✓ Licence photo uploaded for: ${userId}`);
+    res.json({ success: true, url: signedUrlData.signedUrl });
+  } catch (error) {
+    console.error('Licence photo upload error:', error);
+    res.status(500).json({ error: error.message || 'Upload failed' });
+  }
+});
+
+// ============================================================
+// DELETE LICENCE PHOTO
+// ============================================================
+
+app.delete('/api/delete-licence-photo', async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+
+    // Delete files from storage
+    const { data: existingFiles } = await supabase.storage.from('licence-photos').list('', { search: userId });
+    if (existingFiles?.length) {
+      await supabase.storage.from('licence-photos').remove(existingFiles.map(f => f.name));
+    }
+
+    // Clear URL and reset status on profile
+    await supabase.from('profiles').update({
+      licence_photo_url: null,
+      licence_status: null,
+      driver_tier: 'regular',
+    }).eq('id', userId);
+
+    console.log(`✓ Licence photo deleted for: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Licence photo delete error:', error);
+    res.status(500).json({ error: error.message || 'Delete failed' });
+  }
+});
+
+// ============================================================
 // PAYMENT ENDPOINTS (Square delayed capture)
 // ============================================================
 
 // Create payment with delayed capture (hold on card)
 app.post('/api/create-payment', async (req, res) => {
   try {
-    const { sourceId, amount, rideId, userId, seatsToBook = 1, rideName } = req.body;
+    const { sourceId, amount, rideId, userId, seatsToBook = 1, rideName, thirdPartyPassenger } = req.body;
 
     if (!sourceId || !amount || !rideId || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -140,6 +261,7 @@ app.post('/api/create-payment', async (req, res) => {
         driver_payout_amount: driverPayout,
         square_payment_id: paymentId,
         status: 'pending_driver',
+        ...(thirdPartyPassenger ? { third_party_passenger: thirdPartyPassenger } : {}),
       }])
       .select()
       .single();
@@ -170,6 +292,88 @@ app.post('/api/create-payment', async (req, res) => {
 });
 
 // Driver accepts booking - capture payment
+// Accept booking via email link (GET)
+app.get('/api/driver/accept-booking', async (req, res) => {
+  try {
+    const { bookingId, driverId } = req.query;
+    if (!bookingId || !driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=missing-params');
+
+    const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+    if (!booking) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=booking-not-found');
+
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
+    if (!ride || ride.driver_id !== driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=not-authorized');
+
+    if (booking.status !== 'pending_driver') {
+      return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?info=already-actioned');
+    }
+
+    // Capture the payment
+    if (booking.square_payment_id) {
+      await squareClient.payments.complete({ paymentId: booking.square_payment_id });
+    }
+
+    await supabase.from('bookings').update({
+      status: 'confirmed',
+      driver_action: 'accepted',
+      driver_action_at: new Date().toISOString(),
+    }).eq('id', bookingId);
+
+    await recalculateSeats(booking.ride_id);
+
+    try {
+      const { sendBookingAcceptedEmail } = await import('./emails.js');
+      sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Booking accepted via email: ${bookingId}`);
+    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?success=booking-accepted');
+  } catch (error) {
+    console.error('Accept booking (email) error:', error);
+    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=server-error');
+  }
+});
+
+// Reject booking via email link (GET)
+app.get('/api/driver/reject-booking', async (req, res) => {
+  try {
+    const { bookingId, driverId } = req.query;
+    if (!bookingId || !driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=missing-params');
+
+    const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+    if (!booking) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=booking-not-found');
+
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
+    if (!ride || ride.driver_id !== driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=not-authorized');
+
+    if (booking.status !== 'pending_driver') {
+      return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?info=already-actioned');
+    }
+
+    // Cancel the payment hold
+    if (booking.square_payment_id) {
+      await squareClient.payments.cancel({ paymentId: booking.square_payment_id });
+    }
+
+    await supabase.from('bookings').update({
+      status: 'rejected',
+      driver_action: 'rejected',
+      driver_action_at: new Date().toISOString(),
+    }).eq('id', bookingId);
+
+    try {
+      const { sendBookingRejectedEmail } = await import('./emails.js');
+      sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Booking rejected via email: ${bookingId}`);
+    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?success=booking-rejected');
+  } catch (error) {
+    console.error('Reject booking (email) error:', error);
+    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=server-error');
+  }
+});
+
 app.post('/api/driver/accept-booking', async (req, res) => {
   try {
     const { bookingId, driverId } = req.body;
@@ -465,11 +669,30 @@ app.post('/api/driver/complete-ride', async (req, res) => {
     await supabase.from('rides').update({ status: 'completed' }).eq('id', rideId);
 
     // Mark all confirmed bookings as completed
+    const { data: completedBookings } = await supabase
+      .from('bookings')
+      .select('*, passenger:profiles!bookings_passenger_id_fkey(name)')
+      .eq('ride_id', rideId)
+      .eq('status', 'confirmed');
+
     await supabase
       .from('bookings')
       .update({ status: 'completed', completed_at: new Date().toISOString() })
       .eq('ride_id', rideId)
       .eq('status', 'confirmed');
+
+    // Send review reminder emails
+    try {
+      const { sendPassengerReviewReminder, sendDriverReviewReminder } = await import('./emails.js');
+      const passengerNames = [];
+      for (const booking of (completedBookings || [])) {
+        sendPassengerReviewReminder(booking, ride).catch(err => console.error('Passenger review email error:', err));
+        if (booking.passenger?.name) passengerNames.push(booking.passenger.name);
+      }
+      if (passengerNames.length > 0) {
+        sendDriverReviewReminder(ride, passengerNames).catch(err => console.error('Driver review email error:', err));
+      }
+    } catch {}
 
     res.json({ success: true });
   } catch (error) {
@@ -525,9 +748,10 @@ app.post('/api/admin/approve-driver', async (req, res) => {
       reviewed_at: new Date().toISOString(),
     }).eq('id', applicationId);
 
-    // Update profile
+    // Update profile (also sync age_group from application)
     await supabase.from('profiles').update({
       is_approved_driver: true,
+      age_group: application.age_group || undefined,
     }).eq('id', application.user_id);
 
     // Send email
@@ -755,6 +979,52 @@ app.get('/api/admin/users', async (req, res) => {
   }
 });
 
+// Approve licence (Gold Driver)
+app.post('/api/admin/approve-licence', async (req, res) => {
+  try {
+    const { adminId, userId } = req.body;
+    if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Verify admin
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    await supabase.from('profiles').update({
+      licence_status: 'approved',
+      driver_tier: 'gold',
+    }).eq('id', userId);
+
+    console.log(`✓ Licence approved (Gold Driver) for: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Approve licence error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Reject licence
+app.post('/api/admin/reject-licence', async (req, res) => {
+  try {
+    const { adminId, userId } = req.body;
+    if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
+
+    // Verify admin
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    await supabase.from('profiles').update({
+      licence_status: 'rejected',
+      driver_tier: 'regular',
+    }).eq('id', userId);
+
+    console.log(`✓ Licence rejected for: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Reject licence error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Toggle admin status for a user
 app.post('/api/admin/toggle-admin', async (req, res) => {
   try {
@@ -935,12 +1205,136 @@ async function cleanupPastRides() {
   }
 }
 
+// ============================================================
+// CHECK WISH MATCHES (called after a ride is posted)
+// ============================================================
+app.post('/api/check-wish-matches', async (req, res) => {
+  try {
+    const { ride_id } = req.body;
+    if (!ride_id) return res.status(400).json({ error: 'ride_id required' });
+
+    // Fetch the newly posted ride
+    const { data: ride, error: rideError } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('id', ride_id)
+      .single();
+
+    if (rideError || !ride) return res.status(404).json({ error: 'Ride not found' });
+
+    // Extract just the date part from the ride's date_time
+    const rideDate = new Date(ride.date_time).toISOString().split('T')[0];
+
+    // Find matching active wishes (include user profile for gender check)
+    const { data: matches, error: matchError } = await supabase
+      .from('ride_wishes')
+      .select('*, user:profiles!ride_wishes_user_id_fkey(gender, travel_status)')
+      .eq('status', 'active')
+      .eq('departure_location', ride.departure_location)
+      .eq('arrival_location', ride.arrival_location)
+      .eq('desired_date', rideDate);
+
+    if (matchError) throw matchError;
+
+    // Get driver profile for gender compatibility check
+    const { data: driver } = await supabase.from('profiles').select('gender').eq('id', ride.driver_id).single();
+    const driverGender = driver?.gender || null;
+    const occupants = ride.existing_occupants || null;
+
+    let emailsSent = 0;
+    if (matches && matches.length > 0) {
+      const { sendRideMatchEmail } = await import('./emails.js');
+      for (const wish of matches) {
+        // Don't notify the driver about their own wish
+        if (wish.user_id === ride.driver_id) continue;
+
+        // Gender compatibility check: can this passenger travel with this driver?
+        const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
+        if (passengerGender) {
+          const occ = occupants || { males: 0, females: 0, couples: 0 };
+          let males = (occ.males || 0) + (occ.couples || 0);
+          let females = (occ.females || 0) + (occ.couples || 0);
+          if (driverGender === 'Male') males++;
+          if (driverGender === 'Female') females++;
+          if (passengerGender === 'Female' && females < 1) continue;
+          if (passengerGender === 'Male' && males < 1) continue;
+        }
+
+        try {
+          await sendRideMatchEmail(wish, ride);
+          emailsSent++;
+        } catch (emailErr) {
+          console.error('Error sending match email:', emailErr);
+        }
+      }
+    }
+
+    res.json({ matches: matches?.length || 0, emailsSent });
+  } catch (error) {
+    console.error('Check wish matches error:', error);
+    res.status(500).json({ error: 'Failed to check wish matches' });
+  }
+});
+
+// Send post-ride reminder emails (2 hours after departure)
+async function sendPostRideReminders() {
+  try {
+    const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+
+    // Find rides that departed 2+ hours ago, still upcoming, reminder not yet sent
+    const { data: rides, error } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('status', 'upcoming')
+      .eq('reminder_sent', false)
+      .lt('date_time', twoHoursAgo);
+
+    if (error) throw error;
+    if (!rides || rides.length === 0) return;
+
+    const { sendDriverPostRideReminder, sendPassengerPostRideReminder } = await import('./emails.js');
+
+    for (const ride of rides) {
+      // Send reminder to driver
+      try {
+        await sendDriverPostRideReminder(ride);
+      } catch (err) {
+        console.error('Driver reminder email error:', err);
+      }
+
+      // Send reminder to each confirmed passenger
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('ride_id', ride.id)
+        .eq('status', 'confirmed');
+
+      for (const booking of (bookings || [])) {
+        try {
+          await sendPassengerPostRideReminder(booking, ride);
+        } catch (err) {
+          console.error('Passenger reminder email error:', err);
+        }
+      }
+
+      // Mark reminder as sent
+      await supabase.from('rides').update({ reminder_sent: true }).eq('id', ride.id);
+    }
+
+    if (rides.length > 0) console.log(`✓ Sent post-ride reminders for ${rides.length} ride(s)`);
+  } catch (error) {
+    console.error('Post-ride reminders error:', error);
+  }
+}
+
 // Run every 15 minutes
 setInterval(cleanupPastRides, 15 * 60 * 1000);
+setInterval(sendPostRideReminders, 15 * 60 * 1000);
 
 const PORT = 3001;
 app.listen(PORT, () => {
   console.log(`✅ ChapaRide server running on port ${PORT}`);
   // Run once on startup after a short delay
   setTimeout(cleanupPastRides, 5000);
+  setTimeout(sendPostRideReminders, 10000);
 });

@@ -6,6 +6,8 @@ import { LUGGAGE_OPTIONS } from '../lib/constants';
 import LocationDropdown from '../components/LocationDropdown';
 import type { NavigateFn } from '../lib/types';
 
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
+
 interface PostRideProps {
   onNavigate: NavigateFn;
 }
@@ -32,6 +34,25 @@ export default function PostRide({ onNavigate }: PostRideProps) {
   const [driverDeclaration, setDriverDeclaration] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Pre-fill from wish data if available
+  useEffect(() => {
+    const wishData = sessionStorage.getItem('prefill-ride');
+    if (wishData) {
+      try {
+        const wish = JSON.parse(wishData);
+        setFormData(prev => ({
+          ...prev,
+          from: wish.from || '',
+          to: wish.to || '',
+          date: wish.date || '',
+          time: wish.time || '',
+          availableSeats: wish.passengers ? String(wish.passengers) : '',
+        }));
+      } catch {}
+      sessionStorage.removeItem('prefill-ride');
+    }
+  }, []);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -160,7 +181,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
         couples: parseInt(formData.occupantCouples) || 0,
       };
 
-      const { error: insertError } = await supabase.from('rides').insert([
+      const { data: insertedRides, error: insertError } = await supabase.from('rides').insert([
         {
           driver_id: user.id,
           departure_location: formData.from.trim(),
@@ -176,9 +197,19 @@ export default function PostRide({ onNavigate }: PostRideProps) {
           existing_occupants: existingOccupants,
           status: 'upcoming',
         },
-      ]);
+      ]).select();
 
       if (insertError) throw insertError;
+
+      // Check for matching ride wishes and notify passengers
+      if (insertedRides && insertedRides[0]) {
+        fetch(`${API_URL}/api/check-wish-matches`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ride_id: insertedRides[0].id }),
+        }).catch(err => console.error('Wish match check error:', err));
+      }
+
       onNavigate('dashboard');
     } catch (err: any) {
       setError(err.message || 'Failed to post ride');
@@ -217,6 +248,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                     if (errors.from) setErrors((prev) => { const n = { ...prev }; delete n.from; return n; });
                   }}
                   error={errors.from}
+                  exclude={formData.to}
                 />
                 <LocationDropdown
                   label="To *"
@@ -226,6 +258,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                     if (errors.to) setErrors((prev) => { const n = { ...prev }; delete n.to; return n; });
                   }}
                   error={errors.to}
+                  exclude={formData.from}
                 />
               </div>
 

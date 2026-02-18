@@ -41,6 +41,8 @@ async function getDetails(bookingData) {
 export async function sendBookingRequestEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
+  const acceptUrl = `https://srv1291941.hstgr.cloud:3001/api/driver/accept-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}`;
+  const rejectUrl = `https://srv1291941.hstgr.cloud:3001/api/driver/reject-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}`;
   return sendEmail(driver.email, `New Booking Request: ${ride.departure_location} → ${ride.arrival_location}`,
     `<h2>New Booking Request</h2>
     <p>Hi ${driver.name},</p>
@@ -52,7 +54,11 @@ export async function sendBookingRequestEmail(bookingData) {
       <p><strong>Amount:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
     </div>
     <p>The payment hold on the passenger's card will expire in 6 days.</p>
-    <p><a href="https://srv1291941.hstgr.cloud/#dashboard" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+    <div style="margin: 24px 0;">
+      <a href="${acceptUrl}" style="display: inline-block; padding: 14px 28px; background: #166534; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Accept Booking</a>
+      <a href="${rejectUrl}" style="display: inline-block; padding: 14px 28px; background: #991b1b; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Reject Booking</a>
+    </div>
+    <p style="color: #666; font-size: 13px;">Or manage from your <a href="https://srv1291941.hstgr.cloud/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>`
   );
 }
 
@@ -71,7 +77,8 @@ export async function sendBookingAcceptedEmail(bookingData) {
       <p><strong>Total charged:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
       <p><strong>Driver:</strong> ${driver.name}</p>
     </div>
-    <p>Your card has now been charged. Contact details will be available 12 hours before departure.</p>
+    <p>Your card has now been charged.</p>
+    <p>Contact details will be available 12 hours before departure.</p>
     <p><a href="https://srv1291941.hstgr.cloud/#my-bookings" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
   );
 }
@@ -160,6 +167,89 @@ export async function sendDriverApplicationNotification(application) {
       <p><strong>Driving experience:</strong> ${application.years_driving_experience} years</p>
     </div>
     <p><a href="https://srv1291941.hstgr.cloud/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Review Application</a></p>`
+  );
+}
+
+// 9. Ride match notification (to wish creator)
+export async function sendRideMatchEmail(wish, ride) {
+  const { data: wisher } = await supabase.from('profiles').select('*').eq('id', wish.user_id).single();
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!wisher || !driver) return false;
+  return sendEmail(wisher.email, `Ride Alert: ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>A Ride Matching Your Alert is Available!</h2>
+    <p>Hi ${wisher.name},</p>
+    <p>Great news! A ride matching your alert has just been posted.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Price per seat:</strong> £${Number(ride.price_per_seat).toFixed(2)}</p>
+      <p><strong>Available seats:</strong> ${ride.seats_available}</p>
+      <p><strong>Driver:</strong> ${driver.name}</p>
+    </div>
+    <p><a href="https://srv1291941.hstgr.cloud/#ride-details/${ride.id}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Ride Details</a></p>`
+  );
+}
+
+// 10. Post-ride reminder to driver (mark as complete + leave reviews)
+export async function sendDriverPostRideReminder(ride) {
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!driver) return false;
+  return sendEmail(driver.email, `Ride Complete? ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>Has your ride taken place?</h2>
+    <p>Hi ${driver.name},</p>
+    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> was scheduled to depart recently.</p>
+    <p>If the ride has taken place, please mark it as complete on your dashboard. This will:</p>
+    <ul>
+      <li>Finalise passenger payments</li>
+      <li>Allow you and your passengers to leave reviews for each other</li>
+      <li>Update your ride history</li>
+    </ul>
+    <p><a href="https://srv1291941.hstgr.cloud/#dashboard" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Mark as Complete</a></p>
+    <p style="color: #666; font-size: 13px; margin-top: 20px;">Don't forget to leave reviews for your passengers after marking the ride complete!</p>`
+  );
+}
+
+// 11. Post-ride reminder to passenger (leave a review)
+export async function sendPassengerPostRideReminder(booking, ride) {
+  const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!passenger || !driver) return false;
+  return sendEmail(passenger.email, `How was your ride? ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>How was your ride?</h2>
+    <p>Hi ${passenger.name},</p>
+    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> with <strong>${driver.name}</strong> on <strong>${formatDate(ride.date_time)}</strong> should have taken place.</p>
+    <p>Once the driver marks the ride as complete, you'll be able to leave a review. Reviews help build trust in the ChapaRide community and help other passengers choose great drivers!</p>
+    <p><a href="https://srv1291941.hstgr.cloud/#my-bookings" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
+  );
+}
+
+// 12. Review reminder to passenger (review the driver)
+export async function sendPassengerReviewReminder(booking, ride) {
+  const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!passenger || !driver) return false;
+  return sendEmail(passenger.email, `Leave a review for ${driver.name}`,
+    `<h2>Your ride is complete!</h2>
+    <p>Hi ${passenger.name},</p>
+    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> has been marked as complete by the driver.</p>
+    <p>How was your experience with <strong>${driver.name}</strong>? Your review helps other passengers choose great drivers and helps build trust in the ChapaRide community.</p>
+    <p><a href="https://srv1291941.hstgr.cloud/#my-bookings" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a></p>`
+  );
+}
+
+// 13. Review reminder to driver (review passengers)
+export async function sendDriverReviewReminder(ride, passengerNames) {
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!driver) return false;
+  const passengerList = passengerNames.length === 1
+    ? `<strong>${passengerNames[0]}</strong>`
+    : passengerNames.map(n => `<strong>${n}</strong>`).join(', ');
+  return sendEmail(driver.email, `Leave reviews for your passengers`,
+    `<h2>Ride marked as complete!</h2>
+    <p>Hi ${driver.name},</p>
+    <p>You've marked your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> as complete.</p>
+    <p>Don't forget to leave reviews for your passenger(s): ${passengerList}. Your feedback helps build a safe and trusted community.</p>
+    <p><a href="https://srv1291941.hstgr.cloud/#dashboard" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Leave Reviews</a></p>`
   );
 }
 

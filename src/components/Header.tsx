@@ -107,6 +107,9 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 <button onClick={() => onNavigate('my-bookings')} style={navLinkStyle(currentPage === 'my-bookings')}>
                   My Bookings
                 </button>
+                <button onClick={() => onNavigate('ride-wishes')} style={navLinkStyle(currentPage === 'ride-wishes')}>
+                  Ride Alerts
+                </button>
                 <button onClick={() => onNavigate('dashboard')} style={navLinkStyle(currentPage === 'dashboard')}>
                   Dashboard
                 </button>
@@ -251,6 +254,9 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
               <>
                 <button onClick={() => { onNavigate('my-bookings'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>
                   My Bookings
+                </button>
+                <button onClick={() => { onNavigate('ride-wishes'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>
+                  Ride Alerts
                 </button>
                 <button onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>
                   Dashboard

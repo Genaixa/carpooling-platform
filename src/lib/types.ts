@@ -18,6 +18,7 @@ export type Page =
   | 'contact'
   | 'privacy-policy'
   | 'faqs'
-  | 'register-driver';
+  | 'register-driver'
+  | 'ride-wishes';
 
 export type NavigateFn = (page: Page, rideId?: string, userId?: string) => void;

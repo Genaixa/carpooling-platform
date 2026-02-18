@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Booking, isContactVisible } from '../lib/supabase';
+import { supabase, Booking, isContactVisible, getDriverAlias } from '../lib/supabase';
 import { REFUND_POLICY } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -24,6 +24,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const [cancellingBooking, setCancellingBooking] = useState<Booking | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [reviewingBooking, setReviewingBooking] = useState<Booking | null>(null);
+  const [expandedPastId, setExpandedPastId] = useState<string | null>(null);
 
   // Financial Report state
   const [bookingsView, setBookingsView] = useState<'bookings' | 'financials'>('bookings');
@@ -522,7 +523,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 style={{ cursor: 'pointer', color: '#1A9D9D', fontWeight: '500' }}
                                 onClick={() => onNavigate('public-profile', undefined, driver.id)}
                               >
-                                {driver.name}
+                                {getDriverAlias(driver.id)}
                               </span>
                             ) : (
                               <span style={{ color: '#9CA3AF' }}>Unknown</span>
@@ -594,7 +595,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '20px', marginBottom: '20px' }}>
                           <div>
                             <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: 0, cursor: 'pointer' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>
-                              {driver.name} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
+                              {getDriverAlias(driver.id)} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
                             </p>
                           </div>
                         </div>
@@ -641,36 +642,104 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
             {pastBookings.length > 0 && (
               <div>
                 <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '25px' }}>Past Bookings</h2>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-                  {pastBookings.map((booking) => {
-                    if (!booking.ride) return null;
-                    const driver = (booking.ride as any)?.driver;
-
-                    return (
-                      <div key={booking.id} style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #9CA3AF', opacity: 0.85 }}>
-                        <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                          {booking.ride.departure_location} → {booking.ride.arrival_location}
-                        </h3>
-                        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px', alignItems: 'center' }}>
-                          <span style={{ fontSize: '13px', color: '#4B5563' }}>{formatDate(booking.ride.date_time)}</span>
-                          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                            {getStatusLabel(booking.status, booking.driver_action)}
-                          </span>
-                        </div>
-                        <p style={{ fontSize: '13px', color: '#4B5563', marginBottom: '4px' }}>
-                          {booking.seats_booked} seat(s) - £{booking.total_paid?.toFixed(2)}
-                        </p>
-                        {driver && <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 12px' }}>Driver: {driver.name}</p>}
-
-                        {/* Leave Review for completed bookings */}
-                        {booking.status === 'completed' && (
-                          <button onClick={() => setReviewingBooking(booking)} style={{ padding: '8px 16px', fontSize: '13px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '8px', cursor: 'pointer', fontWeight: '500' }}>
-                            Leave Review
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
+                <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                  {isMobile ? (
+                    /* Mobile: expandable list */
+                    <div>
+                      {pastBookings.map((booking) => {
+                        if (!booking.ride) return null;
+                        const driver = (booking.ride as any)?.driver;
+                        const isExpanded = expandedPastId === booking.id;
+                        return (
+                          <div key={booking.id} style={{ borderBottom: '1px solid #E8EBED' }}>
+                            <div
+                              onClick={() => setExpandedPastId(isExpanded ? null : booking.id)}
+                              style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {booking.ride.departure_location} → {booking.ride.arrival_location}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                                  {formatDate(booking.ride.date_time)}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
+                                  {getStatusLabel(booking.status, booking.driver_action)}
+                                </span>
+                                <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                              </div>
+                            </div>
+                            {isExpanded && (
+                              <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
+                                <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '4px' }}>
+                                  {booking.seats_booked} seat(s) — £{booking.total_paid?.toFixed(2)}
+                                </div>
+                                {driver && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '8px' }}>{getDriverAlias(driver.id)}</div>}
+                                {booking.status === 'completed' && (
+                                  <button onClick={() => setReviewingBooking(booking)} style={{ padding: '6px 14px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Leave Review</button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* Desktop: table */
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#F8FAFB' }}>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Date</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Seats</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Paid</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Driver</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Status</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}></th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {pastBookings.map((booking) => {
+                          if (!booking.ride) return null;
+                          const driver = (booking.ride as any)?.driver;
+                          return (
+                            <tr key={booking.id} style={{ backgroundColor: 'white' }}
+                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FAFBFC'}
+                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
+                            >
+                              <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                {booking.ride.departure_location} → {booking.ride.arrival_location}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
+                                {formatDate(booking.ride.date_time)}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED', textAlign: 'center' }}>
+                                {booking.seats_booked}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED', textAlign: 'right', fontWeight: '600' }}>
+                                £{booking.total_paid?.toFixed(2)}
+                              </td>
+                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED' }}>
+                                {driver ? getDriverAlias(driver.id) : '—'}
+                              </td>
+                              <td style={{ padding: '12px 16px', borderBottom: '1px solid #E8EBED', textAlign: 'center' }}>
+                                <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
+                                  {getStatusLabel(booking.status, booking.driver_action)}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px', borderBottom: '1px solid #E8EBED', textAlign: 'right' }}>
+                                {booking.status === 'completed' && (
+                                  <button onClick={() => setReviewingBooking(booking)} style={{ padding: '5px 12px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               </div>
             )}

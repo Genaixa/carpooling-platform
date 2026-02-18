@@ -22,6 +22,10 @@ export interface Profile {
   city: string | null;
   postcode: string | null;
   country: string | null;
+  age_group: '18-25' | '26-35' | '36-45' | '46-55' | '56+' | null;
+  driver_tier: 'regular' | 'gold';
+  licence_photo_url: string | null;
+  licence_status: 'pending' | 'approved' | 'rejected' | null;
   average_rating: number | null;
   total_reviews: number;
   created_at: string;
@@ -49,6 +53,7 @@ export interface Ride {
   existing_occupants: { males: number; females: number; couples: number } | null;
   additional_notes: string | null;
   status: 'upcoming' | 'completed' | 'cancelled';
+  reminder_sent: boolean;
   created_at: string;
   updated_at: string;
   driver?: Profile;
@@ -113,6 +118,19 @@ export interface DriverPayout {
   created_at: string;
   driver?: Profile;
   admin?: Profile;
+}
+
+export interface RideWish {
+  id: string;
+  user_id: string;
+  departure_location: string;
+  arrival_location: string;
+  desired_date: string;
+  desired_time: string | null;
+  passengers_count: number;
+  status: 'active' | 'fulfilled' | 'expired';
+  created_at: string;
+  user?: Profile;
 }
 
 export interface Review {
@@ -222,4 +240,14 @@ export function isContactVisible(rideDateTime: string): boolean {
   const now = Date.now();
   const twelveHoursMs = 12 * 60 * 60 * 1000;
   return (rideTime - now) <= twelveHoursMs;
+}
+
+// Generate a consistent anonymous driver number from a UUID
+export function getDriverAlias(driverId: string): string {
+  let hash = 0;
+  for (let i = 0; i < driverId.length; i++) {
+    hash = ((hash << 5) - hash + driverId.charCodeAt(i)) | 0;
+  }
+  const num = Math.abs(hash) % 10000;
+  return `Driver #${num.toString().padStart(4, '0')}`;
 }

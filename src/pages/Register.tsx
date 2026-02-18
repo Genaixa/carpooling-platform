@@ -22,7 +22,8 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
     city: '',
     postcode: '',
     country: 'United Kingdom',
-    gender: 'Male' as 'Male' | 'Female'
+    gender: 'Male' as 'Male' | 'Female',
+    ageGroup: '' as string,
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
@@ -59,6 +60,11 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
       setError('You must confirm that you are 18 years of age or over');
       return;
     }
+
+    if (!formData.ageGroup) {
+      setError('Please select your age group');
+      return;
+    }
   
     setLoading(true);
   
@@ -75,6 +81,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
           postcode: formData.postcode,
           country: formData.country,
           gender: formData.gender,
+          age_group: formData.ageGroup,
         }
       );
       onNavigate(intent === 'driver' ? 'driver-apply' : 'home');
@@ -293,6 +300,31 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                 </select>
               </div>
 
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Age Group *</label>
+                <select
+                  name="ageGroup"
+                  value={formData.ageGroup}
+                  onChange={handleChange}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    fontSize: '16px',
+                    border: '2px solid #E8EBED',
+                    borderRadius: '12px',
+                    backgroundColor: 'white',
+                    transition: 'border-color 0.3s'
+                  }}
+                >
+                  <option value="">Select age group</option>
+                  <option value="18-25">18-25</option>
+                  <option value="26-35">26-35</option>
+                  <option value="36-45">36-45</option>
+                  <option value="46-55">46-55</option>
+                  <option value="56+">56+</option>
+                </select>
+              </div>
 
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Password *</label>
