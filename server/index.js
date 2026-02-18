@@ -7,10 +7,17 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import multer from 'multer';
 
-// Credentials (use env vars in production)
-const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN || '';
-const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://fiylgivjirvmgkytejep.supabase.co';
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZpeWxnaXZqaXJ2bWdreXRlamVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2OTA4OTI1NSwiZXhwIjoyMDg0NjY1MjU1fQ.ifLBGtb2O-Hhhmaq0OysOJdyg6rFvwcM4ao3JoWJXx0';
+// Credentials from environment variables only
+const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
+const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const SITE_URL = process.env.SITE_URL || 'https://srv1291941.hstgr.cloud';
+const API_URL = process.env.API_URL || 'https://srv1291941.hstgr.cloud:3001';
+
+if (!SQUARE_ACCESS_TOKEN || !VITE_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  console.error('FATAL: Missing required environment variables (SQUARE_ACCESS_TOKEN, VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
+  process.exit(1);
+}
 
 const COMMISSION_RATE = 0.25; // 25% platform commission
 const DRIVER_RATE = 0.75;    // 75% to driver
@@ -24,8 +31,20 @@ const squareClient = new SquareClient({
 
 const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-app.use(cors());
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://srv1291941.hstgr.cloud,https://chaparide.com,http://localhost:5173').split(',');
+app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+
+// Security headers
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  if (req.secure || req.headers['x-forwarded-proto'] === 'https') {
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  }
+  next();
+});
 
 
 const upload = multer({
@@ -296,16 +315,16 @@ app.post('/api/create-payment', async (req, res) => {
 app.get('/api/driver/accept-booking', async (req, res) => {
   try {
     const { bookingId, driverId } = req.query;
-    if (!bookingId || !driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=missing-params');
+    if (!bookingId || !driverId) return res.redirect(`${SITE_URL}/#dashboard?error=missing-params`);
 
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
-    if (!booking) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=booking-not-found');
+    if (!booking) return res.redirect(`${SITE_URL}/#dashboard?error=booking-not-found`);
 
     const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
-    if (!ride || ride.driver_id !== driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=not-authorized');
+    if (!ride || ride.driver_id !== driverId) return res.redirect(`${SITE_URL}/#dashboard?error=not-authorized`);
 
     if (booking.status !== 'pending_driver') {
-      return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?info=already-actioned');
+      return res.redirect(`${SITE_URL}/#dashboard?info=already-actioned`);
     }
 
     // Capture the payment
@@ -327,10 +346,10 @@ app.get('/api/driver/accept-booking', async (req, res) => {
     } catch {}
 
     console.log(`✓ Booking accepted via email: ${bookingId}`);
-    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?success=booking-accepted');
+    res.redirect(`${SITE_URL}/#dashboard?success=booking-accepted`);
   } catch (error) {
     console.error('Accept booking (email) error:', error);
-    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=server-error');
+    res.redirect(`${SITE_URL}/#dashboard?error=server-error`);
   }
 });
 
@@ -338,16 +357,16 @@ app.get('/api/driver/accept-booking', async (req, res) => {
 app.get('/api/driver/reject-booking', async (req, res) => {
   try {
     const { bookingId, driverId } = req.query;
-    if (!bookingId || !driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=missing-params');
+    if (!bookingId || !driverId) return res.redirect(`${SITE_URL}/#dashboard?error=missing-params`);
 
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
-    if (!booking) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=booking-not-found');
+    if (!booking) return res.redirect(`${SITE_URL}/#dashboard?error=booking-not-found`);
 
     const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
-    if (!ride || ride.driver_id !== driverId) return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=not-authorized');
+    if (!ride || ride.driver_id !== driverId) return res.redirect(`${SITE_URL}/#dashboard?error=not-authorized`);
 
     if (booking.status !== 'pending_driver') {
-      return res.redirect('https://srv1291941.hstgr.cloud/#dashboard?info=already-actioned');
+      return res.redirect(`${SITE_URL}/#dashboard?info=already-actioned`);
     }
 
     // Cancel the payment hold
@@ -367,10 +386,10 @@ app.get('/api/driver/reject-booking', async (req, res) => {
     } catch {}
 
     console.log(`✓ Booking rejected via email: ${bookingId}`);
-    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?success=booking-rejected');
+    res.redirect(`${SITE_URL}/#dashboard?success=booking-rejected`);
   } catch (error) {
     console.error('Reject booking (email) error:', error);
-    res.redirect('https://srv1291941.hstgr.cloud/#dashboard?error=server-error');
+    res.redirect(`${SITE_URL}/#dashboard?error=server-error`);
   }
 });
 
@@ -1135,10 +1154,13 @@ async function recalculateSeats(rideId) {
   await supabase.from('rides').update({ seats_available: available }).eq('id', rideId);
 }
 
-// Test email endpoint
+// Test email endpoint (admin only)
 app.post('/api/test-email', async (req, res) => {
   try {
-    const { type, email, name } = req.body;
+    const { type, email, name, adminId } = req.body;
+    if (!adminId) return res.status(401).json({ error: 'Admin ID required' });
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
     const { testEmail } = await import('./emails.js');
     const result = await testEmail(email || 'test@example.com', name || 'Test User', type || 'booking-confirmation');
     res.json({ success: result, message: `Test ${type} email ${result ? 'sent' : 'failed'}` });
@@ -1147,9 +1169,13 @@ app.post('/api/test-email', async (req, res) => {
   }
 });
 
-// Fix all seat counts
+// Fix all seat counts (admin only)
 app.post('/api/fix-all-seats', async (req, res) => {
   try {
+    const { adminId } = req.body;
+    if (!adminId) return res.status(401).json({ error: 'Admin ID required' });
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
     const { data: rides } = await supabase.from('rides').select('id, seats_total').eq('status', 'upcoming');
     let fixed = 0;
     for (const ride of (rides || [])) {
