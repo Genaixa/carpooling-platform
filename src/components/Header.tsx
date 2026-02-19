@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Avatar from './Avatar';
 import toast from 'react-hot-toast';
@@ -13,7 +14,31 @@ interface HeaderProps {
 export default function Header({ onNavigate, currentPage }: HeaderProps) {
   const { user, profile, signOut } = useAuth();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [bookingNotifCount, setBookingNotifCount] = useState(0);
   const isMobile = useIsMobile(768);
+
+  const refreshNotifCount = async () => {
+    if (!user) { setBookingNotifCount(0); return; }
+    const lastSeen = localStorage.getItem('lastSeenBookings') || new Date(0).toISOString();
+    const { count } = await supabase
+      .from('bookings')
+      .select('id', { count: 'exact', head: true })
+      .eq('passenger_id', user.id)
+      .eq('status', 'confirmed')
+      .gt('driver_action_at', lastSeen);
+    setBookingNotifCount(count || 0);
+  };
+
+  useEffect(() => {
+    refreshNotifCount();
+  }, [user]);
+
+  // Listen for the bookings-seen event fired by MyBookings page
+  useEffect(() => {
+    const handler = () => setBookingNotifCount(0);
+    window.addEventListener('bookings-seen', handler);
+    return () => window.removeEventListener('bookings-seen', handler);
+  }, []);
 
   const handleSignOut = async () => {
     try {
@@ -104,8 +129,18 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
             <button onClick={() => onNavigate('how-it-works')} style={navLinkStyle(currentPage === 'how-it-works')}>How it Works</button>
             {user && (
               <>
-                <button onClick={() => onNavigate('my-bookings')} style={navLinkStyle(currentPage === 'my-bookings')}>
+                <button onClick={() => onNavigate('my-bookings')} style={{ ...navLinkStyle(currentPage === 'my-bookings'), display: 'flex', alignItems: 'center', gap: '6px' }}>
                   My Bookings
+                  {bookingNotifCount > 0 && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      minWidth: '18px', height: '18px', padding: '0 4px',
+                      borderRadius: '9px', backgroundColor: '#ef4444', color: 'white',
+                      fontSize: '11px', fontWeight: '700', lineHeight: 1,
+                    }}>
+                      {bookingNotifCount}
+                    </span>
+                  )}
                 </button>
                 <button onClick={() => onNavigate('ride-wishes')} style={navLinkStyle(currentPage === 'ride-wishes')}>
                   Ride Alerts
@@ -252,8 +287,18 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
             </button>
             {user && (
               <>
-                <button onClick={() => { onNavigate('my-bookings'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>
+                <button onClick={() => { onNavigate('my-bookings'); setMobileMenuOpen(false); }} style={{ ...mobileLinkStyle, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                   My Bookings
+                  {bookingNotifCount > 0 && (
+                    <span style={{
+                      display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                      minWidth: '20px', height: '20px', padding: '0 5px',
+                      borderRadius: '10px', backgroundColor: '#ef4444', color: 'white',
+                      fontSize: '12px', fontWeight: '700', lineHeight: 1,
+                    }}>
+                      {bookingNotifCount}
+                    </span>
+                  )}
                 </button>
                 <button onClick={() => { onNavigate('ride-wishes'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>
                   Ride Alerts

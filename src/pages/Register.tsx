@@ -25,6 +25,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
     country: 'United Kingdom',
     gender: 'Male' as 'Male' | 'Female',
     ageGroup: '' as string,
+    maritalStatus: '' as string,
   });
   const [agreedToTerms, setAgreedToTerms] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
@@ -66,6 +67,11 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
       setError('Please select your age group');
       return;
     }
+
+    if (!formData.maritalStatus) {
+      setError('Please select your marital status');
+      return;
+    }
   
     setLoading(true);
   
@@ -83,6 +89,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
           country: formData.country,
           gender: formData.gender,
           age_group: formData.ageGroup,
+          marital_status: formData.maritalStatus,
         }
       );
       onNavigate(intent === 'driver' ? 'driver-apply' : 'home');
@@ -345,6 +352,29 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                   <option value="36-45">36-45</option>
                   <option value="46-55">46-55</option>
                   <option value="56+">56+</option>
+                </select>
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Marital Status *</label>
+                <select
+                  name="maritalStatus"
+                  value={formData.maritalStatus}
+                  onChange={handleChange}
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '14px',
+                    fontSize: '16px',
+                    border: '2px solid #E8EBED',
+                    borderRadius: '12px',
+                    backgroundColor: 'white',
+                    transition: 'border-color 0.3s'
+                  }}
+                >
+                  <option value="">Select marital status</option>
+                  <option value="Single">Single</option>
+                  <option value="Married">Married</option>
                 </select>
               </div>
 

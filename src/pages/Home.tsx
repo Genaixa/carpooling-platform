@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarComposition, getCarCompositionLabel, getDriverAlias } from '../lib/supabase';
 import { NavigateFn } from '../lib/types';
@@ -71,6 +71,10 @@ export default function Home({ onNavigate }: HomeProps) {
   const [seatsNeeded, setSeatsNeeded] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('date-asc');
 
+  // City filter for logged-in users — defaults to the passenger's registered city
+  const [cityFilter, setCityFilter] = useState<string>('All');
+  const cityFilterInitialized = useRef(false);
+
   // Debug: Log profile changes (commented out for production)
   useEffect(() => {
     /* DEBUG: Profile monitoring
@@ -112,7 +116,7 @@ export default function Home({ onNavigate }: HomeProps) {
         .from('rides')
         .select(`
           *,
-          driver:profiles(id, name, gender, age_group, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
+          driver:profiles(id, name, gender, age_group, marital_status, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
         `)
         .eq('status', 'upcoming')
         .gt('seats_available', 0)
@@ -227,6 +231,11 @@ export default function Home({ onNavigate }: HomeProps) {
       }
     }
 
+    // City filter — only for logged-in users
+    if (user && cityFilter !== 'All') {
+      filtered = filtered.filter((ride) => ride.departure_location === cityFilter);
+    }
+
     // Sort rides
     filtered.sort((a, b) => {
       switch (sortBy) {
@@ -246,7 +255,7 @@ export default function Home({ onNavigate }: HomeProps) {
     });
 
     return filtered;
-  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy, effectiveGender, bookingFor, bookingForGender, profile]);
+  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy, effectiveGender, bookingFor, bookingForGender, profile, cityFilter, user]);
 
   // Group rides by destination, sorted chronologically within groups,
   // groups ordered by their earliest ride's departure time
@@ -267,6 +276,33 @@ export default function Home({ onNavigate }: HomeProps) {
     );
     return entries;
   }, [rides]);
+
+  // Unique departure cities from all loaded rides (for the city filter dropdown)
+  const departureCities = useMemo(() => {
+    const cities = new Set(allRides.map((r) => r.departure_location));
+    return Array.from(cities).sort();
+  }, [allRides]);
+
+  // Initialise city filter from profile.city once rides are loaded
+  useEffect(() => {
+    if (!cityFilterInitialized.current && user && profile?.city && departureCities.length > 0) {
+      cityFilterInitialized.current = true;
+      // Exact match
+      if (departureCities.includes(profile.city)) {
+        setCityFilter(profile.city);
+        return;
+      }
+      // Partial match — e.g. profile.city "London" → "London - Stamford Hill"
+      const partial = departureCities.find(
+        (d) =>
+          d.toLowerCase().includes(profile.city.toLowerCase()) ||
+          profile.city.toLowerCase().includes(d.toLowerCase())
+      );
+      if (partial) {
+        setCityFilter(partial);
+      }
+    }
+  }, [user, profile, departureCities]);
 
   // Handle hero form submission
   const handleHeroSearch = () => {
@@ -332,6 +368,7 @@ export default function Home({ onNavigate }: HomeProps) {
     setPriceMax('');
     setSeatsNeeded('');
     setSortBy('date-asc');
+    setCityFilter('All');
     toast.success('All filters cleared');
   };
 
@@ -972,6 +1009,68 @@ export default function Home({ onNavigate }: HomeProps) {
             {rides.length} {rides.length === 1 ? 'ride' : 'rides'} found
             {profile && <span> &middot; Incompatible rides are greyed out</span>}
           </p>
+
+          {/* City filter — logged-in users only */}
+          {user && departureCities.length > 0 && (
+            <div style={{
+              marginTop: '20px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '10px',
+              flexWrap: 'wrap',
+            }}>
+              <label style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>
+                Show rides from:
+              </label>
+              <select
+                value={cityFilter}
+                onChange={(e) => setCityFilter(e.target.value)}
+                style={{
+                  padding: '8px 36px 8px 16px',
+                  border: '2px solid #E5E7EB',
+                  borderRadius: '50px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  color: '#1F2937',
+                  backgroundColor: 'white',
+                  cursor: 'pointer',
+                  outline: 'none',
+                  appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat',
+                  backgroundPosition: 'right 14px center',
+                  boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
+                onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
+              >
+                <option value="All">All locations</option>
+                {departureCities.map((city) => (
+                  <option key={city} value={city}>{city}</option>
+                ))}
+              </select>
+              {cityFilter !== 'All' && (
+                <button
+                  onClick={() => setCityFilter('All')}
+                  style={{
+                    fontSize: '12px',
+                    color: '#6B7280',
+                    background: 'none',
+                    border: '1px solid #D1D5DB',
+                    borderRadius: '50px',
+                    cursor: 'pointer',
+                    padding: '5px 12px',
+                    fontWeight: '500',
+                  }}
+                >
+                  Show all
+                </button>
+              )}
+            </div>
+          )}
+
           {!user && (
             <div style={{
               marginTop: '16px',
@@ -1214,6 +1313,12 @@ export default function Home({ onNavigate }: HomeProps) {
                                 <>
                                   <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
                                   <span style={{ fontSize: '12px', color: '#6B7280' }}>{(ride.driver as any).city}</span>
+                                </>
+                              )}
+                              {(ride.driver as any).marital_status && (
+                                <>
+                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
+                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>{(ride.driver as any).marital_status}</span>
                                 </>
                               )}
                               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>

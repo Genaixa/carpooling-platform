@@ -160,6 +160,9 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                     {(driver as any).city && (
                       <span style={{ fontSize: '13px', color: '#6B7280' }}>{(driver as any).city}</span>
                     )}
+                    {(driver as any).marital_status && (
+                      <span style={{ fontSize: '13px', color: '#6B7280' }}>{(driver as any).marital_status}</span>
+                    )}
                     {driver.average_rating && (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
                         <StarRating rating={driver.average_rating} size="sm" />

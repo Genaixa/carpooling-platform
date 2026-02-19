@@ -30,6 +30,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
     email: '',
     bio: '',
     gender: 'Male' as 'Male' | 'Female',
+    marital_status: '' as string,
     vehicle_make: '',
     vehicle_model: '',
     vehicle_color: '',
@@ -60,6 +61,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
         email: profile.email || '',
         bio: (profile as any).bio || '',
         gender: (profile.gender || 'Male') as 'Male' | 'Female',
+        marital_status: profile.marital_status || '',
         vehicle_make: (profile as any).vehicle_make || '',
         vehicle_model: (profile as any).vehicle_model || '',
         vehicle_color: (profile as any).vehicle_color || '',
@@ -139,6 +141,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
         country: formData.country.trim() || null,
         travel_status: 'solo',
         gender: formData.gender,
+        marital_status: formData.marital_status || null,
         bio: formData.bio.trim() || null,
         vehicle_make: formData.vehicle_make.trim() || null,
         vehicle_model: formData.vehicle_model.trim() || null,
@@ -300,6 +303,19 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
               options={[
                 { value: 'Male', label: 'Male' },
                 { value: 'Female', label: 'Female' },
+              ]}
+            />
+
+            {/* Marital Status */}
+            <Select
+              label="Marital Status"
+              name="marital_status"
+              value={formData.marital_status}
+              onChange={handleChange}
+              options={[
+                { value: '', label: 'Select marital status' },
+                { value: 'Single', label: 'Single' },
+                { value: 'Married', label: 'Married' },
               ]}
             />
 

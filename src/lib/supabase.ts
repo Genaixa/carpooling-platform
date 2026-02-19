@@ -23,6 +23,7 @@ export interface Profile {
   postcode: string | null;
   country: string | null;
   age_group: '18-25' | '26-35' | '36-45' | '46-55' | '56+' | null;
+  marital_status: 'Single' | 'Married' | null;
   driver_tier: 'regular' | 'gold';
   licence_photo_url: string | null;
   licence_status: 'pending' | 'approved' | 'rejected' | null;

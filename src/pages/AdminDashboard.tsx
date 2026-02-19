@@ -549,6 +549,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Age Group</span><p style={{ margin: 0, color: '#1F2937' }}>{app.age_group}</p></div>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Gender</span><p style={{ margin: 0, color: '#1F2937' }}>{app.gender}</p></div>
+                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Marital Status</span><p style={{ margin: 0, color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Experience</span><p style={{ margin: 0, color: '#1F2937' }}>{app.years_driving_experience} years</p></div>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Car</span><p style={{ margin: 0, color: '#1F2937' }}>{app.car_make} {app.car_model}</p></div>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Licence</span><p style={{ margin: 0, color: app.has_drivers_license ? '#166534' : '#991b1b' }}>{app.has_drivers_license ? 'Yes' : 'No'}</p></div>

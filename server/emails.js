@@ -74,6 +74,7 @@ export async function sendBookingRequestEmail(bookingData) {
   const passengerInfoRows = `
       <p><strong>Gender:</strong> ${passenger.gender || 'Not specified'}</p>
       <p><strong>Age group:</strong> ${passenger.age_group || 'Not specified'}</p>
+      <p><strong>Marital status:</strong> ${passenger.marital_status || 'Not specified'}</p>
       <p><strong>City:</strong> ${passenger.city || 'Not specified'}</p>
       <p><strong>Travelling as:</strong> ${passenger.travel_status === 'couple' ? 'Couple' : 'Solo'}</p>
       <p><strong>Passenger rating:</strong> ${ratingText}</p>`;
@@ -327,6 +328,71 @@ export async function sendDriverWishNotificationEmail(driver, wish) {
     <p>If you're interested in offering this ride, you can post it directly from your dashboard. The passenger will be automatically notified when a matching ride is available.</p>
     <p><a href="${SITE_URL}/#post-ride" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Post This Ride</a></p>
     <p style="color: #666; font-size: 13px; margin-top: 16px;">You are receiving this because you are a registered driver in ${wish.departure_location.split(' - ')[0] || wish.departure_location}. You can turn off these alerts in your <a href="${SITE_URL}/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>`
+  );
+}
+
+// 15. Driver accepted booking confirmation (to driver)
+export async function sendDriverBookingAcceptedEmail(bookingData) {
+  const { ride, driver, passenger } = await getDetails(bookingData);
+  if (!ride || !driver || !passenger) return false;
+  return sendEmail(driver.email, `Booking Accepted: ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>You Accepted a Booking ✅</h2>
+    <p>Hi ${driver.name},</p>
+    <p>You have accepted the booking request from <strong>${getPassengerAlias(passenger.id)}</strong>. Their card has been charged.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Seats booked:</strong> ${bookingData.seats_booked}</p>
+      <p><strong>Your payout:</strong> £${Number(bookingData.driver_payout_amount).toFixed(2)}</p>
+    </div>
+    <p>Contact details for this passenger will be visible to you 12 hours before departure.</p>
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+  );
+}
+
+// 16. Driver rejected booking confirmation (to driver)
+export async function sendDriverBookingRejectedEmail(bookingData) {
+  const { ride, driver, passenger } = await getDetails(bookingData);
+  if (!ride || !driver || !passenger) return false;
+  return sendEmail(driver.email, `Booking Declined: ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>You Declined a Booking</h2>
+    <p>Hi ${driver.name},</p>
+    <p>You have declined the booking request from <strong>${getPassengerAlias(passenger.id)}</strong>. The hold on their card has been released and they will not be charged.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Seats requested:</strong> ${bookingData.seats_booked}</p>
+    </div>
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+  );
+}
+
+// 17. Passenger contact details email (12 hours before departure)
+export async function sendPassengerContactDetailsEmail(booking, ride, driver) {
+  const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
+  if (!passenger || !driver || !ride) return false;
+
+  const contactSection = driver.phone
+    ? `<p><strong>Phone:</strong> <a href="tel:${driver.phone}" style="color: #1A9D9D;">${driver.phone}</a></p>`
+    : `<p>No phone number on file. Please check your dashboard for contact options.</p>`;
+
+  return sendEmail(passenger.email, `Driver Contact Details: ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>Your ride departs in 12 hours 🚗</h2>
+    <p>Hi ${passenger.name},</p>
+    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your driver's contact details:</p>
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="font-weight: 700; margin: 0 0 8px 0; color: #166534;">Driver Information</p>
+      <p><strong>Driver:</strong> ${getDriverAlias(driver.id)}</p>
+      ${contactSection}
+    </div>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Seats booked:</strong> ${booking.seats_booked}</p>
+      ${ride.meeting_point_details ? `<p><strong>Meeting point:</strong> ${ride.meeting_point_details}</p>` : ''}
+    </div>
+    <p>Have a safe and comfortable journey!</p>
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
   );
 }
 

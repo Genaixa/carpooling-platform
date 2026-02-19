@@ -341,8 +341,9 @@ app.get('/api/driver/accept-booking', async (req, res) => {
     await recalculateSeats(booking.ride_id);
 
     try {
-      const { sendBookingAcceptedEmail } = await import('./emails.js');
+      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
       sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+      sendDriverBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
     } catch {}
 
     console.log(`✓ Booking accepted via email: ${bookingId}`);
@@ -381,8 +382,9 @@ app.get('/api/driver/reject-booking', async (req, res) => {
     }).eq('id', bookingId);
 
     try {
-      const { sendBookingRejectedEmail } = await import('./emails.js');
+      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
       sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+      sendDriverBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
     } catch {}
 
     console.log(`✓ Booking rejected via email: ${bookingId}`);
@@ -432,10 +434,11 @@ app.post('/api/driver/accept-booking', async (req, res) => {
     // Update seat count
     await recalculateSeats(booking.ride_id);
 
-    // Send email to passenger
+    // Send emails to passenger and driver
     try {
-      const { sendBookingAcceptedEmail } = await import('./emails.js');
+      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
       sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+      sendDriverBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
     } catch {}
 
     console.log(`✓ Booking accepted: ${bookingId}`);
@@ -481,10 +484,11 @@ app.post('/api/driver/reject-booking', async (req, res) => {
 
     if (updateError) throw updateError;
 
-    // Send email to passenger
+    // Send emails to passenger and driver
     try {
-      const { sendBookingRejectedEmail } = await import('./emails.js');
+      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
       sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+      sendDriverBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
     } catch {}
 
     console.log(`✓ Booking rejected: ${bookingId}`);
@@ -1408,9 +1412,55 @@ async function sendPostRideReminders() {
   }
 }
 
+// Send contact detail emails 12 hours before departure
+async function sendContactDetailEmails() {
+  try {
+    const now = new Date();
+    const in12h = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
+
+    // Find upcoming rides departing within the next 12 hours
+    const { data: rides, error } = await supabase
+      .from('rides')
+      .select('*')
+      .eq('status', 'upcoming')
+      .gte('date_time', now.toISOString())
+      .lte('date_time', in12h);
+
+    if (error) throw error;
+    if (!rides || rides.length === 0) return;
+
+    const { sendPassengerContactDetailsEmail } = await import('./emails.js');
+
+    for (const ride of rides) {
+      const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+
+      // Find confirmed bookings for this ride where contact email not yet sent
+      const { data: bookings } = await supabase
+        .from('bookings')
+        .select('*')
+        .eq('ride_id', ride.id)
+        .eq('status', 'confirmed')
+        .eq('contact_email_sent', false);
+
+      for (const booking of (bookings || [])) {
+        try {
+          await sendPassengerContactDetailsEmail(booking, ride, driver);
+          await supabase.from('bookings').update({ contact_email_sent: true }).eq('id', booking.id);
+          console.log(`✓ Sent contact details email for booking ${booking.id}`);
+        } catch (err) {
+          console.error('Contact detail email error:', err);
+        }
+      }
+    }
+  } catch (error) {
+    console.error('sendContactDetailEmails error:', error);
+  }
+}
+
 // Run every 15 minutes
 setInterval(cleanupPastRides, 15 * 60 * 1000);
 setInterval(sendPostRideReminders, 15 * 60 * 1000);
+setInterval(sendContactDetailEmails, 15 * 60 * 1000);
 
 const PORT = 3001;
 app.listen(PORT, () => {
@@ -1418,4 +1468,5 @@ app.listen(PORT, () => {
   // Run once on startup after a short delay
   setTimeout(cleanupPastRides, 5000);
   setTimeout(sendPostRideReminders, 10000);
+  setTimeout(sendContactDetailEmails, 15000);
 });

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Booking, isContactVisible, getDriverAlias } from '../lib/supabase';
 import { REFUND_POLICY } from '../lib/constants';
@@ -40,7 +40,38 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   }, [user, authLoading, onNavigate]);
 
   useEffect(() => {
-    if (user) loadBookings();
+    if (user) {
+      loadBookings();
+      // Clear the header notification badge when My Bookings is opened
+      localStorage.setItem('lastSeenBookings', new Date().toISOString());
+      window.dispatchEvent(new Event('bookings-seen'));
+    }
+  }, [user]);
+
+  // Real-time subscription: show toast when a booking is confirmed
+  const channelRef = useRef<any>(null);
+  useEffect(() => {
+    if (!user) return;
+    channelRef.current = supabase
+      .channel(`bookings-passenger-${user.id}`)
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'bookings',
+        filter: `passenger_id=eq.${user.id}`,
+      }, (payload: any) => {
+        if (payload.new.status === 'confirmed' && payload.old.status === 'pending_driver') {
+          toast.success('Your booking has been confirmed! Your card has been charged.', { duration: 6000 });
+          loadBookings();
+          localStorage.setItem('lastSeenBookings', new Date().toISOString());
+          window.dispatchEvent(new Event('bookings-seen'));
+        }
+      })
+      .subscribe();
+
+    return () => {
+      if (channelRef.current) supabase.removeChannel(channelRef.current);
+    };
   }, [user]);
 
   const loadBookings = async () => {
