@@ -372,14 +372,24 @@ export async function sendDriverBookingAcceptedEmail(bookingData) {
   return sendEmail(driver.email, `Booking Accepted: ${ride.departure_location} → ${ride.arrival_location}`,
     `<h2>You Accepted a Booking ✅</h2>
     <p>Hi ${driver.name},</p>
-    <p>You have accepted the booking request from <strong>${getPassengerAlias(passenger.id)}</strong>. Their card has been charged.</p>
+    <p>You have accepted the booking request. Their card has been charged.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
       <p><strong>Seats booked:</strong> ${bookingData.seats_booked}</p>
       <p><strong>Your payout:</strong> £${Number(bookingData.driver_payout_amount).toFixed(2)}</p>
     </div>
-    <p>Contact details for this passenger will be visible to you 12 hours before departure.</p>
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="font-weight: 700; margin: 0 0 10px 0; color: #166534;">Your Passenger</p>
+      <p><strong>Passenger ID:</strong> ${getPassengerAlias(passenger.id)}</p>
+      <p><strong>Gender:</strong> ${passenger.gender || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${passenger.age_group || 'Not specified'}</p>
+      <p><strong>Marital status:</strong> ${passenger.marital_status || 'Not specified'}</p>
+      <p><strong>Hometown:</strong> ${passenger.city || 'Not specified'}</p>
+    </div>
+    <p style="color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
+      The passenger's contact details (phone number) will be visible to you <strong>12 hours before departure</strong>.
+    </p>
     <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
   );
 }
