@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import type { NavigateFn } from '../lib/types';
 
 interface Props {
@@ -6,22 +5,6 @@ interface Props {
 }
 
 export default function RidePosted({ onNavigate }: Props) {
-  const [countdown, setCountdown] = useState(20);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCountdown((c) => {
-        if (c <= 1) {
-          clearInterval(interval);
-          onNavigate('home');
-          return 0;
-        }
-        return c - 1;
-      });
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [onNavigate]);
-
   return (
     <div style={{
       minHeight: '100vh',
@@ -76,9 +59,8 @@ export default function RidePosted({ onNavigate }: Props) {
             'Passengers can now find and book your ride.',
             "You'll receive an email the moment someone requests to book.",
             'You can accept or decline each booking request from the email or your dashboard.',
-            "Once you accept, the passenger's card is charged and their contact details will be shared with you 12 hours before departure.",
           ].map((step, i) => (
-            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 3 ? '10px' : 0 }}>
+            <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 2 ? '10px' : 0 }}>
               <span style={{
                 flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%',
                 backgroundColor: '#16a34a', color: 'white', fontSize: '12px',
@@ -116,10 +98,6 @@ export default function RidePosted({ onNavigate }: Props) {
         >
           Post Another Ride
         </button>
-
-        <p style={{ marginTop: '20px', fontSize: '13px', color: '#9CA3AF' }}>
-          Redirecting to homepage in {countdown}s…
-        </p>
       </div>
     </div>
   );
