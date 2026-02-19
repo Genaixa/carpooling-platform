@@ -1052,21 +1052,41 @@ export default function Home({ onNavigate }: HomeProps) {
                   <option key={city} value={city}>{city}</option>
                 ))}
               </select>
-              {cityFilter !== 'All' && (
+              {(cityFilter !== 'All' || searchFrom || searchTo || dateMin || dateMax || priceMin || priceMax || seatsNeeded || sortBy !== 'date-asc') && (
                 <button
-                  onClick={() => setCityFilter('All')}
+                  onClick={() => {
+                    setCityFilter('All');
+                    setSearchFrom('');
+                    setSearchTo('');
+                    setDateMin('');
+                    setDateMax('');
+                    setPriceMin('');
+                    setPriceMax('');
+                    setSeatsNeeded('');
+                    setSortBy('date-asc');
+                    setHeroFrom('');
+                    setHeroTo('');
+                    setHeroDate('');
+                    setHeroPassengers('1');
+                  }}
                   style={{
-                    fontSize: '12px',
-                    color: '#6B7280',
+                    fontSize: '13px',
+                    color: '#DC2626',
                     background: 'none',
-                    border: '1px solid #D1D5DB',
+                    border: '1px solid #FECACA',
                     borderRadius: '50px',
                     cursor: 'pointer',
-                    padding: '5px 12px',
-                    fontWeight: '500',
+                    padding: '6px 14px',
+                    fontWeight: '600',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
                   }}
                 >
-                  Show all
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                  Clear all filters
                 </button>
               )}
             </div>
