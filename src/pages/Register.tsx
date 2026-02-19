@@ -520,20 +520,6 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                 </label>
               </div>
 
-              {intent === 'driver' && (
-                <div style={{
-                  backgroundColor: '#fffbeb',
-                  border: '1px solid #fde68a',
-                  borderRadius: '12px',
-                  padding: '14px 16px',
-                  marginBottom: '20px',
-                  fontSize: '13px',
-                  color: '#92400e',
-                  lineHeight: '1.5',
-                }}>
-                  <strong>Almost there!</strong> After creating your account you'll be taken straight to Step 2 — the Driver Application — where you'll provide your vehicle details and complete the vetting process.
-                </div>
-              )}
 
               <button
                 type="submit"
