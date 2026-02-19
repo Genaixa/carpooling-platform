@@ -117,16 +117,24 @@ export async function sendBookingAcceptedEmail(bookingData) {
   return sendEmail(passenger.email, `Booking Confirmed: ${ride.departure_location} → ${ride.arrival_location}`,
     `<h2>Booking Confirmed! ✅</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Great news! <strong>${getDriverAlias(driver.id)}</strong> has accepted your booking request.</p>
+    <p>Great news! Your booking has been accepted. Your card has now been charged.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
       <p><strong>Seats booked:</strong> ${bookingData.seats_booked}</p>
       <p><strong>Total charged:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
-      <p><strong>Driver:</strong> ${getDriverAlias(driver.id)}</p>
     </div>
-    <p>Your card has now been charged.</p>
-    <p>Contact details will be available 12 hours before departure.</p>
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="font-weight: 700; margin: 0 0 10px 0; color: #166534;">Your Driver</p>
+      <p><strong>Driver ID:</strong> ${getDriverAlias(driver.id)}</p>
+      <p><strong>Gender:</strong> ${driver.gender || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${driver.age_group || 'Not specified'}</p>
+      <p><strong>Marital status:</strong> ${driver.marital_status || 'Not specified'}</p>
+      <p><strong>Hometown:</strong> ${driver.city || 'Not specified'}</p>
+    </div>
+    <p style="color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
+      Contact details (phone number) will be shared with you <strong>12 hours before departure</strong>.
+    </p>
     <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
   );
 }
