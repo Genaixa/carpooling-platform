@@ -1291,6 +1291,27 @@ async function cleanupPastRides() {
 }
 
 // ============================================================
+// NOTIFY DRIVER: RIDE POSTED CONFIRMATION
+// ============================================================
+app.post('/api/rides/notify-posted', async (req, res) => {
+  try {
+    const { ride_id } = req.body;
+    if (!ride_id) return res.status(400).json({ error: 'ride_id required' });
+
+    const { data: ride, error } = await supabase.from('rides').select('*').eq('id', ride_id).single();
+    if (error || !ride) return res.status(404).json({ error: 'Ride not found' });
+
+    const { sendRidePostedEmail } = await import('./emails.js');
+    sendRidePostedEmail(ride).catch(err => console.error('Ride posted email error:', err));
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('notify-posted error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
 // CHECK WISH MATCHES (called after a ride is posted)
 // ============================================================
 app.post('/api/check-wish-matches', async (req, res) => {

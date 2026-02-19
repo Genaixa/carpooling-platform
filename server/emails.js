@@ -331,7 +331,33 @@ export async function sendDriverWishNotificationEmail(driver, wish) {
   );
 }
 
-// 15. Driver accepted booking confirmation (to driver)
+// 15. Driver ride posted confirmation (to driver)
+export async function sendRidePostedEmail(ride) {
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!driver || !ride) return false;
+
+  const luggageText = ride.luggage_size === 'none' || !ride.luggage_size
+    ? 'No luggage space offered'
+    : `${ride.luggage_size.charAt(0).toUpperCase() + ride.luggage_size.slice(1)} (${ride.luggage_count || 0} item${ride.luggage_count !== 1 ? 's' : ''})`;
+
+  return sendEmail(driver.email, `Ride Posted: ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>Your Ride Has Been Posted ✅</h2>
+    <p>Hi ${driver.name},</p>
+    <p>Your ride has been successfully posted on ChapaRide and is now visible to passengers.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Seats available:</strong> ${ride.seats_available}</p>
+      <p><strong>Price per seat:</strong> £${Number(ride.price_per_seat).toFixed(2)}</p>
+      <p><strong>Luggage:</strong> ${luggageText}</p>
+      ${ride.additional_notes ? `<p><strong>Notes:</strong> ${ride.additional_notes}</p>` : ''}
+    </div>
+    <p>You will receive an email as soon as a passenger requests to book your ride. You can accept or reject bookings from your dashboard.</p>
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+  );
+}
+
+// 16. Driver accepted booking confirmation (to driver)
 export async function sendDriverBookingAcceptedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;

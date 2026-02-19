@@ -203,11 +203,18 @@ export default function PostRide({ onNavigate }: PostRideProps) {
 
       // Check for matching ride wishes and notify passengers
       if (insertedRides && insertedRides[0]) {
+        const rideId = insertedRides[0].id;
         fetch(`${API_URL}/api/check-wish-matches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ride_id: insertedRides[0].id }),
+          body: JSON.stringify({ ride_id: rideId }),
         }).catch(err => console.error('Wish match check error:', err));
+
+        fetch(`${API_URL}/api/rides/notify-posted`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ride_id: rideId }),
+        }).catch(err => console.error('Ride posted email error:', err));
       }
 
       onNavigate('dashboard');
