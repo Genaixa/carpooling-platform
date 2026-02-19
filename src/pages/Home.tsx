@@ -231,8 +231,8 @@ export default function Home({ onNavigate }: HomeProps) {
       }
     }
 
-    // City filter — only for logged-in users and only when no manual search is active
-    if (user && cityFilter !== 'All' && !searchFrom.trim() && !searchTo.trim()) {
+    // City filter — only for logged-in users
+    if (user && cityFilter !== 'All') {
       filtered = filtered.filter((ride) => ride.departure_location === cityFilter);
     }
 
@@ -315,6 +315,8 @@ export default function Home({ onNavigate }: HomeProps) {
     if (heroPassengers) {
       setSeatsNeeded(heroPassengers);
     }
+    // Clear the auto-city filter so the typed search takes precedence
+    setCityFilter('All');
     // Scroll to results section
     document.getElementById('rides-section')?.scrollIntoView({ behavior: 'smooth' });
   };
