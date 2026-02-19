@@ -118,7 +118,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
       faqs: [
         {
           question: 'Is ChapaRide safe?',
-          answer: 'All drivers are vetted and approved before they can offer rides. We verify driving licences, vehicle details, and insurance. Our compatibility matching system pairs passengers with suitable drivers. Both parties can leave reviews after each journey.',
+          answer: 'All drivers are vetted and approved before they can offer rides. Our compatibility matching system pairs passengers with suitable drivers. Both parties can leave reviews after each journey.',
         },
         {
           question: 'How does the review system work?',

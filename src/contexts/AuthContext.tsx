@@ -122,6 +122,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         ]);
 
       if (profileError) throw profileError;
+
+      await loadProfile(data.user.id);
     }
   };
 

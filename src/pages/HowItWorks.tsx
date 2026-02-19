@@ -23,7 +23,7 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
           <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }} />
         </div>
         <div style={{ position: 'relative', zIndex: 10 }}>
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', marginBottom: '12px' }}>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', marginBottom: '12px', color: 'white' }}>
             How It Works
           </h1>
           <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(255,255,255,0.9)', maxWidth: '600px', margin: '0 auto' }}>

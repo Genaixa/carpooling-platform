@@ -1,10 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, RideWish, checkRideCompatibility, getDriverAlias } from '../lib/supabase';
+import { AGE_GROUP_OPTIONS } from '../lib/constants';
 import { useIsMobile } from '../hooks/useIsMobile';
 import LocationDropdown from '../components/LocationDropdown';
 import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
+
+const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
 
 interface RideWishesProps {
   onNavigate: NavigateFn;
@@ -25,6 +28,9 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
     date: '',
     time: '',
     passengers: '1',
+    bookingFor: 'myself' as 'myself' | 'someone-else',
+    thirdPartyGender: 'Male' as 'Male' | 'Female',
+    thirdPartyAgeGroup: '',
   });
 
   useEffect(() => {
@@ -123,13 +129,36 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
         desired_date: formData.date,
         desired_time: formData.time || null,
         passengers_count: parseInt(formData.passengers),
+        booking_for: formData.bookingFor,
+        third_party_gender: formData.bookingFor === 'someone-else' ? formData.thirdPartyGender : null,
+        third_party_age_group: formData.bookingFor === 'someone-else' && formData.thirdPartyAgeGroup ? formData.thirdPartyAgeGroup : null,
         status: 'active',
       }]);
 
       if (error) throw error;
 
       toast.success('Ride alert created! We\'ll email you when a matching ride is posted.');
-      setFormData({ from: '', to: '', date: '', time: '', passengers: '1' });
+
+      // Notify local drivers of this wish (fire and forget)
+      fetch(`${API_URL}/api/notify-drivers-of-wish`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          wish: {
+            user_id: user.id,
+            departure_location: formData.from.trim(),
+            arrival_location: formData.to.trim(),
+            desired_date: formData.date,
+            desired_time: formData.time || null,
+            passengers_count: parseInt(formData.passengers),
+            booking_for: formData.bookingFor,
+            third_party_gender: formData.bookingFor === 'someone-else' ? formData.thirdPartyGender : null,
+            third_party_age_group: formData.bookingFor === 'someone-else' && formData.thirdPartyAgeGroup ? formData.thirdPartyAgeGroup : null,
+          },
+        }),
+      }).catch(() => {});
+
+      setFormData({ from: '', to: '', date: '', time: '', passengers: '1', bookingFor: 'myself', thirdPartyGender: 'Male', thirdPartyAgeGroup: '' });
       loadWishes();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create alert');
@@ -406,7 +435,7 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                 exclude={formData.from}
               />
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px', marginBottom: '16px' }}>
               <div>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
                   Date *
@@ -467,6 +496,64 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                   ))}
                 </select>
               </div>
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (formData.bookingFor === 'someone-else' ? '1fr 1fr 1fr' : '1fr 1fr 1fr'), gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                  Booking for
+                </label>
+                <select
+                  value={formData.bookingFor}
+                  onChange={(e) => setFormData(prev => ({ ...prev, bookingFor: e.target.value as 'myself' | 'someone-else' }))}
+                  style={{
+                    width: '100%', padding: '14px', fontSize: '16px',
+                    border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 16px center',
+                  }}
+                >
+                  <option value="myself">Myself</option>
+                  <option value="someone-else">Someone else</option>
+                </select>
+              </div>
+              {formData.bookingFor === 'someone-else' && (
+                <>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                      Passenger's gender
+                    </label>
+                    <select value={formData.thirdPartyGender} onChange={(e) => setFormData(prev => ({ ...prev, thirdPartyGender: e.target.value as 'Male' | 'Female' }))} style={{
+                      width: '100%', padding: '14px', fontSize: '16px',
+                      border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 16px center',
+                    }}>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                      Passenger's age group
+                    </label>
+                    <select value={formData.thirdPartyAgeGroup} onChange={(e) => setFormData(prev => ({ ...prev, thirdPartyAgeGroup: e.target.value }))} style={{
+                      width: '100%', padding: '14px', fontSize: '16px',
+                      border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
+                      appearance: 'none',
+                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                      backgroundRepeat: 'no-repeat',
+                      backgroundPosition: 'right 16px center',
+                    }}>
+                      <option value="">Not specified</option>
+                      {AGE_GROUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                    </select>
+                  </div>
+                </>
+              )}
             </div>
             <button
               type="submit"

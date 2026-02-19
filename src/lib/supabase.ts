@@ -28,6 +28,7 @@ export interface Profile {
   licence_status: 'pending' | 'approved' | 'rejected' | null;
   average_rating: number | null;
   total_reviews: number;
+  notify_driver_alerts: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -128,6 +129,9 @@ export interface RideWish {
   desired_date: string;
   desired_time: string | null;
   passengers_count: number;
+  booking_for: 'myself' | 'someone-else';
+  third_party_gender: string | null;
+  third_party_age_group: string | null;
   status: 'active' | 'fulfilled' | 'expired';
   created_at: string;
   user?: Profile;

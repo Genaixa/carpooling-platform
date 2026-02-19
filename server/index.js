@@ -12,7 +12,7 @@ const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
 const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const SITE_URL = process.env.SITE_URL || 'https://srv1291941.hstgr.cloud';
-const API_URL = process.env.API_URL || 'https://srv1291941.hstgr.cloud:3001';
+const API_URL = process.env.API_URL || 'https://srv1291941.hstgr.cloud';
 
 if (!SQUARE_ACCESS_TOKEN || !VITE_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
   console.error('FATAL: Missing required environment variables (SQUARE_ACCESS_TOKEN, VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)');
@@ -703,13 +703,13 @@ app.post('/api/driver/complete-ride', async (req, res) => {
     // Send review reminder emails
     try {
       const { sendPassengerReviewReminder, sendDriverReviewReminder } = await import('./emails.js');
-      const passengerNames = [];
+      const passengerIds = [];
       for (const booking of (completedBookings || [])) {
         sendPassengerReviewReminder(booking, ride).catch(err => console.error('Passenger review email error:', err));
-        if (booking.passenger?.name) passengerNames.push(booking.passenger.name);
+        if (booking.passenger_id) passengerIds.push(booking.passenger_id);
       }
-      if (passengerNames.length > 0) {
-        sendDriverReviewReminder(ride, passengerNames).catch(err => console.error('Driver review email error:', err));
+      if (passengerIds.length > 0) {
+        sendDriverReviewReminder(ride, passengerIds).catch(err => console.error('Driver review email error:', err));
       }
     } catch {}
 
@@ -733,6 +733,61 @@ app.post('/api/notify-driver-application', async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Driver application notification error:', err);
+    res.json({ success: false });
+  }
+});
+
+// ============================================================
+// NOTIFY LOCAL DRIVERS OF A NEW RIDE WISH
+// ============================================================
+
+app.post('/api/notify-drivers-of-wish', async (req, res) => {
+  try {
+    const { wish } = req.body;
+    if (!wish) return res.status(400).json({ error: 'Missing wish data' });
+
+    // Extract city from departure_location (e.g. "London - Golders Green" → "London")
+    const departureCity = wish.departure_location.includes(' - ')
+      ? wish.departure_location.split(' - ')[0].trim()
+      : wish.departure_location.trim();
+
+    // Find approved drivers who opt in, live in the departure city, and are not the passenger
+    const { data: drivers, error } = await supabase
+      .from('profiles')
+      .select('id, name, email, city, notify_driver_alerts')
+      .eq('is_approved_driver', true)
+      .eq('notify_driver_alerts', true)
+      .neq('id', wish.user_id);
+
+    if (error) throw error;
+
+    // Filter by city match (case-insensitive)
+    const matchingDrivers = (drivers || []).filter(d => {
+      if (!d.city) return false;
+      const driverCity = d.city.trim().toLowerCase();
+      const depCity = departureCity.toLowerCase();
+      return driverCity === depCity || driverCity.includes(depCity) || depCity.includes(driverCity);
+    });
+
+    if (matchingDrivers.length === 0) {
+      return res.json({ success: true, notified: 0 });
+    }
+
+    const { sendDriverWishNotificationEmail } = await import('./emails.js');
+
+    let notified = 0;
+    for (const driver of matchingDrivers) {
+      try {
+        await sendDriverWishNotificationEmail(driver, wish);
+        notified++;
+      } catch (emailErr) {
+        console.error(`Failed to notify driver ${driver.id}:`, emailErr);
+      }
+    }
+
+    res.json({ success: true, notified });
+  } catch (err) {
+    console.error('Notify drivers of wish error:', err);
     res.json({ success: false });
   }
 });
@@ -901,9 +956,9 @@ app.get('/api/admin/rides-overview', async (req, res) => {
     const ridesWithFinancials = (rides || []).map(ride => {
       const rideBookings = bookingsByRide[ride.id] || [];
       const confirmedBookings = rideBookings.filter(b => ['confirmed', 'completed'].includes(b.status));
-      const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (b.total_paid || 0), 0);
-      const totalCommission = confirmedBookings.reduce((sum, b) => sum + (b.commission_amount || 0), 0);
-      const totalDriverPayout = confirmedBookings.reduce((sum, b) => sum + (b.driver_payout_amount || 0), 0);
+      const totalRevenue = confirmedBookings.reduce((sum, b) => sum + (parseFloat(b.total_paid) || 0), 0);
+      const totalCommission = confirmedBookings.reduce((sum, b) => sum + (parseFloat(b.commission_amount) || 0), 0);
+      const totalDriverPayout = totalRevenue - totalCommission;
 
       return {
         ...ride,

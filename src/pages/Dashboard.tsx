@@ -16,7 +16,7 @@ interface DashboardProps {
 }
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
-  const { user, profile, loading: authLoading } = useAuth();
+  const { user, profile, loading: authLoading, updateProfile } = useAuth();
   const isMobile = useIsMobile();
   const [rides, setRides] = useState<Ride[]>([]);
   const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
@@ -38,6 +38,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('desc');
   const [passengerWishes, setPassengerWishes] = useState<RideWish[]>([]);
   const [wishMatchingRides, setWishMatchingRides] = useState<Record<string, { mine: number; others: number }>>({});
+  const [notifyDriverAlerts, setNotifyDriverAlerts] = useState(true);
   const [licenceUploading, setLicenceUploading] = useState(false);
   const [expandedRideId, setExpandedRideId] = useState<string | null>(null);
   const [expandedWishId, setExpandedWishId] = useState<string | null>(null);
@@ -46,9 +47,51 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!authLoading && !user) onNavigate('login');
   }, [user, authLoading, onNavigate]);
 
+  // Show toast messages from email action redirects
+  useEffect(() => {
+    const hash = window.location.hash;
+    const qIdx = hash.indexOf('?');
+    if (qIdx === -1) return;
+    const params = new URLSearchParams(hash.substring(qIdx));
+    const successParam = params.get('success');
+    const errorParam = params.get('error');
+    const infoParam = params.get('info');
+    if (successParam === 'booking-accepted') {
+      toast.success('Booking accepted successfully! The passenger has been notified.');
+    } else if (successParam === 'booking-rejected') {
+      toast.success('Booking rejected. The passenger has been notified and refunded.');
+    } else if (errorParam === 'booking-not-found') {
+      toast.error('Booking not found. It may have been cancelled.');
+    } else if (errorParam === 'not-authorized') {
+      toast.error('You are not authorised to action this booking.');
+    } else if (errorParam === 'server-error') {
+      toast.error('Something went wrong. Please try again from your dashboard.');
+    } else if (errorParam === 'missing-params') {
+      toast.error('Invalid link. Please use the buttons in your email.');
+    } else if (infoParam === 'already-actioned') {
+      toast('This booking has already been actioned.', { icon: 'ℹ️' });
+    }
+    // Clean URL
+    window.location.hash = hash.substring(0, qIdx);
+  }, []);
+
   useEffect(() => {
     if (user) loadData();
   }, [user]);
+
+  // Sync notify_driver_alerts from profile
+  useEffect(() => {
+    if (profile) setNotifyDriverAlerts(profile.notify_driver_alerts !== false);
+  }, [profile]);
+
+  const handleToggleNotifyAlerts = async (checked: boolean) => {
+    setNotifyDriverAlerts(checked);
+    try {
+      await updateProfile({ notify_driver_alerts: checked });
+    } catch {
+      setNotifyDriverAlerts(!checked); // revert on error
+    }
+  };
 
   const loadData = async () => {
     if (!user) return;
@@ -627,7 +670,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
                 <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '32px', maxWidth: '480px', width: '100%', margin: '16px', textAlign: 'center' }}>
                   <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1F2937', marginBottom: '12px' }}>Cancel This Ride?</h3>
-                  <p style={{ color: '#4B5563', marginBottom: '24px' }}>All passengers will be fully refunded and notified. This action cannot be undone.</p>
+                  <p style={{ color: '#4B5563', marginBottom: '12px' }}>All passengers will be fully refunded and notified. This action cannot be undone.</p>
+                  <p style={{ color: '#991b1b', fontSize: '13px', marginBottom: '24px', fontWeight: '500' }}>Warning: Cancelling rides frequently or too close to departure may result in removal from the platform.</p>
                   <div style={{ display: 'flex', gap: '12px' }}>
                     <button onClick={() => setCancellingRideId(null)} disabled={cancellingRide} style={{ flex: 1, padding: '14px', border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white', color: '#4B5563', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Keep Ride</button>
                     <button onClick={() => handleCancelRide(cancellingRideId)} disabled={cancellingRide} style={{ flex: 1, padding: '14px', border: 'none', borderRadius: '12px', backgroundColor: '#ef4444', color: 'white', fontSize: '16px', fontWeight: '600', cursor: cancellingRide ? 'not-allowed' : 'pointer' }}>
@@ -641,9 +685,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             {/* Passengers Looking for Rides */}
             {profile?.is_approved_driver && passengerWishes.length > 0 && (
               <div style={{ marginBottom: '40px' }}>
-                <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', marginBottom: '16px' }}>
-                  Passengers Looking for Rides
-                </h2>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
+                    Passengers Looking for Rides
+                  </h2>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#4B5563', backgroundColor: '#f8fafc', border: '1px solid #E8EBED', borderRadius: '10px', padding: '8px 14px' }}>
+                    <input
+                      type="checkbox"
+                      checked={notifyDriverAlerts}
+                      onChange={(e) => handleToggleNotifyAlerts(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#1A9D9D', cursor: 'pointer' }}
+                    />
+                    Email me when passengers in my city create alerts
+                  </label>
+                </div>
                 <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
                   These passengers are looking for rides. Would you offer them a ride?
                 </p>
@@ -670,6 +725,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                 <div style={{ fontSize: '12px', color: '#6B7280' }}>
                                   {new Date(wish.desired_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
                                   {wish.desired_time ? ` at ${wish.desired_time}` : ''} · {wish.passengers_count} passenger{wish.passengers_count > 1 ? 's' : ''}
+                                  {(wish as any).booking_for === 'someone-else' && ` · For someone else${(wish as any).third_party_gender || (wish as any).third_party_age_group ? ` (${[(wish as any).third_party_gender, (wish as any).third_party_age_group].filter(Boolean).join(', ')})` : ''}`}
                                 </div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
@@ -728,6 +784,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Date & Time</th>
                           <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Passengers</th>
                           <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Gender</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Booking For</th>
                           <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Status</th>
                           <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Action</th>
                         </tr>
@@ -768,6 +825,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   )}
                                 </td>
                                 <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  {(wish as any).booking_for === 'someone-else' ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '700', backgroundColor: '#fef3c7', color: '#92400e' }}>
+                                        Someone else
+                                      </span>
+                                      <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                                        {[(wish as any).third_party_gender, (wish as any).third_party_age_group].filter(Boolean).join(', ') || ''}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#4B5563' }}>Themselves</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
                                   {matchInfo?.mine ? (
                                     <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#dcfce7', color: '#166534' }}>Posted</span>
                                   ) : matchInfo?.others ? (
@@ -789,7 +860,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               </tr>
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan={6} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                  <td colSpan={7} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
                                     {wish.user && (
                                       <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 0 6px' }}>
                                         {wish.user.age_group && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>Age {wish.user.age_group}</span>}

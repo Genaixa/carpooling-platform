@@ -12,7 +12,8 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
   const { signUp } = useAuth();
   const isMobile = useIsMobile();
   const [formData, setFormData] = useState({
-    fullName: '',
+    firstName: '',
+    surname: '',
     email: '',
     phone: '',
     password: '',
@@ -73,7 +74,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
         formData.email,
         formData.password,
         {
-          name: formData.fullName,
+          name: `${formData.firstName.trim()} ${formData.surname.trim()}`,
           phone: formData.phone,
           address_line1: formData.addressLine1,
           address_line2: formData.addressLine2,
@@ -121,13 +122,28 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
               color: 'white',
               marginBottom: '12px',
               textShadow: '2px 2px 4px rgba(0,0,0,0.2)'
-            }}>{intent === 'driver' ? 'Sign up to drive' : 'Create your account'}</h1>
+            }}>{intent === 'driver' ? 'Become a Driver' : 'Create your account'}</h1>
             <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
               {intent === 'driver'
-                ? 'Register first, then complete your driver application'
+                ? 'Join thousands of travellers saving money on rides'
                 : 'Join thousands of travellers saving money on rides'}
             </p>
           </div>
+
+          {/* Step indicator for driver intent */}
+          {intent === 'driver' && (
+            <div style={{ marginBottom: '24px' }}>
+              {/* Step labels */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Step 1: Create Account</span>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.6)' }}>Step 2: Driver Application</span>
+              </div>
+              {/* Progress bar */}
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '99px', height: '8px' }}>
+                <div style={{ width: '50%', backgroundColor: 'white', borderRadius: '99px', height: '8px', transition: 'width 0.3s' }} />
+              </div>
+            </div>
+          )}
 
           {/* Register Card */}
           <div style={{
@@ -150,25 +166,31 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                 </div>
               )}
 
-              <div style={{ marginBottom: '20px' }}>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Full Name *</label>
-                <input
-                  type="text"
-                  name="fullName"
-                  value={formData.fullName}
-                  onChange={handleChange}
-                  required
-                  placeholder="John Smith"
-                  style={{ 
-                    width: '100%', 
-                    padding: '14px', 
-                    fontSize: '16px', 
-                    border: '2px solid #E8EBED', 
-                    borderRadius: '12px', 
-                    backgroundColor: 'white',
-                    transition: 'border-color 0.3s'
-                  }}
-                />
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>First Name *</label>
+                  <input
+                    type="text"
+                    name="firstName"
+                    value={formData.firstName}
+                    onChange={handleChange}
+                    required
+                    placeholder="John"
+                    style={{ width: '100%', padding: '14px', fontSize: '16px', border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white', transition: 'border-color 0.3s' }}
+                  />
+                </div>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Surname *</label>
+                  <input
+                    type="text"
+                    name="surname"
+                    value={formData.surname}
+                    onChange={handleChange}
+                    required
+                    placeholder="Smith"
+                    style={{ width: '100%', padding: '14px', fontSize: '16px', border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white', transition: 'border-color 0.3s' }}
+                  />
+                </div>
               </div>
 
               <div style={{ marginBottom: '20px' }}>
@@ -369,31 +391,33 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
               </div>
 
               {/* Passenger Responsibility & Children Policy */}
-              <div style={{
-                backgroundColor: '#f0fdf4',
-                border: '1px solid #bbf7d0',
-                borderRadius: '12px',
-                padding: '16px',
-                marginBottom: '20px',
-                fontSize: '13px',
-                lineHeight: '1.6',
-                color: '#374151',
-              }}>
-                <p style={{ fontWeight: '700', color: '#166534', margin: '0 0 8px 0', fontSize: '14px' }}>
-                  Passenger Responsibility
-                </p>
-                <p style={{ margin: '0 0 8px 0' }}>
-                  By joining a ride on ChapaRide, I agree to arrive at the pick-up point on time, pay my share of fuel and travel costs as agreed with the driver, behave respectfully and follow the driver's reasonable instructions, and understand that ChapaRide is only a platform and my safety is my responsibility.
-                </p>
-                <p style={{ fontWeight: '700', color: '#166534', margin: '12px 0 8px 0', fontSize: '14px' }}>
-                  Children Policy
-                </p>
-                <ul style={{ margin: '0', paddingLeft: '20px' }}>
-                  <li>Children under 12 must not travel alone.</li>
-                  <li>By registering a passenger aged 12-17, it is implied that parental/guardian consent has been given unless otherwise stated.</li>
-                  <li>ChapaRide is a platform only - parents/guardians are responsible for minors' safety.</li>
-                </ul>
-              </div>
+              {intent !== 'driver' && (
+                <div style={{
+                  backgroundColor: '#f0fdf4',
+                  border: '1px solid #bbf7d0',
+                  borderRadius: '12px',
+                  padding: '16px',
+                  marginBottom: '20px',
+                  fontSize: '13px',
+                  lineHeight: '1.6',
+                  color: '#374151',
+                }}>
+                  <p style={{ fontWeight: '700', color: '#166534', margin: '0 0 8px 0', fontSize: '14px' }}>
+                    Passenger Responsibility
+                  </p>
+                  <p style={{ margin: '0 0 8px 0' }}>
+                    By joining a ride on ChapaRide, I agree to arrive at the pick-up point on time, pay my share of fuel and travel costs as agreed with the driver, behave respectfully and follow the driver's reasonable instructions, and understand that ChapaRide is only a platform and my safety is my responsibility.
+                  </p>
+                  <p style={{ fontWeight: '700', color: '#166534', margin: '12px 0 8px 0', fontSize: '14px' }}>
+                    Children Policy
+                  </p>
+                  <ul style={{ margin: '0', paddingLeft: '20px' }}>
+                    <li>Children under 12 must not travel alone.</li>
+                    <li>By registering a passenger aged 12-17, it is implied that parental/guardian consent has been given unless otherwise stated.</li>
+                    <li>ChapaRide is a platform only - parents/guardians are responsible for minors' safety.</li>
+                  </ul>
+                </div>
+              )}
 
               {/* Age Confirmation Checkbox */}
               <div style={{
@@ -466,6 +490,21 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                 </label>
               </div>
 
+              {intent === 'driver' && (
+                <div style={{
+                  backgroundColor: '#fffbeb',
+                  border: '1px solid #fde68a',
+                  borderRadius: '12px',
+                  padding: '14px 16px',
+                  marginBottom: '20px',
+                  fontSize: '13px',
+                  color: '#92400e',
+                  lineHeight: '1.5',
+                }}>
+                  <strong>Almost there!</strong> After creating your account you'll be taken straight to Step 2 — the Driver Application — where you'll provide your vehicle details and complete the vetting process.
+                </div>
+              )}
+
               <button
                 type="submit"
                 disabled={loading}
@@ -483,7 +522,11 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                   transition: 'all 0.3s'
                 }}
               >
-                {loading ? 'Creating account...' : 'Create Account'}
+                {loading
+                  ? 'Creating account...'
+                  : intent === 'driver'
+                    ? 'Create Account & Continue to Driver Application →'
+                    : 'Create Account'}
               </button>
             </form>
 

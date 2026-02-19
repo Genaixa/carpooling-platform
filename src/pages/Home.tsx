@@ -112,7 +112,7 @@ export default function Home({ onNavigate }: HomeProps) {
         .from('rides')
         .select(`
           *,
-          driver:profiles(id, name, gender, age_group, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
+          driver:profiles(id, name, gender, age_group, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
         `)
         .eq('status', 'upcoming')
         .gt('seats_available', 0)
@@ -1210,6 +1210,12 @@ export default function Home({ onNavigate }: HomeProps) {
                                   <span style={{ fontSize: '12px', color: '#6B7280' }}>Age {(ride.driver as any).age_group}</span>
                                 </>
                               )}
+                              {(ride.driver as any).city && (
+                                <>
+                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
+                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>{(ride.driver as any).city}</span>
+                                </>
+                              )}
                               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
                               <span style={{ fontSize: '12px', color: '#6B7280' }}>
                                 {getCarCompositionLabel(getCarComposition(ride.driver.gender, ride.existing_occupants as { males: number; females: number; couples: number } | null))}
@@ -1307,6 +1313,42 @@ export default function Home({ onNavigate }: HomeProps) {
                 </div>
               </div>
             ))}
+
+            {/* Can't find a suitable ride? */}
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '20px',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+              padding: isMobile ? '24px 20px' : '28px 32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              flexWrap: 'wrap',
+              gap: '16px',
+              borderLeft: '5px solid #1A9D9D',
+            }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937' }}>Ride Alerts</div>
+                <div style={{ fontSize: '14px', color: '#4B5563' }}>Can't find the ride you need?</div>
+                <div style={{ fontSize: '14px', color: '#6B7280' }}>Set up an alert and we'll email you when a matching ride is posted.</div>
+              </div>
+              <button
+                onClick={() => onNavigate('ride-wishes')}
+                style={{
+                  padding: '12px 24px',
+                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '50px',
+                  fontSize: '14px',
+                  fontWeight: '600',
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Set Up a Ride Alert
+              </button>
+            </div>
           </div>
         )}
       </main>

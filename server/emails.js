@@ -34,6 +34,15 @@ async function sendEmail(to, subject, html) {
   } catch (err) { console.error('Email send failed:', err); return false; }
 }
 
+function getPassengerAlias(passengerId) {
+  let hash = 0;
+  for (let i = 0; i < passengerId.length; i++) {
+    hash = ((hash << 5) - hash + passengerId.charCodeAt(i)) | 0;
+  }
+  const num = Math.abs(hash) % 10000;
+  return `Passenger #${num.toString().padStart(4, '0')}`;
+}
+
 function getDriverAlias(driverId) {
   let hash = 0;
   for (let i = 0; i < driverId.length; i++) {
@@ -56,17 +65,42 @@ export async function sendBookingRequestEmail(bookingData) {
   if (!ride || !driver || !passenger) return false;
   const acceptUrl = `${API_URL}/api/driver/accept-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}`;
   const rejectUrl = `${API_URL}/api/driver/reject-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}`;
+
+  const thirdParty = bookingData.third_party_passenger;
+  const ratingText = passenger.average_rating
+    ? `${Number(passenger.average_rating).toFixed(1)} ★ (${passenger.total_reviews} review${passenger.total_reviews !== 1 ? 's' : ''})`
+    : 'No reviews yet';
+
+  const passengerInfoRows = `
+      <p><strong>Gender:</strong> ${passenger.gender || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${passenger.age_group || 'Not specified'}</p>
+      <p><strong>City:</strong> ${passenger.city || 'Not specified'}</p>
+      <p><strong>Travelling as:</strong> ${passenger.travel_status === 'couple' ? 'Couple' : 'Solo'}</p>
+      <p><strong>Passenger rating:</strong> ${ratingText}</p>`;
+
+  const thirdPartySection = thirdParty ? `
+    <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; margin: 16px 0;">
+      <p style="font-weight: 700; color: #1e40af; margin: 0 0 8px 0;">Booking is for a third-party passenger:</p>
+      <p><strong>Gender:</strong> ${thirdParty.gender || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${thirdParty.age_group || 'Not specified'}</p>
+      ${thirdParty.special_needs ? `<p><strong>Special needs:</strong> ${thirdParty.special_needs}</p>` : ''}
+    </div>` : '';
+
   return sendEmail(driver.email, `New Booking Request: ${ride.departure_location} → ${ride.arrival_location}`,
     `<h2>New Booking Request</h2>
     <p>Hi ${driver.name},</p>
-    <p><strong>${passenger.name}</strong> has requested to book ${bookingData.seats_booked} seat(s) on your ride.</p>
+    <p><strong>${getPassengerAlias(passenger.id)}</strong> has requested to book ${bookingData.seats_booked} seat(s) on your ride.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
       <p><strong>Seats requested:</strong> ${bookingData.seats_booked}</p>
       <p><strong>Amount:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
     </div>
-    <p>The payment hold on the passenger's card will expire in 6 days.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="font-weight: 700; margin: 0 0 8px 0;">Account holder info:</p>
+      ${passengerInfoRows}
+    </div>
+    ${thirdPartySection}
     <div style="margin: 24px 0;">
       <a href="${acceptUrl}" style="display: inline-block; padding: 14px 28px; background: #166534; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Accept Booking</a>
       <a href="${rejectUrl}" style="display: inline-block; padding: 14px 28px; background: #991b1b; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Reject Booking</a>
@@ -92,7 +126,7 @@ export async function sendBookingAcceptedEmail(bookingData) {
     </div>
     <p>Your card has now been charged.</p>
     <p>Contact details will be available 12 hours before departure.</p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
   );
 }
 
@@ -105,7 +139,7 @@ export async function sendBookingRejectedEmail(bookingData) {
     <p>Hi ${passenger.name},</p>
     <p>Unfortunately, ${getDriverAlias(driver.id)} has declined your booking request for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
     <p>The hold on your card has been released and you will not be charged.</p>
-    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
+    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
   );
 }
 
@@ -137,7 +171,7 @@ export async function sendDriverCancellationEmail(bookingData, ride) {
     <p>Hi ${passenger.name},</p>
     <p>We're sorry, but the driver has cancelled the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
     <p>A full refund has been issued to your original payment method.</p>
-    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
+    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
   );
 }
 
@@ -179,7 +213,7 @@ export async function sendDriverApplicationNotification(application) {
       <p><strong>Car:</strong> ${application.car_make} ${application.car_model}</p>
       <p><strong>Driving experience:</strong> ${application.years_driving_experience} years</p>
     </div>
-    <p><a href="${SITE_URL}/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Review Application</a></p>`
+    <p><a href="${SITE_URL}/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Review Application</a></p>`
   );
 }
 
@@ -199,7 +233,7 @@ export async function sendRideMatchEmail(wish, ride) {
       <p><strong>Available seats:</strong> ${ride.seats_available}</p>
       <p><strong>Driver:</strong> ${getDriverAlias(driver.id)}</p>
     </div>
-    <p><a href="${SITE_URL}/#ride-details/${ride.id}" style="display: inline-block; padding: 12px 24px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Ride Details</a></p>`
+    <p><a href="${SITE_URL}/#ride-details/${ride.id}" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Ride Details</a></p>`
   );
 }
 
@@ -217,7 +251,7 @@ export async function sendDriverPostRideReminder(ride) {
       <li>Allow you and your passengers to leave reviews for each other</li>
       <li>Update your ride history</li>
     </ul>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Mark as Complete</a></p>
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1e40af; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Mark as Complete</a></p>
     <p style="color: #666; font-size: 13px; margin-top: 20px;">Don't forget to leave reviews for your passengers after marking the ride complete!</p>`
   );
 }
@@ -232,7 +266,7 @@ export async function sendPassengerPostRideReminder(booking, ride) {
     <p>Hi ${passenger.name},</p>
     <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> with <strong>${getDriverAlias(driver.id)}</strong> on <strong>${formatDate(ride.date_time)}</strong> should have taken place.</p>
     <p>Once the driver marks the ride as complete, you'll be able to leave a review. Reviews help build trust in the ChapaRide community and help other passengers choose great drivers!</p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
   );
 }
 
@@ -246,23 +280,53 @@ export async function sendPassengerReviewReminder(booking, ride) {
     <p>Hi ${passenger.name},</p>
     <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> has been marked as complete by the driver.</p>
     <p>How was your experience with <strong>${getDriverAlias(driver.id)}</strong>? Your review helps other passengers choose great drivers and helps build trust in the ChapaRide community.</p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a></p>`
   );
 }
 
 // 13. Review reminder to driver (review passengers)
-export async function sendDriverReviewReminder(ride, passengerNames) {
+export async function sendDriverReviewReminder(ride, passengerIds) {
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!driver) return false;
-  const passengerList = passengerNames.length === 1
-    ? `<strong>${passengerNames[0]}</strong>`
-    : passengerNames.map(n => `<strong>${n}</strong>`).join(', ');
+  const passengerList = passengerIds.length === 1
+    ? `<strong>${getPassengerAlias(passengerIds[0])}</strong>`
+    : passengerIds.map(id => `<strong>${getPassengerAlias(id)}</strong>`).join(', ');
   return sendEmail(driver.email, `Leave reviews for your passengers`,
     `<h2>Ride marked as complete!</h2>
     <p>Hi ${driver.name},</p>
     <p>You've marked your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> as complete.</p>
     <p>Don't forget to leave reviews for your passenger(s): ${passengerList}. Your feedback helps build a safe and trusted community.</p>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%); color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Leave Reviews</a></p>`
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Leave Reviews</a></p>`
+  );
+}
+
+// 14. Driver notification: passenger ride alert in their area
+export async function sendDriverWishNotificationEmail(driver, wish) {
+  const dateFormatted = new Date(wish.desired_date + 'T12:00:00').toLocaleDateString('en-GB', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  const timeText = wish.desired_time ? ` at ${wish.desired_time}` : ' (time flexible)';
+  const passengerCount = wish.passengers_count || 1;
+
+  const bookingForText = wish.booking_for === 'someone-else'
+    ? `Booking for someone else${wish.third_party_gender ? ` (${wish.third_party_gender}${wish.third_party_age_group ? ', ' + wish.third_party_age_group : ''})` : ''}`
+    : 'Booking for themselves';
+
+  return sendEmail(
+    driver.email,
+    `Passenger Alert: ${wish.departure_location} → ${wish.arrival_location} on ${dateFormatted}`,
+    `<h2>A passenger in your area is looking for a ride!</h2>
+    <p>Hi ${driver.name},</p>
+    <p>A passenger has created a ride alert for a route departing from <strong>${wish.departure_location}</strong> — your area. There are currently no matching rides available, so this could be an opportunity for you.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${wish.departure_location} → ${wish.arrival_location}</p>
+      <p><strong>Date:</strong> ${dateFormatted}${timeText}</p>
+      <p><strong>Passengers:</strong> ${passengerCount}</p>
+      <p><strong>Booking:</strong> ${bookingForText}</p>
+    </div>
+    <p>If you're interested in offering this ride, you can post it directly from your dashboard. The passenger will be automatically notified when a matching ride is available.</p>
+    <p><a href="${SITE_URL}/#post-ride" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Post This Ride</a></p>
+    <p style="color: #666; font-size: 13px; margin-top: 16px;">You are receiving this because you are a registered driver in ${wish.departure_location.split(' - ')[0] || wish.departure_location}. You can turn off these alerts in your <a href="${SITE_URL}/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>`
   );
 }
 

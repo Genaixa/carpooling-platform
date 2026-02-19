@@ -1,6 +1,6 @@
 export const ROUTE_LOCATIONS = [
   'London - Stamford Hill',
-  'London - Golders Green',
+  'London - Golders Green/Hendon',
   'Edgware',
   'Manchester',
   'Gateshead',

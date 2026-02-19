@@ -156,12 +156,17 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                       </span>
                     )}
                   </p>
-                  {driver.average_rating && (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginTop: '4px' }}>
-                      <StarRating rating={driver.average_rating} size="sm" />
-                      <span style={{ fontSize: '13px', color: '#4B5563' }}>({driver.average_rating.toFixed(1)})</span>
-                    </div>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
+                    {(driver as any).city && (
+                      <span style={{ fontSize: '13px', color: '#6B7280' }}>{(driver as any).city}</span>
+                    )}
+                    {driver.average_rating && (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <StarRating rating={driver.average_rating} size="sm" />
+                        <span style={{ fontSize: '13px', color: '#4B5563' }}>({driver.average_rating.toFixed(1)})</span>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>

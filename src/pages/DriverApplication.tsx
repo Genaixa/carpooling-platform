@@ -79,6 +79,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
         first_name: firstName,
         surname: surname,
         gender: profile.gender || '',
+        age_group: profile.age_group || '',
       }));
     }
   }, [existingApplication, profile, loading]);
@@ -270,6 +271,18 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
             </p>
           </div>
 
+          {!isReapplying && (
+            <div style={{ marginBottom: '24px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.6)' }}>Step 1: Create Account</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Step 2: Driver Application</span>
+              </div>
+              <div style={{ backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '99px', height: '8px' }}>
+                <div style={{ width: '100%', backgroundColor: 'white', borderRadius: '99px', height: '8px' }} />
+              </div>
+            </div>
+          )}
+
           {isReapplying && (
             <div style={{
               backgroundColor: wasRevoked ? '#fef2f2' : '#fef3c7',
@@ -345,7 +358,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px', marginTop: '30px' }}>Compliance</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginBottom: '20px' }}>
                 {[
-                  { name: 'has_drivers_license', label: 'I have a valid UK driving licence' },
+                  { name: 'has_drivers_license', label: 'I have a valid driving licence that permits me to legally drive in the UK' },
                   { name: 'car_insured', label: 'My car is fully insured' },
                   { name: 'has_mot', label: 'My car has a valid MOT certificate' },
                 ].map(({ name, label }) => (

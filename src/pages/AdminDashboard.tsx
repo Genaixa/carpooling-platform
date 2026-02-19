@@ -291,14 +291,14 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           balanceOwed: 0,
         };
       }
-      driverMap[dId].totalEarned += ride.totalDriverPayout;
+      driverMap[dId].totalEarned += (parseFloat(ride.totalRevenue as any) || 0) - (parseFloat(ride.totalCommission as any) || 0);
     }
 
     // Sum up paid amounts
     for (const p of payoutsList) {
       const dId = p.driver_id;
       if (driverMap[dId]) {
-        driverMap[dId].totalPaidOut += p.amount;
+        driverMap[dId].totalPaidOut += parseFloat(p.amount as any) || 0;
       }
     }
 
@@ -455,13 +455,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     : ridesOverview.filter(r => r.status === rideStatusFilter);
 
   // Totals for summary cards - reflect current filter
-  const totalRevenue = filteredRides.reduce((sum, r) => sum + r.totalRevenue, 0);
-  const totalCommission = filteredRides.reduce((sum, r) => sum + r.totalCommission, 0);
-  const totalDriverPayouts = filteredRides.reduce((sum, r) => sum + r.totalDriverPayout, 0);
+  const totalRevenue = filteredRides.reduce((sum, r) => sum + (parseFloat(r.totalRevenue as any) || 0), 0);
+  const totalCommission = filteredRides.reduce((sum, r) => sum + (parseFloat(r.totalCommission as any) || 0), 0);
+  const totalDriverPayouts = totalRevenue - totalCommission;
   const filteredDriverIds = new Set(filteredRides.map(r => r.driver_id));
   const totalPaidOut = rideStatusFilter === 'all'
-    ? payouts.reduce((sum, p) => sum + p.amount, 0)
-    : payouts.filter(p => filteredDriverIds.has(p.driver_id)).reduce((sum, p) => sum + p.amount, 0);
+    ? payouts.reduce((sum, p) => sum + (parseFloat(p.amount as any) || 0), 0)
+    : payouts.filter(p => filteredDriverIds.has(p.driver_id)).reduce((sum, p) => sum + (parseFloat(p.amount as any) || 0), 0);
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
@@ -567,6 +567,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Account Number</span><p style={{ margin: 0, color: '#1F2937', fontSize: '14px' }}>{app.bank_account_number || '—'}</p></div>
                             <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Sort Code</span><p style={{ margin: 0, color: '#1F2937', fontSize: '14px' }}>{app.bank_sort_code || '—'}</p></div>
                           </div>
+                        </div>
+                      )}
+
+                      {app.status === 'rejected' && app.admin_notes && (
+                        <div style={{ backgroundColor: '#fee2e2', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #fca5a5' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#991b1b', display: 'block', marginBottom: '6px' }}>Rejection Reason</span>
+                          <p style={{ margin: 0, fontSize: '14px', color: '#7f1d1d' }}>{app.admin_notes}</p>
                         </div>
                       )}
 
@@ -919,15 +926,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Revenue</p>
-                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#166534', margin: 0 }}>£{ride.totalRevenue.toFixed(2)}</p>
+                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#166534', margin: 0 }}>£{(parseFloat(ride.totalRevenue as any) || 0).toFixed(2)}</p>
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Commission</p>
-                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1A9D9D', margin: 0 }}>£{ride.totalCommission.toFixed(2)}</p>
+                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1A9D9D', margin: 0 }}>£{(parseFloat(ride.totalCommission as any) || 0).toFixed(2)}</p>
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Driver</p>
-                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1e40af', margin: 0 }}>£{ride.totalDriverPayout.toFixed(2)}</p>
+                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1e40af', margin: 0 }}>£{((parseFloat(ride.totalRevenue as any) || 0) - (parseFloat(ride.totalCommission as any) || 0)).toFixed(2)}</p>
                                     </div>
                                     <span style={{ fontSize: '18px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                                       ▼
@@ -972,9 +979,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                                   {booking.status.replace('_', ' ')}
                                                 </span>
                                               </td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1F2937', fontWeight: '600' }}>£{(booking.total_paid || 0).toFixed(2)}</td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1A9D9D', fontWeight: '600' }}>£{(booking.commission_amount || 0).toFixed(2)}</td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(booking.driver_payout_amount || 0).toFixed(2)}</td>
+                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1F2937', fontWeight: '600' }}>£{(parseFloat(booking.total_paid as any) || 0).toFixed(2)}</td>
+                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1A9D9D', fontWeight: '600' }}>£{(parseFloat(booking.commission_amount as any) || 0).toFixed(2)}</td>
+                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(parseFloat(booking.driver_payout_amount as any) || 0).toFixed(2)}</td>
                                             </tr>
                                           );
                                         })}
@@ -1071,7 +1078,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                         {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         {p.notes && <span style={{ color: '#9CA3AF', marginLeft: '8px' }}>— {p.notes}</span>}
                                       </span>
-                                      <span style={{ fontWeight: '600', color: '#166534' }}>£{p.amount.toFixed(2)}</span>
+                                      <span style={{ fontWeight: '600', color: '#166534' }}>£{(parseFloat(p.amount as any) || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
