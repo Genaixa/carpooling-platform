@@ -217,7 +217,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
         }).catch(err => console.error('Ride posted email error:', err));
       }
 
-      onNavigate('dashboard');
+      onNavigate('ride-posted');
     } catch (err: any) {
       setError(err.message || 'Failed to post ride');
     } finally {

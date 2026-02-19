@@ -21,6 +21,7 @@ export type Page =
   | 'register-driver'
   | 'ride-wishes'
   | 'booking-accepted-confirm'
-  | 'booking-rejected-confirm';
+  | 'booking-rejected-confirm'
+  | 'ride-posted';
 
 export type NavigateFn = (page: Page, rideId?: string, userId?: string) => void;

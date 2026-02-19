@@ -23,6 +23,7 @@ import FAQs from './pages/FAQs';
 import ResetPassword from './pages/ResetPassword';
 import RideWishes from './pages/RideWishes';
 import BookingActionConfirm from './pages/BookingActionConfirm';
+import RidePosted from './pages/RidePosted';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import type { Page } from './lib/types';
@@ -171,6 +172,8 @@ function AppContent() {
         return <BookingActionConfirm onNavigate={handleNavigate} action="accepted" />;
       case 'booking-rejected-confirm':
         return <BookingActionConfirm onNavigate={handleNavigate} action="rejected" />;
+      case 'ride-posted':
+        return <RidePosted onNavigate={handleNavigate} />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }
