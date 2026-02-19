@@ -22,6 +22,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy';
 import FAQs from './pages/FAQs';
 import ResetPassword from './pages/ResetPassword';
 import RideWishes from './pages/RideWishes';
+import BookingActionConfirm from './pages/BookingActionConfirm';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import type { Page } from './lib/types';
@@ -51,6 +52,8 @@ function AppContent() {
     if (clean.startsWith('public-profile/')) return { page: 'public-profile', userId: clean.split('/')[1] };
     if (clean === 'register-driver') return { page: 'register' as Page };
     if (clean.startsWith('payment-success')) return { page: 'payment-success' as Page };
+    if (clean.startsWith('booking-accepted-confirm')) return { page: 'booking-accepted-confirm' as Page };
+    if (clean.startsWith('booking-rejected-confirm')) return { page: 'booking-rejected-confirm' as Page };
     return { page: clean as Page };
   };
 
@@ -164,6 +167,10 @@ function AppContent() {
         return <FAQs onNavigate={handleNavigate} />;
       case 'ride-wishes':
         return <RideWishes onNavigate={handleNavigate} />;
+      case 'booking-accepted-confirm':
+        return <BookingActionConfirm onNavigate={handleNavigate} action="accepted" />;
+      case 'booking-rejected-confirm':
+        return <BookingActionConfirm onNavigate={handleNavigate} action="rejected" />;
       default:
         return <Home onNavigate={handleNavigate} />;
     }

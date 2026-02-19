@@ -347,7 +347,7 @@ app.get('/api/driver/accept-booking', async (req, res) => {
     } catch {}
 
     console.log(`✓ Booking accepted via email: ${bookingId}`);
-    res.redirect(`${SITE_URL}/#dashboard?success=booking-accepted`);
+    res.redirect(`${SITE_URL}/#booking-accepted-confirm`);
   } catch (error) {
     console.error('Accept booking (email) error:', error);
     res.redirect(`${SITE_URL}/#dashboard?error=server-error`);
@@ -388,7 +388,7 @@ app.get('/api/driver/reject-booking', async (req, res) => {
     } catch {}
 
     console.log(`✓ Booking rejected via email: ${bookingId}`);
-    res.redirect(`${SITE_URL}/#dashboard?success=booking-rejected`);
+    res.redirect(`${SITE_URL}/#booking-rejected-confirm`);
   } catch (error) {
     console.error('Reject booking (email) error:', error);
     res.redirect(`${SITE_URL}/#dashboard?error=server-error`);

@@ -19,6 +19,8 @@ export type Page =
   | 'privacy-policy'
   | 'faqs'
   | 'register-driver'
-  | 'ride-wishes';
+  | 'ride-wishes'
+  | 'booking-accepted-confirm'
+  | 'booking-rejected-confirm';
 
 export type NavigateFn = (page: Page, rideId?: string, userId?: string) => void;
