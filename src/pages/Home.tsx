@@ -461,8 +461,7 @@ export default function Home({ onNavigate }: HomeProps) {
     setShowPaymentModal(false);
     setSelectedRide(null);
     setBookingRide(null);
-    toast.success('Payment successful! Booking confirmed.');
-    loadRides();
+    onNavigate('payment-success');
   };
 
   // Handle payment modal cancel
