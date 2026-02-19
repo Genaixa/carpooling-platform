@@ -75,7 +75,7 @@ export default function RidePosted({ onNavigate }: Props) {
 
         {/* Buttons */}
         <button
-          onClick={() => onNavigate('dashboard')}
+          onClick={() => onNavigate('home')}
           style={{
             width: '100%', padding: '16px',
             background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
@@ -85,7 +85,7 @@ export default function RidePosted({ onNavigate }: Props) {
             marginBottom: '12px',
           }}
         >
-          Go to Dashboard
+          Go to Homepage
         </button>
         <button
           onClick={() => onNavigate('post-ride')}
