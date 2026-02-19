@@ -124,8 +124,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     if (!formData.has_drivers_license) newErrors.has_drivers_license = 'You must have a valid driving licence';
     if (!formData.car_insured) newErrors.car_insured = 'Your car must be insured';
     if (!formData.has_mot) newErrors.has_mot = 'Your car must have a valid MOT';
-    if (!formData.car_make.trim()) newErrors.car_make = 'Car make is required';
-    if (!formData.car_model.trim()) newErrors.car_model = 'Car model is required';
+
     if (!formData.years_driving_experience) newErrors.years_driving_experience = 'Years of experience is required';
     if (!formData.emergency_contact_name.trim()) newErrors.emergency_contact_name = 'Emergency contact name is required';
     if (!formData.emergency_contact_phone.trim()) newErrors.emergency_contact_phone = 'Emergency contact phone is required';
@@ -336,18 +335,6 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
               {/* Vehicle & Driving */}
               <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px', marginTop: '30px' }}>Vehicle & Driving</h3>
-              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Car Make *</label>
-                  <input name="car_make" type="text" value={formData.car_make} onChange={handleChange} placeholder="e.g., Toyota" style={inputStyle('car_make')} />
-                  {errors.car_make && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.car_make}</p>}
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Car Model *</label>
-                  <input name="car_model" type="text" value={formData.car_model} onChange={handleChange} placeholder="e.g., Corolla" style={inputStyle('car_model')} />
-                  {errors.car_model && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.car_model}</p>}
-                </div>
-              </div>
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Years of Driving Experience *</label>
                 <input name="years_driving_experience" type="number" min="0" value={formData.years_driving_experience} onChange={handleChange} style={{ ...inputStyle('years_driving_experience'), maxWidth: '200px' }} />
