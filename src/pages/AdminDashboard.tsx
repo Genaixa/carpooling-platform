@@ -58,7 +58,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [activeDrivers, setActiveDrivers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'active-drivers' | 'licence-reviews' | 'finances' | 'admins'>('applications');
+  const [tab, setTab] = useState<'applications' | 'active-drivers' | 'licence-reviews' | 'finances' | 'admins' | 'contact'>('applications');
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
@@ -79,6 +79,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   // Admin management state
   const [allUsers, setAllUsers] = useState<{ id: string; name: string; email: string; is_admin: boolean; is_approved_driver: boolean; created_at: string }[]>([]);
   const [adminSearch, setAdminSearch] = useState('');
+
+  // Contact search state
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactRoleFilter, setContactRoleFilter] = useState<'all' | 'drivers' | 'passengers'>('all');
+  const [contactResults, setContactResults] = useState<{ id: string; name: string; email: string; is_approved_driver: boolean }[]>([]);
+  const [contactLoading, setContactLoading] = useState(false);
+  const [contactSearched, setContactSearched] = useState(false);
 
   // Licence reviews state
   const [pendingLicences, setPendingLicences] = useState<Profile[]>([]);
@@ -199,6 +206,29 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error('Failed to load users: ' + (err.message || 'Unknown error'));
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleContactSearch = async () => {
+    if (!contactSearch.trim()) return;
+    setContactLoading(true);
+    setContactSearched(true);
+    try {
+      let query = supabase
+        .from('profiles')
+        .select('id, name, email, is_approved_driver')
+        .ilike('name', `%${contactSearch.trim()}%`)
+        .order('name', { ascending: true })
+        .limit(50);
+      if (contactRoleFilter === 'drivers') query = query.eq('is_approved_driver', true);
+      else if (contactRoleFilter === 'passengers') query = query.eq('is_approved_driver', false);
+      const { data, error } = await query;
+      if (error) throw error;
+      setContactResults(data || []);
+    } catch (err: any) {
+      toast.error('Search failed: ' + (err.message || 'Unknown error'));
+    } finally {
+      setContactLoading(false);
     }
   };
 
@@ -481,6 +511,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             { key: 'licence-reviews' as const, label: `Licence Reviews (${pendingLicences.length || '...'})` },
             { key: 'finances' as const, label: 'Rides & Finances' },
             { key: 'admins' as const, label: 'Manage Admins' },
+            { key: 'contact' as const, label: 'Contact Users' },
           ]).map(t => (
             <button
               key={t.key}
@@ -1092,6 +1123,119 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   </>
                 )}
               </>
+            )}
+          </>
+        )}
+
+        {/* ==================== CONTACT USERS TAB ==================== */}
+        {tab === 'contact' && (
+          <>
+            <div style={{ marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', marginBottom: '6px' }}>Contact a User</h2>
+              <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>Search by name to find a user's email address. Click the email link to open in Outlook.</p>
+            </div>
+
+            {/* Search controls */}
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
+              <div style={{ flex: '1', minWidth: '220px' }}>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Name</label>
+                <input
+                  type="text"
+                  placeholder="e.g. John Smith"
+                  value={contactSearch}
+                  onChange={(e) => setContactSearch(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleContactSearch()}
+                  style={{
+                    width: '100%', padding: '12px 16px', fontSize: '15px',
+                    border: '2px solid #E5E7EB', borderRadius: '12px', outline: 'none', boxSizing: 'border-box',
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
+                  onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Role</label>
+                <select
+                  value={contactRoleFilter}
+                  onChange={(e) => setContactRoleFilter(e.target.value as 'all' | 'drivers' | 'passengers')}
+                  style={{
+                    padding: '12px 16px', fontSize: '15px', border: '2px solid #E5E7EB',
+                    borderRadius: '12px', outline: 'none', backgroundColor: 'white', cursor: 'pointer',
+                  }}
+                  onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
+                  onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
+                >
+                  <option value="all">All users</option>
+                  <option value="drivers">Drivers only</option>
+                  <option value="passengers">Passengers only</option>
+                </select>
+              </div>
+              <button
+                onClick={handleContactSearch}
+                disabled={!contactSearch.trim() || contactLoading}
+                style={{
+                  padding: '12px 28px', fontSize: '15px', fontWeight: '700', borderRadius: '12px',
+                  border: 'none', cursor: !contactSearch.trim() || contactLoading ? 'not-allowed' : 'pointer',
+                  background: !contactSearch.trim() || contactLoading ? '#E5E7EB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  color: !contactSearch.trim() || contactLoading ? '#9CA3AF' : 'white',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {contactLoading ? 'Searching...' : 'Search'}
+              </button>
+            </div>
+
+            {/* Results */}
+            {contactSearched && !contactLoading && (
+              contactResults.length === 0 ? (
+                <div style={{
+                  backgroundColor: 'white', borderRadius: '16px', padding: '40px',
+                  textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+                }}>
+                  <p style={{ color: '#6B7280', fontSize: '15px', margin: 0 }}>No users found matching "<strong>{contactSearch}</strong>"</p>
+                </div>
+              ) : (
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Role</th>
+                          <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {contactResults.map((u) => (
+                          <tr key={u.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                            <td style={{ padding: '14px 16px', fontWeight: '600', color: '#1F2937' }}>{u.name || '—'}</td>
+                            <td style={{ padding: '14px 16px' }}>
+                              {u.is_approved_driver ? (
+                                <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
+                              ) : (
+                                <span style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Passenger</span>
+                              )}
+                            </td>
+                            <td style={{ padding: '14px 16px' }}>
+                              <a
+                                href={`mailto:${u.email}`}
+                                style={{ color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', fontSize: '14px' }}
+                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
+                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
+                              >
+                                {u.email}
+                              </a>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ padding: '12px 16px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
+                    {contactResults.length} result{contactResults.length !== 1 ? 's' : ''} found
+                  </div>
+                </div>
+              )
             )}
           </>
         )}
