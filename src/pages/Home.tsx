@@ -231,8 +231,8 @@ export default function Home({ onNavigate }: HomeProps) {
       }
     }
 
-    // City filter — only for logged-in users
-    if (user && cityFilter !== 'All') {
+    // City filter — only for logged-in users and only when no manual search is active
+    if (user && cityFilter !== 'All' && !searchFrom.trim() && !searchTo.trim()) {
       filtered = filtered.filter((ride) => ride.departure_location === cityFilter);
     }
 
