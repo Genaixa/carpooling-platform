@@ -6,14 +6,14 @@ interface Props {
 }
 
 export default function RidePosted({ onNavigate }: Props) {
-  const [countdown, setCountdown] = useState(8);
+  const [countdown, setCountdown] = useState(20);
 
   useEffect(() => {
     const interval = setInterval(() => {
       setCountdown((c) => {
         if (c <= 1) {
           clearInterval(interval);
-          onNavigate('dashboard');
+          onNavigate('home');
           return 0;
         }
         return c - 1;
@@ -118,7 +118,7 @@ export default function RidePosted({ onNavigate }: Props) {
         </button>
 
         <p style={{ marginTop: '20px', fontSize: '13px', color: '#9CA3AF' }}>
-          Redirecting to dashboard in {countdown}s…
+          Redirecting to homepage in {countdown}s…
         </p>
       </div>
     </div>
