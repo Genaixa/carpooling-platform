@@ -1450,7 +1450,7 @@ async function sendContactDetailEmails() {
     if (error) throw error;
     if (!rides || rides.length === 0) return;
 
-    const { sendPassengerContactDetailsEmail } = await import('./emails.js');
+    const { sendPassengerContactDetailsEmail, sendDriverContactDetailsEmail } = await import('./emails.js');
 
     for (const ride of rides) {
       const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
@@ -1465,9 +1465,11 @@ async function sendContactDetailEmails() {
 
       for (const booking of (bookings || [])) {
         try {
+          const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
           await sendPassengerContactDetailsEmail(booking, ride, driver);
+          if (passenger) await sendDriverContactDetailsEmail(booking, ride, passenger);
           await supabase.from('bookings').update({ contact_email_sent: true }).eq('id', booking.id);
-          console.log(`✓ Sent contact details email for booking ${booking.id}`);
+          console.log(`✓ Sent contact details emails for booking ${booking.id}`);
         } catch (err) {
           console.error('Contact detail email error:', err);
         }

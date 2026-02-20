@@ -440,6 +440,35 @@ export async function sendPassengerContactDetailsEmail(booking, ride, driver) {
   );
 }
 
+// 18. Driver contact details email (12 hours before departure) — reveals passenger's real name
+export async function sendDriverContactDetailsEmail(booking, ride, passenger) {
+  const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
+  if (!driver || !passenger || !ride) return false;
+
+  const contactSection = passenger.phone
+    ? `<p><strong>Phone:</strong> <a href="tel:${passenger.phone}" style="color: #1A9D9D;">${passenger.phone}</a></p>`
+    : `<p>No phone number on file for this passenger.</p>`;
+
+  return sendEmail(driver.email, `Passenger Contact Details: ${ride.departure_location} → ${ride.arrival_location}`,
+    `<h2>Your ride departs in 12 hours 🚗</h2>
+    <p>Hi ${driver.name},</p>
+    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your passenger's contact details:</p>
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p style="font-weight: 700; margin: 0 0 8px 0; color: #166534;">Passenger Information</p>
+      <p><strong>Name:</strong> ${passenger.name}</p>
+      ${contactSection}
+    </div>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Seats booked:</strong> ${booking.seats_booked}</p>
+      ${ride.meeting_point_details ? `<p><strong>Meeting point:</strong> ${ride.meeting_point_details}</p>` : ''}
+    </div>
+    <p>Have a safe and comfortable journey!</p>
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+  );
+}
+
 // Legacy booking emails (kept for compatibility)
 export async function sendBookingEmails(bookingData) {
   return sendBookingRequestEmail(bookingData);
