@@ -426,7 +426,7 @@ export async function sendPassengerContactDetailsEmail(booking, ride, driver) {
     <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your driver's contact details:</p>
     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p style="font-weight: 700; margin: 0 0 8px 0; color: #166534;">Driver Information</p>
-      <p><strong>Driver:</strong> ${getDriverAlias(driver.id)}</p>
+      <p><strong>Driver:</strong> ${driver.name}</p>
       ${contactSection}
     </div>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
