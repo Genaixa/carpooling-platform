@@ -324,7 +324,10 @@ app.get('/api/driver/accept-booking', async (req, res) => {
     if (!ride || ride.driver_id !== driverId) return res.redirect(`${SITE_URL}/#dashboard?error=not-authorized`);
 
     if (booking.status !== 'pending_driver') {
-      return res.redirect(`${SITE_URL}/#dashboard?info=already-actioned`);
+      // Already processed — still show the appropriate confirm page
+      if (booking.status === 'confirmed') return res.redirect(`${SITE_URL}/#booking-accepted-confirm`);
+      if (booking.status === 'rejected' || booking.status === 'cancelled') return res.redirect(`${SITE_URL}/#booking-rejected-confirm`);
+      return res.redirect(`${SITE_URL}/#booking-accepted-confirm`);
     }
 
     // Capture the payment
@@ -367,7 +370,9 @@ app.get('/api/driver/reject-booking', async (req, res) => {
     if (!ride || ride.driver_id !== driverId) return res.redirect(`${SITE_URL}/#dashboard?error=not-authorized`);
 
     if (booking.status !== 'pending_driver') {
-      return res.redirect(`${SITE_URL}/#dashboard?info=already-actioned`);
+      // Already processed — still show the appropriate confirm page
+      if (booking.status === 'rejected' || booking.status === 'cancelled') return res.redirect(`${SITE_URL}/#booking-rejected-confirm`);
+      return res.redirect(`${SITE_URL}/#booking-accepted-confirm`);
     }
 
     // Cancel the payment hold
