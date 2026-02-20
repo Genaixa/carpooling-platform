@@ -588,6 +588,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>MOT</span><p style={{ margin: 0, color: app.has_mot ? '#166534' : '#991b1b' }}>{app.has_mot ? 'Yes' : 'No'}</p></div>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>DBS Acknowledged</span><p style={{ margin: 0, color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
                         <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Emergency</span><p style={{ margin: 0, color: '#1F2937' }}>{app.emergency_contact_name} ({app.emergency_contact_phone})</p></div>
+                        <div style={{ gridColumn: isMobile ? 'span 2' : 'span 3' }}>
+                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Address</span>
+                          <p style={{ margin: 0, color: '#1F2937' }}>
+                            {[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}
+                          </p>
+                        </div>
                       </div>
 
                       {/* Bank Details */}
