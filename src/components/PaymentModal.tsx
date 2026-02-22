@@ -122,7 +122,6 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
       const sourceId = result.token;
 
       // Run 3D Secure verification (SCA / PSD2) — triggers bank challenge if required.
-      // Wrapped in try/catch: if verifyBuyer fails or is unsupported, proceed without it.
       let verificationToken: string | undefined;
       if (paymentsRef.current) {
         try {
@@ -132,8 +131,16 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
             intent: 'CHARGE',
           });
           verificationToken = verifyResult?.token;
-        } catch (verifyErr) {
-          console.warn('3DS verification skipped:', verifyErr);
+        } catch (verifyErr: any) {
+          const msg = verifyErr?.message || String(verifyErr) || '';
+          // If the user cancelled the bank challenge, stop and tell them
+          if (/cancel/i.test(msg)) {
+            throw new Error('Payment cancelled — please try again and complete the bank verification when prompted.');
+          }
+          // For all other verifyBuyer errors (config/popup/browser issues),
+          // proceed without the token. Square will decline if SCA is truly required,
+          // giving the user the error below.
+          console.warn('3DS verifyBuyer failed, proceeding without token:', msg);
         }
       }
 

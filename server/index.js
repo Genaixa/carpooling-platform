@@ -360,7 +360,20 @@ app.post('/api/create-payment', async (req, res) => {
     res.json({ success: true, paymentId, bookingId: bookingData.id });
   } catch (error) {
     console.error('Payment error:', error);
-    res.status(500).json({ error: error.message || 'Payment failed' });
+    // Return a friendly message for known Square decline codes
+    const errMsg = error.message || '';
+    const squareErrors = error.errors || [];
+    const hasCode = (code) => squareErrors.some(e => e.code === code);
+    if (hasCode('CARD_DECLINED_VERIFICATION_REQUIRED')) {
+      return res.status(402).json({ error: 'Your bank requires additional verification (3D Secure) to complete this payment. Please try again — you may see a prompt from your bank to approve the transaction.' });
+    }
+    if (hasCode('CARD_DECLINED')) {
+      return res.status(402).json({ error: 'Your card was declined. Please check your card details or try a different card.' });
+    }
+    if (hasCode('INSUFFICIENT_FUNDS')) {
+      return res.status(402).json({ error: 'Your card has insufficient funds. Please try a different card.' });
+    }
+    res.status(500).json({ error: errMsg || 'Payment failed' });
   }
 });
 
