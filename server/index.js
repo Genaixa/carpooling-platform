@@ -237,6 +237,59 @@ app.delete('/api/delete-licence-photo', async (req, res) => {
 });
 
 // ============================================================
+// UPLOAD LICENCE PHOTO DURING APPLICATION (no approval required)
+// ============================================================
+
+app.post('/api/upload-application-licence-photo', upload.single('photo'), async (req, res) => {
+  try {
+    const { userId } = req.body;
+    if (!userId || !req.file) {
+      return res.status(400).json({ error: 'Missing userId or photo file' });
+    }
+
+    // Ensure bucket exists (private bucket for licence photos)
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets?.some(b => b.name === 'licence-photos');
+    if (!bucketExists) {
+      await supabase.storage.createBucket('licence-photos', { public: false });
+    }
+
+    const ext = req.file.originalname.split('.').pop();
+    const fileName = `${userId}-${Date.now()}.${ext}`;
+
+    // Delete old licence photos for this user
+    const { data: existingFiles } = await supabase.storage.from('licence-photos').list('', { search: userId });
+    if (existingFiles?.length) {
+      await supabase.storage.from('licence-photos').remove(existingFiles.map(f => f.name));
+    }
+
+    const { error: uploadError } = await supabase.storage
+      .from('licence-photos')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        cacheControl: '3600',
+        upsert: true,
+      });
+
+    if (uploadError) throw uploadError;
+
+    const { data: signedUrlData } = await supabase.storage.from('licence-photos').createSignedUrl(fileName, 60 * 60 * 24 * 365);
+    if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL');
+
+    await supabase.from('profiles').update({
+      licence_photo_url: signedUrlData.signedUrl,
+      licence_status: 'pending',
+    }).eq('id', userId);
+
+    console.log(`✓ Application licence photo uploaded for: ${userId}`);
+    res.json({ success: true, url: signedUrlData.signedUrl });
+  } catch (error) {
+    console.error('Application licence photo upload error:', error);
+    res.status(500).json({ error: error.message || 'Upload failed' });
+  }
+});
+
+// ============================================================
 // PAYMENT ENDPOINTS (Square delayed capture)
 // ============================================================
 

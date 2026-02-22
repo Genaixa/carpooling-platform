@@ -37,6 +37,9 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     bank_sort_code: '',
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [licencePhotoUrl, setLicencePhotoUrl] = useState<string | null>(null);
+  const [licencePhotoFile, setLicencePhotoFile] = useState<File | null>(null);
+  const [uploadingLicencePhoto, setUploadingLicencePhoto] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !user) {
@@ -112,6 +115,59 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
     }));
     if (errors[name]) {
       setErrors(prev => { const n = { ...prev }; delete n[name]; return n; });
+    }
+  };
+
+  const handleLicenceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
+      toast.error('Please select a JPG or PNG image');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('Image must be under 5MB');
+      return;
+    }
+    setLicencePhotoFile(file);
+  };
+
+  const handleLicenceUpload = async () => {
+    if (!licencePhotoFile || !user) return;
+    setUploadingLicencePhoto(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', licencePhotoFile);
+      formData.append('userId', user.id);
+      const res = await fetch(`${API_URL}/api/upload-application-licence-photo`, {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Upload failed');
+      setLicencePhotoUrl(data.url);
+      setLicencePhotoFile(null);
+      toast.success('Licence photo uploaded');
+    } catch (err: any) {
+      toast.error(err.message || 'Upload failed');
+    } finally {
+      setUploadingLicencePhoto(false);
+    }
+  };
+
+  const handleLicenceDelete = async () => {
+    if (!user) return;
+    try {
+      await fetch(`${API_URL}/api/delete-licence-photo`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      setLicencePhotoUrl(null);
+      setLicencePhotoFile(null);
+      toast.success('Licence photo removed');
+    } catch {
+      toast.error('Failed to remove photo');
     }
   };
 
@@ -356,6 +412,78 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                 ))}
                 {(errors.has_drivers_license || errors.car_insured || errors.has_mot) && (
                   <p style={{ color: '#ef4444', fontSize: '14px' }}>All compliance checks must be confirmed</p>
+                )}
+              </div>
+
+              {/* Licence Photo Upload */}
+              <div style={{
+                marginTop: '28px', marginBottom: '10px',
+                backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0',
+                borderRadius: '16px', padding: '20px',
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+                  <span style={{ fontSize: '20px' }}>⭐</span>
+                  <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#166534', margin: 0 }}>
+                    Upload Your Driving Licence Photo — Unlock Gold Status
+                  </h4>
+                </div>
+                <p style={{ fontSize: '13px', color: '#374151', marginBottom: '4px', lineHeight: '1.6' }}>
+                  Uploading a clear photo of your driving licence is <strong>optional</strong>, but it unlocks <strong>Gold Status Driver</strong> — giving you higher visibility and greater trust with passengers. It also <strong>speeds up your approval</strong> as our team can verify your licence directly without follow-up.
+                </p>
+                <p style={{ fontSize: '12px', color: '#6B7280', marginBottom: '16px' }}>
+                  Your licence photo is stored securely and is only visible to our admin team.
+                </p>
+
+                {licencePhotoUrl ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
+                    <img
+                      src={licencePhotoUrl}
+                      alt="Driving licence"
+                      style={{ height: '80px', borderRadius: '8px', border: '2px solid #86EFAC', objectFit: 'cover' }}
+                    />
+                    <div>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#166534', margin: '0 0 8px 0' }}>
+                        ✓ Licence photo uploaded
+                      </p>
+                      <button
+                        type="button"
+                        onClick={handleLicenceDelete}
+                        style={{
+                          padding: '8px 18px', backgroundColor: '#FEE2E2', color: '#991B1B',
+                          border: '1px solid #FCA5A5', borderRadius: '8px',
+                          fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                        }}
+                      >
+                        Remove Photo
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/jpg,image/png"
+                      onChange={handleLicenceFileChange}
+                      disabled={uploadingLicencePhoto}
+                      style={{ fontSize: '14px', color: '#4B5563', display: 'block', marginBottom: '12px' }}
+                    />
+                    {licencePhotoFile && (
+                      <button
+                        type="button"
+                        onClick={handleLicenceUpload}
+                        disabled={uploadingLicencePhoto}
+                        style={{
+                          padding: '10px 24px',
+                          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                          color: 'white', border: 'none', borderRadius: '8px',
+                          fontSize: '14px', fontWeight: '600', cursor: 'pointer',
+                          opacity: uploadingLicencePhoto ? 0.7 : 1,
+                        }}
+                      >
+                        {uploadingLicencePhoto ? 'Uploading...' : 'Upload Licence Photo'}
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
 
