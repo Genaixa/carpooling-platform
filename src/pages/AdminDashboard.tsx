@@ -74,7 +74,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [payoutModal, setPayoutModal] = useState<{ driverId: string; driverName: string; balance: number } | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutNotes, setPayoutNotes] = useState('');
-  const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
+  const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'overdue' | 'completed' | 'cancelled'>('all');
 
   // Users tab state
   const [usersData, setUsersData] = useState<any[]>([]);
@@ -97,6 +97,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   // Licence reviews state
   const [pendingLicences, setPendingLicences] = useState<Profile[]>([]);
   const [licencePhotoModal, setLicencePhotoModal] = useState<string | null>(null);
+  const [profilePhotoModal, setProfilePhotoModal] = useState<string | null>(null);
   const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null);
 
   useEffect(() => {
@@ -178,7 +179,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const [profilesResult, bookingsResult, ridesResult] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, name, email, phone, is_approved_driver, is_admin, average_rating, total_reviews, created_at, gender, city')
+          .select('id, name, email, phone, is_approved_driver, is_admin, average_rating, total_reviews, created_at, gender, city, profile_photo_url')
           .order('created_at', { ascending: false }),
         // Fetch all non-cancelled booking passenger IDs to count per user
         supabase
@@ -235,7 +236,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         const hi = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
         const [ridesResult, usersResult] = await Promise.all([
           supabase.from('rides').select('id, departure_location, arrival_location, date_time, status, driver_id').gte('id', lo).lte('id', hi).limit(10),
-          supabase.from('profiles').select('id, name, email, is_approved_driver, average_rating, total_reviews').gte('id', lo).lte('id', hi).limit(10),
+          supabase.from('profiles').select('id, name, email, is_approved_driver, average_rating, total_reviews, profile_photo_url').gte('id', lo).lte('id', hi).limit(10),
         ]);
         setLookupRides(ridesResult.data || []);
         setLookupUsers(usersResult.data || []);
@@ -245,7 +246,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         const targetAlias = `Driver #${aliasNum}`;
         const { data: allProfiles } = await supabase
           .from('profiles')
-          .select('id, name, email, is_approved_driver, average_rating, total_reviews')
+          .select('id, name, email, is_approved_driver, average_rating, total_reviews, profile_photo_url')
           .limit(2000);
         const matched = (allProfiles || []).filter(p => getDriverAlias(p.id) === targetAlias);
         setLookupUsers(matched);
@@ -253,7 +254,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       } else {
         const { data } = await supabase
           .from('profiles')
-          .select('id, name, email, is_approved_driver, average_rating, total_reviews')
+          .select('id, name, email, is_approved_driver, average_rating, total_reviews, profile_photo_url')
           .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
           .limit(20);
         setLookupUsers(data || []);
@@ -578,9 +579,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     refunded: { bg: '#e0e7ff', color: '#3730a3', border: '#a5b4fc' },
   };
 
+  const now = new Date();
+  const overdueRides = ridesOverview.filter(r => r.status === 'upcoming' && new Date(r.date_time) < now);
   const filteredRides = rideStatusFilter === 'all'
     ? ridesOverview
-    : ridesOverview.filter(r => r.status === rideStatusFilter);
+    : rideStatusFilter === 'overdue'
+      ? overdueRides.sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
+      : ridesOverview.filter(r => r.status === rideStatusFilter);
 
   // Totals for summary cards - reflect current filter
   const totalRevenue = filteredRides.reduce((sum, r) => sum + (parseFloat(r.totalRevenue as any) || 0), 0);
@@ -785,7 +790,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         {/* ==================== LICENCE REVIEWS TAB ==================== */}
         {tab === 'licence-reviews' && (
           <>
-            {/* Photo modal */}
+            {/* Licence Photo modal */}
             {licencePhotoModal && (
               <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => setLicencePhotoModal(null)}>
                 <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '20px', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
@@ -925,20 +930,26 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   <>
                     {/* Ride status filter */}
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                      {(['all', 'upcoming', 'completed', 'cancelled'] as const).map(s => (
-                        <button
-                          key={s}
-                          onClick={() => setRideStatusFilter(s)}
-                          style={{
-                            padding: '8px 18px', fontWeight: '600', fontSize: '13px', borderRadius: '50px',
-                            border: '1px solid #E8EBED', cursor: 'pointer', textTransform: 'capitalize',
-                            backgroundColor: rideStatusFilter === s ? '#374151' : 'white',
-                            color: rideStatusFilter === s ? 'white' : '#374151',
-                          }}
-                        >
-                          {s} ({s === 'all' ? ridesOverview.length : ridesOverview.filter(r => r.status === s).length})
-                        </button>
-                      ))}
+                      {(['all', 'upcoming', 'overdue', 'completed', 'cancelled'] as const).map(s => {
+                        const count = s === 'all' ? ridesOverview.length : s === 'overdue' ? overdueRides.length : ridesOverview.filter(r => r.status === s).length;
+                        const isOverdue = s === 'overdue';
+                        const isActive = rideStatusFilter === s;
+                        return (
+                          <button
+                            key={s}
+                            onClick={() => setRideStatusFilter(s)}
+                            style={{
+                              padding: '8px 18px', fontWeight: '600', fontSize: '13px', borderRadius: '50px',
+                              border: isOverdue && !isActive ? '1px solid #F59E0B' : '1px solid #E8EBED',
+                              cursor: 'pointer', textTransform: 'capitalize',
+                              backgroundColor: isActive ? (isOverdue ? '#D97706' : '#374151') : (isOverdue ? '#FEF3C7' : 'white'),
+                              color: isActive ? 'white' : (isOverdue ? '#92400E' : '#374151'),
+                            }}
+                          >
+                            {isOverdue ? `⚠ Overdue` : s} ({count})
+                          </button>
+                        );
+                      })}
                     </div>
 
                     {filteredRides.length === 0 ? (
@@ -950,11 +961,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         {filteredRides.map(ride => {
                           const rsc = statusColors[ride.status] || statusColors.upcoming;
                           const isExpanded = expandedRide === ride.id;
+                          const isOverdueRide = rideStatusFilter === 'overdue';
                           return (
                             <div key={ride.id} style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
                               <div
                                 onClick={() => setExpandedRide(isExpanded ? null : ride.id)}
-                                style={{ padding: '20px 24px', cursor: 'pointer', borderLeft: `4px solid ${rsc.border}` }}
+                                style={{ padding: '20px 24px', cursor: 'pointer', borderLeft: `4px solid ${isOverdueRide ? '#F59E0B' : rsc.border}` }}
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: '200px' }}>
@@ -962,7 +974,14 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', margin: 0 }}>
                                         {ride.departure_location} → {ride.arrival_location}
                                       </h4>
-                                      {(ride.status === 'completed' || ride.status === 'cancelled') && (
+                                      {isOverdueRide ? (
+                                        <span style={{
+                                          padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
+                                          backgroundColor: '#FEF3C7', color: '#92400E',
+                                        }}>
+                                          ⚠ Overdue
+                                        </span>
+                                      ) : (ride.status === 'completed' || ride.status === 'cancelled') && (
                                         <span style={{
                                           padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
                                           textTransform: 'capitalize', backgroundColor: rsc.bg, color: rsc.color,
@@ -992,6 +1011,37 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Driver</p>
                                       <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1e40af', margin: 0 }}>£{((parseFloat(ride.totalRevenue as any) || 0) - (parseFloat(ride.totalCommission as any) || 0)).toFixed(2)}</p>
                                     </div>
+                                    {rideStatusFilter === 'overdue' && (
+                                      <button
+                                        onClick={async (e) => {
+                                          e.stopPropagation();
+                                          if (!user) return;
+                                          setActionLoading(`reminder-${ride.id}`);
+                                          try {
+                                            const res = await fetch(`${API_URL}/api/admin/resend-email`, {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ adminId: user.id, rideId: ride.id, emailType: 'driver-post-ride-reminder' }),
+                                            });
+                                            const data = await res.json();
+                                            if (data.success) toast.success('Reminder sent to driver');
+                                            else toast.error(data.error || 'Failed to send reminder');
+                                          } catch {
+                                            toast.error('Failed to send reminder');
+                                          } finally {
+                                            setActionLoading(null);
+                                          }
+                                        }}
+                                        disabled={actionLoading === `reminder-${ride.id}`}
+                                        style={{
+                                          padding: '7px 14px', fontSize: '12px', fontWeight: '600', borderRadius: '8px',
+                                          border: '1px solid #F59E0B', backgroundColor: '#FEF3C7', color: '#92400E',
+                                          cursor: 'pointer', whiteSpace: 'nowrap',
+                                        }}
+                                      >
+                                        {actionLoading === `reminder-${ride.id}` ? 'Sending…' : '✉ Send Reminder'}
+                                      </button>
+                                    )}
                                     <span style={{ fontSize: '18px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                                       ▼
                                     </span>
@@ -1296,11 +1346,26 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                     /* ---- USER DETAIL ---- */
                     <>
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
-                        <div>
-                          <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>{selectedLookupItem.data.name}</h3>
-                          <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>{selectedLookupItem.data.email}</p>
-                          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 2px 0', fontFamily: 'monospace' }}>Ref: {getUserRef(selectedLookupItem.data.id)}</p>
-                          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>Alias: {getDriverAlias(selectedLookupItem.data.id)}</p>
+                        <div style={{ display: 'flex', gap: '16px', alignItems: 'flex-start' }}>
+                          {selectedLookupItem.data.profile_photo_url ? (
+                            <img
+                              src={selectedLookupItem.data.profile_photo_url}
+                              alt={selectedLookupItem.data.name}
+                              onClick={() => setProfilePhotoModal(selectedLookupItem.data.profile_photo_url)}
+                              style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '3px solid #E5E7EB', flexShrink: 0 }}
+                              title="Click to enlarge"
+                            />
+                          ) : (
+                            <div style={{ width: '72px', height: '72px', borderRadius: '50%', backgroundColor: '#F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '26px', color: '#9CA3AF', border: '3px solid #E5E7EB', flexShrink: 0 }}>
+                              {(selectedLookupItem.data.name || '?')[0].toUpperCase()}
+                            </div>
+                          )}
+                          <div>
+                            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>{selectedLookupItem.data.name}</h3>
+                            <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>{selectedLookupItem.data.email}</p>
+                            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 2px 0', fontFamily: 'monospace' }}>Ref: {getUserRef(selectedLookupItem.data.id)}</p>
+                            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>Alias: {getDriverAlias(selectedLookupItem.data.id)}</p>
+                          </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
                           {selectedLookupItem.data.is_approved_driver && (
@@ -1707,6 +1772,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#F9FAFB' }}>
+                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Photo</th>
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Phone</th>
@@ -1724,6 +1790,21 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F9FAFB')}
                             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                           >
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              {u.profile_photo_url ? (
+                                <img
+                                  src={u.profile_photo_url}
+                                  alt={u.name}
+                                  onClick={() => setProfilePhotoModal(u.profile_photo_url)}
+                                  style={{ width: '36px', height: '36px', borderRadius: '50%', objectFit: 'cover', cursor: 'pointer', border: '2px solid #E5E7EB' }}
+                                  title="Click to enlarge"
+                                />
+                              ) : (
+                                <div style={{ width: '36px', height: '36px', borderRadius: '50%', backgroundColor: '#F3F4F6', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: '13px', color: '#9CA3AF', border: '2px solid #E5E7EB' }}>
+                                  {(u.name || '?')[0].toUpperCase()}
+                                </div>
+                              )}
+                            </td>
                             <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937' }}>
                               {u.name || '—'}
                               {u.is_admin && <span style={{ marginLeft: '6px', fontSize: '10px', backgroundColor: '#FEF3C7', color: '#92400E', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>Admin</span>}
@@ -1838,6 +1919,18 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         )}
 
       </main>
+
+      {/* ==================== PROFILE PHOTO MODAL ==================== */}
+      {profilePhotoModal && (
+        <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000 }} onClick={() => setProfilePhotoModal(null)}>
+          <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '20px', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
+            <img src={profilePhotoModal} alt="Profile Photo" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '12px' }} />
+            <div style={{ textAlign: 'center', marginTop: '12px' }}>
+              <button onClick={() => setProfilePhotoModal(null)} style={{ padding: '10px 24px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ==================== PAYOUT MODAL ==================== */}
       {payoutModal && (

@@ -33,6 +33,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
   const [tpAgeGroup, setTpAgeGroup] = useState('');
   const [tpSpecialNeeds, setTpSpecialNeeds] = useState('');
   const cardRef = useRef<any>(null);
+  const paymentsRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -89,6 +90,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
       }
 
       const payments = window.Square.payments(applicationId, locationId);
+      paymentsRef.current = payments;
       const card = await payments.card();
       await card.attach(cardContainerRef.current);
       cardRef.current = card;
@@ -119,6 +121,17 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
 
       const sourceId = result.token;
 
+      // Run 3D Secure verification (SCA / PSD2) — triggers bank challenge if required
+      let verificationToken: string | undefined;
+      if (paymentsRef.current) {
+        const verifyResult = await paymentsRef.current.verifyBuyer(sourceId, {
+          amount: amount.toFixed(2),
+          currencyCode: 'GBP',
+          intent: 'CHARGE',
+        });
+        verificationToken = verifyResult?.token;
+      }
+
       const thirdPartyPassenger = bookingForSomeoneElse ? {
         name: tpName,
         gender: bookingForGender || 'Unknown',
@@ -131,6 +144,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sourceId,
+          verificationToken,
           amount,
           rideId,
           userId,

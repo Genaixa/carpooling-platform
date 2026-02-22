@@ -243,7 +243,7 @@ app.delete('/api/delete-licence-photo', async (req, res) => {
 // Create payment with delayed capture (hold on card)
 app.post('/api/create-payment', async (req, res) => {
   try {
-    const { sourceId, amount, rideId, userId, seatsToBook = 1, rideName, thirdPartyPassenger } = req.body;
+    const { sourceId, verificationToken, amount, rideId, userId, seatsToBook = 1, rideName, thirdPartyPassenger } = req.body;
 
     if (!sourceId || !amount || !rideId || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -253,6 +253,7 @@ app.post('/api/create-payment', async (req, res) => {
 
     const result = await squareClient.payments.create({
       sourceId,
+      ...(verificationToken ? { verificationToken } : {}),
       idempotencyKey: crypto.randomUUID(),
       amountMoney: {
         amount: totalAmountCents,
@@ -1235,18 +1236,24 @@ app.post('/api/admin/resend-email', async (req, res) => {
       sendPassengerContactDetailsEmail,
       sendDriverContactDetailsEmail,
       sendRidePostedEmail,
+      sendDriverPostRideReminder,
     } = await import('./emails.js');
 
     let result = false;
     let label = '';
 
     // Ride-level emails (no booking needed)
-    if (emailType === 'ride-posted') {
+    if (emailType === 'ride-posted' || emailType === 'driver-post-ride-reminder') {
       const { data: ride } = await supabase.from('rides').select('*').eq('id', rideId).single();
       const { data: driver } = ride ? await supabase.from('profiles').select('*').eq('id', ride.driver_id).single() : { data: null };
       if (!ride || !driver) return res.status(404).json({ error: 'Ride or driver not found' });
-      result = await sendRidePostedEmail(ride);
-      label = `Ride posted confirmation → ${driver.email}`;
+      if (emailType === 'ride-posted') {
+        result = await sendRidePostedEmail(ride);
+        label = `Ride posted confirmation → ${driver.email}`;
+      } else {
+        result = await sendDriverPostRideReminder(ride);
+        label = `Post-ride reminder → ${driver.email}`;
+      }
 
     // Booking-level emails
     } else {
@@ -1299,6 +1306,23 @@ app.post('/api/test-email', async (req, res) => {
     const result = await testEmail(email || 'test@example.com', name || 'Test User', type || 'booking-confirmation');
     res.json({ success: result, message: `Test ${type} email ${result ? 'sent' : 'failed'}` });
   } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Public contact form
+app.post('/api/contact', async (req, res) => {
+  try {
+    const { name, email, subject, message } = req.body;
+    if (!name || !email || !subject || !message) {
+      return res.status(400).json({ error: 'All fields are required' });
+    }
+    const { sendContactFormEmail } = await import('./emails.js');
+    const result = await sendContactFormEmail({ name, email, subject, message });
+    if (!result) return res.status(500).json({ error: 'Failed to send message' });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Contact form error:', error);
     res.status(500).json({ error: error.message });
   }
 });

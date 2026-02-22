@@ -20,6 +20,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
     postcode: '',
     country: '',
     gender: 'Male' as 'Male' | 'Female',
+    marital_status: '' as string,
   });
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -39,6 +40,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
         postcode: profile.postcode || '',
         country: profile.country || '',
         gender: (profile.gender || 'Male') as 'Male' | 'Female',
+        marital_status: profile.marital_status || '',
       });
       setPhotoPreview(profile.profile_photo_url || null);
     }
@@ -135,6 +137,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
         postcode: formData.postcode || null,
         country: formData.country || null,
         gender: formData.gender,
+        marital_status: (formData.marital_status as 'Single' | 'Married') || null,
         travel_status: 'solo',
       });
       toast.success('Profile updated successfully!');
@@ -249,6 +252,13 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   </button>
                 )}
               </div>
+              <p style={{
+                marginTop: '12px', fontSize: '12px', color: '#6B7280',
+                display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: '1.5',
+              }}>
+                <span style={{ fontSize: '14px', flexShrink: 0 }}>🔒</span>
+                <span>Your profile picture is <strong>not visible to other users</strong>. It is used for identity verification by our admin team only.</span>
+              </p>
             </div>
           </div>
         </div>
@@ -394,6 +404,29 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 >
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
+                </select>
+              </div>
+
+              {/* Marital Status */}
+              <div>
+                <label style={labelStyle}>Marital Status</label>
+                <select
+                  name="marital_status"
+                  value={formData.marital_status}
+                  onChange={handleChange}
+                  style={{
+                    ...inputStyle(),
+                    appearance: 'none',
+                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                    backgroundRepeat: 'no-repeat',
+                    backgroundPosition: 'right 16px center',
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                  onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                >
+                  <option value="">Select marital status</option>
+                  <option value="Single">Single</option>
+                  <option value="Married">Married</option>
                 </select>
               </div>
 
