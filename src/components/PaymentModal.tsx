@@ -121,15 +121,20 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
 
       const sourceId = result.token;
 
-      // Run 3D Secure verification (SCA / PSD2) — triggers bank challenge if required
+      // Run 3D Secure verification (SCA / PSD2) — triggers bank challenge if required.
+      // Wrapped in try/catch: if verifyBuyer fails or is unsupported, proceed without it.
       let verificationToken: string | undefined;
       if (paymentsRef.current) {
-        const verifyResult = await paymentsRef.current.verifyBuyer(sourceId, {
-          amount: amount.toFixed(2),
-          currencyCode: 'GBP',
-          intent: 'CHARGE',
-        });
-        verificationToken = verifyResult?.token;
+        try {
+          const verifyResult = await paymentsRef.current.verifyBuyer(sourceId, {
+            amount: amount.toFixed(2),
+            currencyCode: 'GBP',
+            intent: 'CHARGE',
+          });
+          verificationToken = verifyResult?.token;
+        } catch (verifyErr) {
+          console.warn('3DS verification skipped:', verifyErr);
+        }
       }
 
       const thirdPartyPassenger = bookingForSomeoneElse ? {
