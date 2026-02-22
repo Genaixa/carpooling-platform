@@ -219,7 +219,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                         {passenger?.email && <span> | Email: {passenger.email}</span>}
                       </div>
                     ) : (
-                      <p style={{ marginTop: '8px', fontSize: '12px', color: '#9CA3AF', margin: '8px 0 0' }}>Contact details available 12 hours before departure</p>
+                      <p style={{ marginTop: '8px', fontSize: '12px', color: '#9CA3AF', margin: '8px 0 0' }}>Contact details available 24 hours before departure</p>
                     )}
                   </div>
                 );

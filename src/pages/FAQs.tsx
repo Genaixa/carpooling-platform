@@ -40,7 +40,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
         },
         {
           question: 'How does ChapaRide work?',
-          answer: 'Drivers post available rides with their route, date, and price. Passengers search for rides, book seats, and pay securely online. The driver accepts or declines the booking, and contact details are shared 12 hours before departure.',
+          answer: 'Drivers post available rides with their route, date, and price. Passengers search for rides, book seats, and pay securely online. The driver accepts or declines the booking, and contact details are shared 24 hours before departure.',
         },
         {
           question: 'Is ChapaRide available outside the UK?',
@@ -70,7 +70,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
         },
         {
           question: 'When can I see the driver\'s contact details?',
-          answer: 'For privacy and safety, contact details are only shared 12 hours before the scheduled departure time.',
+          answer: 'For privacy and safety, contact details are only shared 24 hours before the scheduled departure time.',
         },
         {
           question: 'Can children travel on ChapaRide?',

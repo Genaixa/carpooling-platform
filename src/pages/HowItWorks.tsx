@@ -57,7 +57,7 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
               { step: '1', title: 'Create Your Account', desc: 'Sign up with your email. Complete your profile with your gender and travel status (solo or couple) — this helps us match you with compatible rides.' },
               { step: '2', title: 'Find a Ride', desc: 'Search by departure, destination, date, and number of passengers. Filter by price, driver type, and more. Incompatible rides are greyed out so you only book what works for you.' },
               { step: '3', title: 'Book & Pay Securely', desc: 'Select how many seats you need and pay securely with your card. Your payment is held until the driver accepts your booking — if they don\'t, your card hold is automatically released.' },
-              { step: '4', title: 'Travel & Review', desc: 'Once the driver confirms, you\'ll see their contact details 12 hours before departure. After the journey, leave a review to help the community.' },
+              { step: '4', title: 'Travel & Review', desc: 'Once the driver confirms, you\'ll see their contact details 24 hours before departure. After the journey, leave a review to help the community.' },
             ].map((item) => (
               <div key={item.step} style={{
                 padding: '24px', borderRadius: '16px', border: '1px solid #E8EBED',
@@ -208,7 +208,7 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
                 Contact Privacy
               </h4>
               <p style={{ fontSize: '14px', color: '#4B5563', lineHeight: '1.7', margin: 0 }}>
-                Phone numbers and contact details are only shared between driver and passenger 12 hours before the ride's departure time — not before.
+                Phone numbers and contact details are only shared between driver and passenger 24 hours before the ride's departure time — not before.
               </p>
             </div>
 

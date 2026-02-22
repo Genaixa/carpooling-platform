@@ -1218,6 +1218,76 @@ async function recalculateSeats(rideId) {
   await supabase.from('rides').update({ seats_available: available }).eq('id', rideId);
 }
 
+// Admin: resend a specific email for a booking
+app.post('/api/admin/resend-email', async (req, res) => {
+  try {
+    const { adminId, bookingId, rideId, emailType } = req.body;
+    if (!adminId || !emailType || (!bookingId && !rideId)) {
+      return res.status(400).json({ error: 'adminId, emailType, and either bookingId or rideId are required' });
+    }
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const {
+      sendBookingRequestEmail,
+      sendBookingAcceptedEmail,
+      sendPassengerContactDetailsEmail,
+      sendDriverContactDetailsEmail,
+      sendRidePostedEmail,
+    } = await import('./emails.js');
+
+    let result = false;
+    let label = '';
+
+    // Ride-level emails (no booking needed)
+    if (emailType === 'ride-posted') {
+      const { data: ride } = await supabase.from('rides').select('*').eq('id', rideId).single();
+      const { data: driver } = ride ? await supabase.from('profiles').select('*').eq('id', ride.driver_id).single() : { data: null };
+      if (!ride || !driver) return res.status(404).json({ error: 'Ride or driver not found' });
+      result = await sendRidePostedEmail(ride);
+      label = `Ride posted confirmation → ${driver.email}`;
+
+    // Booking-level emails
+    } else {
+      const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+      if (!booking) return res.status(404).json({ error: 'Booking not found' });
+      const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
+      const { data: driver } = ride ? await supabase.from('profiles').select('*').eq('id', ride.driver_id).single() : { data: null };
+      const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
+      if (!ride || !driver || !passenger) return res.status(404).json({ error: 'Could not load ride, driver or passenger' });
+
+      switch (emailType) {
+        case 'booking-request':
+          result = await sendBookingRequestEmail(booking);
+          label = `Booking request → ${driver.email}`;
+          break;
+        case 'booking-accepted':
+          result = await sendBookingAcceptedEmail(booking);
+          label = `Booking confirmed → ${passenger.email}`;
+          break;
+        case 'contact-details-passenger':
+          result = await sendPassengerContactDetailsEmail(booking, ride, driver);
+          label = `Contact details → ${passenger.email}`;
+          break;
+        case 'contact-details-driver':
+          result = await sendDriverContactDetailsEmail(booking, ride, passenger);
+          label = `Contact details → ${driver.email}`;
+          break;
+        default:
+          return res.status(400).json({ error: `Unknown email type: ${emailType}` });
+      }
+    }
+
+    if (!result) return res.status(500).json({ error: 'Email send failed — check server logs' });
+    console.log(`[Admin resend] ${label} (admin: ${adminId})`);
+    res.json({ success: true, message: `Sent: ${label}` });
+  } catch (error) {
+    console.error('Admin resend-email error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Test email endpoint (admin only)
 app.post('/api/test-email', async (req, res) => {
   try {
@@ -1438,19 +1508,19 @@ async function sendPostRideReminders() {
   }
 }
 
-// Send contact detail emails 12 hours before departure
+// Send contact detail emails 24 hours before departure
 async function sendContactDetailEmails() {
   try {
     const now = new Date();
-    const in12h = new Date(now.getTime() + 12 * 60 * 60 * 1000).toISOString();
+    const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
 
-    // Find upcoming rides departing within the next 12 hours
+    // Find upcoming rides departing within the next 24 hours
     const { data: rides, error } = await supabase
       .from('rides')
       .select('*')
       .eq('status', 'upcoming')
       .gte('date_time', now.toISOString())
-      .lte('date_time', in12h);
+      .lte('date_time', in24h);
 
     if (error) throw error;
     if (!rides || rides.length === 0) return;

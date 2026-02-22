@@ -34,6 +34,13 @@ async function sendEmail(to, subject, html) {
   } catch (err) { console.error('Email send failed:', err); return false; }
 }
 
+function getRideRef(rideId) {
+  return rideId.substring(0, 8).toUpperCase();
+}
+function getUserRef(userId) {
+  return userId.substring(0, 8).toUpperCase();
+}
+
 function getPassengerAlias(passengerId) {
   let hash = 0;
   for (let i = 0; i < passengerId.length; i++) {
@@ -87,10 +94,10 @@ export async function sendBookingRequestEmail(bookingData) {
       ${thirdParty.special_needs ? `<p><strong>Special needs:</strong> ${thirdParty.special_needs}</p>` : ''}
     </div>` : '';
 
-  return sendEmail(driver.email, `New Booking Request: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(driver.email, `New Booking Request: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>New Booking Request</h2>
     <p>Hi ${driver.name},</p>
-    <p><strong>${getPassengerAlias(passenger.id)}</strong> has requested to book ${bookingData.seats_booked} seat(s) on your ride.</p>
+    <p><strong>${getPassengerAlias(passenger.id)}</strong> has requested to book ${bookingData.seats_booked} seat(s) on your ride (<strong>${getRideRef(ride.id)}</strong>).</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
@@ -106,7 +113,11 @@ export async function sendBookingRequestEmail(bookingData) {
       <a href="${acceptUrl}" style="display: inline-block; padding: 14px 28px; background: #166534; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Accept Booking</a>
       <a href="${rejectUrl}" style="display: inline-block; padding: 14px 28px; background: #991b1b; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Reject Booking</a>
     </div>
-    <p style="color: #666; font-size: 13px;">Or manage from your <a href="${SITE_URL}/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>`
+    <p style="color: #666; font-size: 13px;">Or manage from your <a href="${SITE_URL}/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong> &nbsp;&middot;&nbsp; Passenger Ref: <strong>${getUserRef(passenger.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -114,10 +125,10 @@ export async function sendBookingRequestEmail(bookingData) {
 export async function sendBookingAcceptedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
-  return sendEmail(passenger.email, `Booking Confirmed: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(passenger.email, `Booking Confirmed: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Booking Confirmed! ✅</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Great news! Your booking has been accepted. Your card has now been charged.</p>
+    <p>Great news! Your booking (<strong>${getRideRef(ride.id)}</strong>) has been accepted. Your card has now been charged.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
@@ -133,9 +144,13 @@ export async function sendBookingAcceptedEmail(bookingData) {
       <p><strong>Hometown:</strong> ${driver.city || 'Not specified'}</p>
     </div>
     <p style="color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
-      Contact details (phone number) will be shared with you <strong>12 hours before departure</strong>.
+      Contact details (phone number) will be shared with you <strong>24 hours before departure</strong>.
     </p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong> &nbsp;&middot;&nbsp; Driver Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -143,12 +158,16 @@ export async function sendBookingAcceptedEmail(bookingData) {
 export async function sendBookingRejectedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
-  return sendEmail(passenger.email, `Booking Declined: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(passenger.email, `Booking Declined: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Booking Declined</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Unfortunately, ${getDriverAlias(driver.id)} has declined your booking request for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
+    <p>Unfortunately, ${getDriverAlias(driver.id)} has declined your booking request (<strong>${getRideRef(ride.id)}</strong>) for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
     <p>The hold on your card has been released and you will not be charged.</p>
-    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
+    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong> &nbsp;&middot;&nbsp; Driver Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -159,15 +178,19 @@ export async function sendPassengerCancellationEmail(bookingData, refundAmount) 
   const refundText = refundAmount > 0
     ? `A refund of £${refundAmount.toFixed(2)} will be processed to your original payment method.`
     : `As this cancellation was made less than 48 hours before departure, no refund is available.`;
-  return sendEmail(passenger.email, `Booking Cancelled: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(passenger.email, `Booking Cancelled: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Booking Cancelled</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Your booking for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)} has been cancelled.</p>
+    <p>Your booking (<strong>${getRideRef(ride.id)}</strong>) for the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)} has been cancelled.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Original amount:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
       <p><strong>Refund amount:</strong> £${(refundAmount || 0).toFixed(2)}</p>
     </div>
-    <p>${refundText}</p>`
+    <p>${refundText}</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -175,12 +198,16 @@ export async function sendPassengerCancellationEmail(bookingData, refundAmount) 
 export async function sendDriverCancellationEmail(bookingData, ride) {
   const { data: passenger } = await supabase.from('profiles').select('*').eq('id', bookingData.passenger_id).single();
   if (!passenger || !ride) return false;
-  return sendEmail(passenger.email, `Ride Cancelled: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(passenger.email, `Ride Cancelled: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Ride Cancelled by Driver</h2>
     <p>Hi ${passenger.name},</p>
-    <p>We're sorry, but the driver has cancelled the ride from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
+    <p>We're sorry, but the driver has cancelled the ride (<strong>${getRideRef(ride.id)}</strong>) from ${ride.departure_location} to ${ride.arrival_location} on ${formatDate(ride.date_time)}.</p>
     <p>A full refund has been issued to your original payment method.</p>
-    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>`
+    <p><a href="${SITE_URL}/#home" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Browse Rides</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -193,7 +220,11 @@ export async function sendDriverApprovedEmail(application) {
     <p>Hi ${application.first_name},</p>
     <p>Congratulations! Your driver application has been approved. You can now post rides on the ChapaRide platform.</p>
     ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Note from admin:</strong> ${application.admin_notes}</p></div>` : ''}
-    <p>Log in to your dashboard and start posting rides today!</p>`
+    <p>Log in to your dashboard and start posting rides today!</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Your Ref: <strong>${getUserRef(user.id)}</strong><br>
+      <span style="font-size:11px;">Quote this if you contact support.</span>
+    </p>`
   );
 }
 
@@ -206,7 +237,11 @@ export async function sendDriverRejectedEmail(application) {
     <p>Hi ${application.first_name},</p>
     <p>Thank you for your interest in becoming a ChapaRide driver. Unfortunately, we are unable to approve your application at this time.</p>
     ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Reason:</strong> ${application.admin_notes}</p></div>` : ''}
-    <p>If you have questions, please contact us at support@chaparide.com.</p>`
+    <p>If you have questions, please contact us at support@chaparide.com.</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Your Ref: <strong>${getUserRef(user.id)}</strong><br>
+      <span style="font-size:11px;">Quote this if you contact support.</span>
+    </p>`
   );
 }
 
@@ -231,10 +266,10 @@ export async function sendRideMatchEmail(wish, ride) {
   const { data: wisher } = await supabase.from('profiles').select('*').eq('id', wish.user_id).single();
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!wisher || !driver) return false;
-  return sendEmail(wisher.email, `Ride Alert: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(wisher.email, `Ride Alert: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>A Ride Matching Your Alert is Available!</h2>
     <p>Hi ${wisher.name},</p>
-    <p>Great news! A ride matching your alert has just been posted.</p>
+    <p>Great news! A ride (<strong>${getRideRef(ride.id)}</strong>) matching your alert has just been posted.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
@@ -242,7 +277,11 @@ export async function sendRideMatchEmail(wish, ride) {
       <p><strong>Available seats:</strong> ${ride.seats_available}</p>
       <p><strong>Driver:</strong> ${getDriverAlias(driver.id)}</p>
     </div>
-    <p><a href="${SITE_URL}/#ride-details/${ride.id}" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Ride Details</a></p>`
+    <p><a href="${SITE_URL}/#ride-details/${ride.id}" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Ride Details</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(wisher.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -250,10 +289,10 @@ export async function sendRideMatchEmail(wish, ride) {
 export async function sendDriverPostRideReminder(ride) {
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!driver) return false;
-  return sendEmail(driver.email, `Ride Complete? ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(driver.email, `Ride Complete? ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Has your ride taken place?</h2>
     <p>Hi ${driver.name},</p>
-    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> was scheduled to depart recently.</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> was scheduled to depart recently.</p>
     <p>If the ride has taken place, please mark it as complete on your dashboard. This will:</p>
     <ul>
       <li>Finalise passenger payments</li>
@@ -261,7 +300,11 @@ export async function sendDriverPostRideReminder(ride) {
       <li>Update your ride history</li>
     </ul>
     <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1e40af; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Mark as Complete</a></p>
-    <p style="color: #666; font-size: 13px; margin-top: 20px;">Don't forget to leave reviews for your passengers after marking the ride complete!</p>`
+    <p style="color: #666; font-size: 13px; margin-top: 20px;">Don't forget to leave reviews for your passengers after marking the ride complete!</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -270,12 +313,16 @@ export async function sendPassengerPostRideReminder(booking, ride) {
   const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!passenger || !driver) return false;
-  return sendEmail(passenger.email, `How was your ride? ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(passenger.email, `How was your ride? ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>How was your ride?</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> with <strong>${getDriverAlias(driver.id)}</strong> on <strong>${formatDate(ride.date_time)}</strong> should have taken place.</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> with <strong>${getDriverAlias(driver.id)}</strong> on <strong>${formatDate(ride.date_time)}</strong> should have taken place.</p>
     <p>Once the driver marks the ride as complete, you'll be able to leave a review. Reviews help build trust in the ChapaRide community and help other passengers choose great drivers!</p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong> &nbsp;&middot;&nbsp; Driver Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -284,12 +331,16 @@ export async function sendPassengerReviewReminder(booking, ride) {
   const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!passenger || !driver) return false;
-  return sendEmail(passenger.email, `Leave a review for ${getDriverAlias(driver.id)}`,
+  return sendEmail(passenger.email, `Leave a review for ${getDriverAlias(driver.id)} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Your ride is complete!</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> has been marked as complete by the driver.</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> has been marked as complete by the driver.</p>
     <p>How was your experience with <strong>${getDriverAlias(driver.id)}</strong>? Your review helps other passengers choose great drivers and helps build trust in the ChapaRide community.</p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong> &nbsp;&middot;&nbsp; Driver Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -300,12 +351,16 @@ export async function sendDriverReviewReminder(ride, passengerIds) {
   const passengerList = passengerIds.length === 1
     ? `<strong>${getPassengerAlias(passengerIds[0])}</strong>`
     : passengerIds.map(id => `<strong>${getPassengerAlias(id)}</strong>`).join(', ');
-  return sendEmail(driver.email, `Leave reviews for your passengers`,
+  return sendEmail(driver.email, `Leave reviews for your passengers - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Ride marked as complete!</h2>
     <p>Hi ${driver.name},</p>
-    <p>You've marked your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> as complete.</p>
+    <p>You've marked your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> as complete.</p>
     <p>Don't forget to leave reviews for your passenger(s): ${passengerList}. Your feedback helps build a safe and trusted community.</p>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Leave Reviews</a></p>`
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Leave Reviews</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -335,7 +390,11 @@ export async function sendDriverWishNotificationEmail(driver, wish) {
     </div>
     <p>If you're interested in offering this ride, you can post it directly from your dashboard. The passenger will be automatically notified when a matching ride is available.</p>
     <p><a href="${SITE_URL}/#post-ride" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Post This Ride</a></p>
-    <p style="color: #666; font-size: 13px; margin-top: 16px;">You are receiving this because you are a registered driver in ${wish.departure_location.split(' - ')[0] || wish.departure_location}. You can turn off these alerts in your <a href="${SITE_URL}/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>`
+    <p style="color: #666; font-size: 13px; margin-top: 16px;">You are receiving this because you are a registered driver in ${wish.departure_location.split(' - ')[0] || wish.departure_location}. You can turn off these alerts in your <a href="${SITE_URL}/#dashboard" style="color: #1A9D9D;">dashboard</a>.</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Your Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote this if you contact support.</span>
+    </p>`
   );
 }
 
@@ -348,10 +407,10 @@ export async function sendRidePostedEmail(ride) {
     ? 'No luggage space offered'
     : `${ride.luggage_size.charAt(0).toUpperCase() + ride.luggage_size.slice(1)} (${ride.luggage_count || 0} item${ride.luggage_count !== 1 ? 's' : ''})`;
 
-  return sendEmail(driver.email, `Ride Posted: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(driver.email, `Your Ride Has Been Posted ✅ - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Your Ride Has Been Posted ✅</h2>
     <p>Hi ${driver.name},</p>
-    <p>Your ride has been successfully posted on ChapaRide and is now visible to passengers.</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) has been successfully posted on ChapaRide and is now visible to passengers.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
@@ -361,7 +420,11 @@ export async function sendRidePostedEmail(ride) {
       ${ride.additional_notes ? `<p><strong>Notes:</strong> ${ride.additional_notes}</p>` : ''}
     </div>
     <p>You will receive an email as soon as a passenger requests to book your ride. You can accept or reject bookings from your dashboard.</p>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -369,10 +432,10 @@ export async function sendRidePostedEmail(ride) {
 export async function sendDriverBookingAcceptedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
-  return sendEmail(driver.email, `Booking Accepted: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(driver.email, `Booking Accepted: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>You Accepted a Booking ✅</h2>
     <p>Hi ${driver.name},</p>
-    <p>You have accepted the booking request. Their card has been charged.</p>
+    <p>You have accepted the booking request (<strong>${getRideRef(ride.id)}</strong>). Their card has been charged.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
@@ -388,9 +451,13 @@ export async function sendDriverBookingAcceptedEmail(bookingData) {
       <p><strong>Hometown:</strong> ${passenger.city || 'Not specified'}</p>
     </div>
     <p style="color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
-      The passenger's contact details (phone number) will be visible to you <strong>12 hours before departure</strong>.
+      The passenger's contact details (phone number) will be visible to you <strong>24 hours before departure</strong>.
     </p>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong> &nbsp;&middot;&nbsp; Passenger Ref: <strong>${getUserRef(passenger.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -398,20 +465,24 @@ export async function sendDriverBookingAcceptedEmail(bookingData) {
 export async function sendDriverBookingRejectedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
-  return sendEmail(driver.email, `Booking Declined: ${ride.departure_location} → ${ride.arrival_location}`,
+  return sendEmail(driver.email, `Booking Declined: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>You Declined a Booking</h2>
     <p>Hi ${driver.name},</p>
-    <p>You have declined the booking request from <strong>${getPassengerAlias(passenger.id)}</strong>. The hold on their card has been released and they will not be charged.</p>
+    <p>You have declined the booking request (<strong>${getRideRef(ride.id)}</strong>) from <strong>${getPassengerAlias(passenger.id)}</strong>. The hold on their card has been released and they will not be charged.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
       <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
       <p><strong>Seats requested:</strong> ${bookingData.seats_booked}</p>
     </div>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong> &nbsp;&middot;&nbsp; Passenger Ref: <strong>${getUserRef(passenger.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
-// 17. Passenger contact details email (12 hours before departure)
+// 17. Passenger contact details email (24 hours before departure)
 export async function sendPassengerContactDetailsEmail(booking, ride, driver) {
   const { data: passenger } = await supabase.from('profiles').select('*').eq('id', booking.passenger_id).single();
   if (!passenger || !driver || !ride) return false;
@@ -420,10 +491,10 @@ export async function sendPassengerContactDetailsEmail(booking, ride, driver) {
     ? `<p><strong>Phone:</strong> <a href="tel:${driver.phone}" style="color: #1A9D9D;">${driver.phone}</a></p>`
     : `<p>No phone number on file. Please check your dashboard for contact options.</p>`;
 
-  return sendEmail(passenger.email, `Driver Contact Details: ${ride.departure_location} → ${ride.arrival_location}`,
-    `<h2>Your ride departs in 12 hours 🚗</h2>
+  return sendEmail(passenger.email, `Driver Contact Details: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
+    `<h2>Your ride departs in 24 hours 🚗</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your driver's contact details:</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your driver's contact details:</p>
     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p style="font-weight: 700; margin: 0 0 8px 0; color: #166534;">Driver Information</p>
       <p><strong>Driver:</strong> ${driver.name}</p>
@@ -436,11 +507,15 @@ export async function sendPassengerContactDetailsEmail(booking, ride, driver) {
       ${ride.meeting_point_details ? `<p><strong>Meeting point:</strong> ${ride.meeting_point_details}</p>` : ''}
     </div>
     <p>Have a safe and comfortable journey!</p>
-    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>`
+    <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View My Bookings</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong> &nbsp;&middot;&nbsp; Driver Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
-// 18. Driver contact details email (12 hours before departure) — reveals passenger's real name
+// 18. Driver contact details email (24 hours before departure) — reveals passenger's real name
 export async function sendDriverContactDetailsEmail(booking, ride, passenger) {
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!driver || !passenger || !ride) return false;
@@ -449,10 +524,10 @@ export async function sendDriverContactDetailsEmail(booking, ride, passenger) {
     ? `<p><strong>Phone:</strong> <a href="tel:${passenger.phone}" style="color: #1A9D9D;">${passenger.phone}</a></p>`
     : `<p>No phone number on file for this passenger.</p>`;
 
-  return sendEmail(driver.email, `Passenger Contact Details: ${ride.departure_location} → ${ride.arrival_location}`,
-    `<h2>Your ride departs in 12 hours 🚗</h2>
+  return sendEmail(driver.email, `Passenger Contact Details: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
+    `<h2>Your ride departs in 24 hours 🚗</h2>
     <p>Hi ${driver.name},</p>
-    <p>Your ride from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your passenger's contact details:</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> departs on <strong>${formatDate(ride.date_time)}</strong>. Here are your passenger's contact details:</p>
     <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p style="font-weight: 700; margin: 0 0 8px 0; color: #166534;">Passenger Information</p>
       <p><strong>Name:</strong> ${passenger.name}</p>
@@ -465,7 +540,11 @@ export async function sendDriverContactDetailsEmail(booking, ride, passenger) {
       ${ride.meeting_point_details ? `<p><strong>Meeting point:</strong> ${ride.meeting_point_details}</p>` : ''}
     </div>
     <p>Have a safe and comfortable journey!</p>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>`
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">View Dashboard</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong> &nbsp;&middot;&nbsp; Passenger Ref: <strong>${getUserRef(passenger.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
   );
 }
 
@@ -486,7 +565,7 @@ export async function sendBookingConfirmationEmail(passengerEmail, passengerName
       <p><strong>Total paid:</strong> £${Number(bookingDetails.total_paid).toFixed(2)}</p>
       <p><strong>Driver:</strong> ${driverName}</p>
     </div>
-    <p>Contact details will be available 12 hours before departure.</p>`
+    <p>Contact details will be available 24 hours before departure.</p>`
   );
 }
 

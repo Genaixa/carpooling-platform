@@ -216,21 +216,39 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   display: 'block', width: '100%',
                 }}
               />
-              {selectedFile && (
-                <button
-                  onClick={handlePhotoUpload}
-                  disabled={uploadingPhoto}
-                  style={{
-                    padding: '10px 24px',
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                    color: 'white', borderRadius: '50px', fontSize: '14px',
-                    fontWeight: '600', border: 'none', cursor: 'pointer',
-                    opacity: uploadingPhoto ? 0.7 : 1,
-                  }}
-                >
-                  {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
-                </button>
-              )}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                {selectedFile && (
+                  <button
+                    onClick={handlePhotoUpload}
+                    disabled={uploadingPhoto}
+                    style={{
+                      padding: '10px 24px',
+                      background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                      color: 'white', borderRadius: '50px', fontSize: '14px',
+                      fontWeight: '600', border: 'none', cursor: 'pointer',
+                      opacity: uploadingPhoto ? 0.7 : 1,
+                    }}
+                  >
+                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                  </button>
+                )}
+                {(photoPreview || profile.profile_photo_url) && !selectedFile && (
+                  <button
+                    onClick={async () => {
+                      await updateProfile({ profile_photo_url: null });
+                      setPhotoPreview(null);
+                      toast.success('Profile photo removed');
+                    }}
+                    style={{
+                      padding: '10px 24px', backgroundColor: '#FEE2E2', color: '#991B1B',
+                      borderRadius: '50px', fontSize: '14px', fontWeight: '600',
+                      border: '1px solid #FCA5A5', cursor: 'pointer',
+                    }}
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>

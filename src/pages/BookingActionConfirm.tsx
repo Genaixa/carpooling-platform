@@ -71,7 +71,7 @@ export default function BookingActionConfirm({ onNavigate, action }: Props) {
               {[
                 "The passenger's card has been charged.",
                 'The passenger has been notified by email that their booking is confirmed.',
-                "The passenger's contact details will become available to you 12 hours before the ride.",
+                "The passenger's contact details will become available to you 24 hours before the ride.",
                 'You can view and manage all your bookings from your dashboard.',
               ].map((step, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 3 ? '10px' : 0 }}>

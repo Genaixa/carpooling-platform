@@ -91,7 +91,7 @@ export default function PaymentSuccess({ onNavigate }: PaymentSuccessProps) {
               'The driver receives your booking request by email',
               'They accept or reject it — you\'ll be notified by email either way',
               'If accepted, your card is charged and the booking is confirmed',
-              'Driver contact details are shared 12 hours before departure',
+              'Driver contact details are shared 24 hours before departure',
             ].map((step, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                 <span style={{

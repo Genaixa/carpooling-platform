@@ -238,13 +238,21 @@ export function getIncompatibilityReason(
 }
 
 /**
- * Returns true if contact details should be visible (within 12 hours of ride departure).
+ * Returns true if contact details should be visible (within 24 hours of ride departure).
  */
 export function isContactVisible(rideDateTime: string): boolean {
   const rideTime = new Date(rideDateTime).getTime();
   const now = Date.now();
-  const twelveHoursMs = 12 * 60 * 60 * 1000;
-  return (rideTime - now) <= twelveHoursMs;
+  const twentyFourHoursMs = 24 * 60 * 60 * 1000;
+  return (rideTime - now) <= twentyFourHoursMs;
+}
+
+// Short 8-char human-readable reference codes from UUID prefix
+export function getRideRef(rideId: string): string {
+  return rideId.substring(0, 8).toUpperCase();
+}
+export function getUserRef(userId: string): string {
+  return userId.substring(0, 8).toUpperCase();
 }
 
 // Generate a consistent anonymous driver number from a UUID

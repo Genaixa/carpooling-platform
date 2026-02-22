@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, DriverApplication, Profile, DriverPayout } from '../lib/supabase';
+import { supabase, DriverApplication, Profile, DriverPayout, getRideRef, getUserRef, getDriverAlias } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import { useIsMobile } from '../hooks/useIsMobile';
@@ -56,9 +56,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const { user, profile, loading: authLoading } = useAuth();
   const isMobile = useIsMobile();
   const [applications, setApplications] = useState<DriverApplication[]>([]);
-  const [activeDrivers, setActiveDrivers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'active-drivers' | 'licence-reviews' | 'finances' | 'admins' | 'contact'>('applications');
+  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users'>('applications');
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
@@ -71,21 +70,29 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [payouts, setPayouts] = useState<DriverPayout[]>([]);
   const [driverSummaries, setDriverSummaries] = useState<DriverPayoutSummary[]>([]);
   const [expandedRide, setExpandedRide] = useState<string | null>(null);
+  const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [payoutModal, setPayoutModal] = useState<{ driverId: string; driverName: string; balance: number } | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutNotes, setPayoutNotes] = useState('');
-  const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'completed' | 'cancelled'>('all');
+  const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
 
-  // Admin management state
-  const [allUsers, setAllUsers] = useState<{ id: string; name: string; email: string; is_admin: boolean; is_approved_driver: boolean; created_at: string }[]>([]);
-  const [adminSearch, setAdminSearch] = useState('');
+  // Users tab state
+  const [usersData, setUsersData] = useState<any[]>([]);
+  const [usersFilter, setUsersFilter] = useState<'all' | 'drivers' | 'passengers'>('all');
+  const [usersSearch, setUsersSearch] = useState('');
+  const [usersLoading, setUsersLoading] = useState(false);
 
-  // Contact search state
-  const [contactSearch, setContactSearch] = useState('');
-  const [contactRoleFilter, setContactRoleFilter] = useState<'all' | 'drivers' | 'passengers'>('all');
-  const [contactResults, setContactResults] = useState<{ id: string; name: string; email: string; is_approved_driver: boolean }[]>([]);
-  const [contactLoading, setContactLoading] = useState(false);
-  const [contactSearched, setContactSearched] = useState(false);
+  // Search & Lookup state
+  const [lookupQuery, setLookupQuery] = useState('');
+  const [lookupLoading, setLookupLoading] = useState(false);
+  const [lookupUsers, setLookupUsers] = useState<any[]>([]);
+  const [lookupRides, setLookupRides] = useState<any[]>([]);
+  const [lookupSearched, setLookupSearched] = useState(false);
+  const [selectedLookupItem, setSelectedLookupItem] = useState<{ type: 'user' | 'ride'; data: any } | null>(null);
+  const [lookupDetail, setLookupDetail] = useState<any | null>(null);
+  const [lookupDetailLoading, setLookupDetailLoading] = useState(false);
+  const [resendLoading, setResendLoading] = useState<string | null>(null);
+  const [resendTypes, setResendTypes] = useState<Record<string, string>>({});
 
   // Licence reviews state
   const [pendingLicences, setPendingLicences] = useState<Profile[]>([]);
@@ -101,31 +108,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   useEffect(() => {
     if (user && profile?.is_admin) {
       if (tab === 'applications') loadApplications();
-      else if (tab === 'active-drivers') loadActiveDrivers();
       else if (tab === 'licence-reviews') loadPendingLicences();
       else if (tab === 'finances') loadFinancialData();
-      else if (tab === 'admins') loadAllUsers();
+      else if (tab === 'users') loadUsersData();
     }
   }, [user, profile, filter, tab]);
 
-  const loadActiveDrivers = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('is_approved_driver', true)
-        .order('name', { ascending: true });
-
-      if (error) throw error;
-      setActiveDrivers(data || []);
-    } catch (err: any) {
-      console.error('Error loading active drivers:', err);
-      toast.error('Failed to load active drivers');
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const loadPendingLicences = async () => {
     try {
@@ -184,51 +172,163 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     }
   };
 
-  const loadAllUsers = async () => {
-    if (!user) return;
+  const loadUsersData = async () => {
+    setUsersLoading(true);
     try {
-      setLoading(true);
-      const url = `${API_URL}/api/admin/users?adminId=${user.id}`;
-      console.log('Fetching admin users:', url);
-      const res = await fetch(url);
-      console.log('Admin users response status:', res.status);
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error('Admin users error response:', errorText);
-        throw new Error(`Server returned ${res.status}`);
+      const [profilesResult, bookingsResult, ridesResult] = await Promise.all([
+        supabase
+          .from('profiles')
+          .select('id, name, email, phone, is_approved_driver, is_admin, average_rating, total_reviews, created_at, gender, city')
+          .order('created_at', { ascending: false }),
+        // Fetch all non-cancelled booking passenger IDs to count per user
+        supabase
+          .from('bookings')
+          .select('passenger_id')
+          .not('status', 'eq', 'cancelled'),
+        // Fetch all ride driver IDs to count per user
+        supabase
+          .from('rides')
+          .select('driver_id'),
+      ]);
+
+      // Build lookup maps: userId -> count
+      const bookingCounts: Record<string, number> = {};
+      for (const b of bookingsResult.data || []) {
+        bookingCounts[b.passenger_id] = (bookingCounts[b.passenger_id] || 0) + 1;
       }
-      const data = await res.json();
-      console.log('Admin users data:', data);
-      if (data.error) throw new Error(data.error);
-      setAllUsers(data.users || []);
+      const rideCounts: Record<string, number> = {};
+      for (const r of ridesResult.data || []) {
+        rideCounts[r.driver_id] = (rideCounts[r.driver_id] || 0) + 1;
+      }
+
+      const enriched = (profilesResult.data || []).map(u => ({
+        ...u,
+        bookings_count: bookingCounts[u.id] || 0,
+        rides_count: rideCounts[u.id] || 0,
+      }));
+      setUsersData(enriched);
     } catch (err: any) {
-      console.error('Error loading users:', err);
-      toast.error('Failed to load users: ' + (err.message || 'Unknown error'));
+      toast.error('Failed to load users');
     } finally {
-      setLoading(false);
+      setUsersLoading(false);
     }
   };
 
-  const handleContactSearch = async () => {
-    if (!contactSearch.trim()) return;
-    setContactLoading(true);
-    setContactSearched(true);
+  const handleLookupSearch = async () => {
+    // Strip "Ref: " prefix — user may copy-paste directly from email or UI labels
+    const query = lookupQuery.trim().replace(/^ref:\s*/i, '').trim();
+    if (!query) return;
+    setLookupLoading(true);
+    setLookupSearched(true);
+    setSelectedLookupItem(null);
+    setLookupDetail(null);
     try {
-      let query = supabase
-        .from('profiles')
-        .select('id, name, email, is_approved_driver')
-        .ilike('name', `%${contactSearch.trim()}%`)
-        .order('name', { ascending: true })
-        .limit(50);
-      if (contactRoleFilter === 'drivers') query = query.eq('is_approved_driver', true);
-      else if (contactRoleFilter === 'passengers') query = query.eq('is_approved_driver', false);
-      const { data, error } = await query;
-      if (error) throw error;
-      setContactResults(data || []);
+      const isRef = /^[0-9a-f]{8}$/i.test(query);
+      // Match "#8876" or "8876" (1–4 digits) — driver alias lookup
+      const aliasMatch = query.match(/^#?(\d{1,4})$/);
+      if (isRef) {
+        // UUID range search: any UUID starting with the 8-char prefix falls between
+        // prefix-0000-0000-0000-000000000000 and prefix-ffff-ffff-ffff-ffffffffffff.
+        // This avoids unreliable id::text casting in the Supabase JS client.
+        const prefix = query.toLowerCase();
+        const lo = `${prefix}-0000-0000-0000-000000000000`;
+        const hi = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
+        const [ridesResult, usersResult] = await Promise.all([
+          supabase.from('rides').select('id, departure_location, arrival_location, date_time, status, driver_id').gte('id', lo).lte('id', hi).limit(10),
+          supabase.from('profiles').select('id, name, email, is_approved_driver, average_rating, total_reviews').gte('id', lo).lte('id', hi).limit(10),
+        ]);
+        setLookupRides(ridesResult.data || []);
+        setLookupUsers(usersResult.data || []);
+      } else if (aliasMatch) {
+        // Driver alias search: fetch all profiles and compute alias client-side
+        const aliasNum = parseInt(aliasMatch[1], 10).toString().padStart(4, '0');
+        const targetAlias = `Driver #${aliasNum}`;
+        const { data: allProfiles } = await supabase
+          .from('profiles')
+          .select('id, name, email, is_approved_driver, average_rating, total_reviews')
+          .limit(2000);
+        const matched = (allProfiles || []).filter(p => getDriverAlias(p.id) === targetAlias);
+        setLookupUsers(matched);
+        setLookupRides([]);
+      } else {
+        const { data } = await supabase
+          .from('profiles')
+          .select('id, name, email, is_approved_driver, average_rating, total_reviews')
+          .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
+          .limit(20);
+        setLookupUsers(data || []);
+        setLookupRides([]);
+      }
     } catch (err: any) {
       toast.error('Search failed: ' + (err.message || 'Unknown error'));
     } finally {
-      setContactLoading(false);
+      setLookupLoading(false);
+    }
+  };
+
+  const handleLookupSelect = async (type: 'user' | 'ride', item: any) => {
+    setSelectedLookupItem({ type, data: item });
+    setLookupDetailLoading(true);
+    setLookupDetail(null);
+    try {
+      if (type === 'user') {
+        const [bookingsResult, ridesResult] = await Promise.all([
+          supabase.from('bookings').select('*, ride:rides(*)').eq('passenger_id', item.id).order('created_at', { ascending: false }),
+          supabase.from('rides').select('*, bookings(*)').eq('driver_id', item.id).order('date_time', { ascending: false }),
+        ]);
+        setLookupDetail({
+          bookingsAsPassenger: bookingsResult.data || [],
+          ridesAsDriver: ridesResult.data || [],
+        });
+      } else {
+        const { data } = await supabase
+          .from('rides')
+          .select('*, driver:profiles(*), bookings(*, passenger:profiles(*))')
+          .eq('id', item.id)
+          .single();
+        setLookupDetail(data);
+      }
+    } catch (err: any) {
+      toast.error('Failed to load details: ' + (err.message || 'Unknown error'));
+    } finally {
+      setLookupDetailLoading(false);
+    }
+  };
+
+  const handleResendEmail = async (bookingId: string) => {
+    const emailType = resendTypes[bookingId] || 'booking-accepted';
+    setResendLoading(bookingId);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/resend-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user!.id, bookingId, emailType }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success(data.message);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resend email');
+    } finally {
+      setResendLoading(null);
+    }
+  };
+
+  const handleResendRideEmail = async (rideId: string) => {
+    setResendLoading(`ride-${rideId}`);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/resend-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminId: user!.id, rideId, emailType: 'ride-posted' }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success(data.message);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to resend email');
+    } finally {
+      setResendLoading(null);
     }
   };
 
@@ -243,7 +343,6 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       toast.success(makeAdmin ? 'Admin access granted' : 'Admin access revoked');
-      loadAllUsers();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update admin status');
     } finally {
@@ -416,7 +515,6 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.success('Driver status revoked');
       setConfirmRevoke(null);
       setRevokeReason(prev => { const n = { ...prev }; delete n[userId]; return n; });
-      loadActiveDrivers();
     } catch (err: any) {
       toast.error(err.message || 'Failed to revoke driver');
     } finally {
@@ -496,22 +594,21 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px' }}>
-        <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
+        <div style={{ maxWidth: '1600px', margin: '0 auto', textAlign: 'center' }}>
           <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Admin Dashboard</h1>
           <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.95)', margin: 0 }}>Manage drivers, rides, and finances</p>
         </div>
       </div>
 
-      <main style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
+      <main style={{ maxWidth: '1600px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         {/* Top-level Tabs */}
         <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
           {([
             { key: 'applications' as const, label: 'Applications' },
-            { key: 'active-drivers' as const, label: `Active Drivers (${activeDrivers.length || '...'})` },
             { key: 'licence-reviews' as const, label: `Licence Reviews (${pendingLicences.length || '...'})` },
             { key: 'finances' as const, label: 'Rides & Finances' },
-            { key: 'admins' as const, label: 'Manage Admins' },
-            { key: 'contact' as const, label: 'Contact Users' },
+            { key: 'lookup' as const, label: '🔍 Search & Lookup' },
+            { key: 'users' as const, label: 'All Users' },
           ]).map(t => (
             <button
               key={t.key}
@@ -555,214 +652,135 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 <p style={{ color: '#4B5563', fontSize: '20px' }}>No {filter === 'all' ? '' : filter} applications</p>
               </div>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                {applications.map(app => {
-                  const sc = statusColors[app.status] || statusColors.pending;
-                  return (
-                    <div key={app.id} style={{ backgroundColor: 'white', borderRadius: '20px', padding: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #1A9D9D' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '20px' }}>
-                        <div>
-                          <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '4px' }}>
-                            {app.first_name} {app.surname}
-                          </h3>
-                          <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>
-                            {app.user?.email || 'Unknown email'} | Applied: {new Date(app.created_at).toLocaleDateString()}
-                          </p>
-                        </div>
-                        <span style={{
-                          padding: '6px 16px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                          textTransform: 'capitalize', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
-                        }}>
-                          {app.status}
-                        </span>
-                      </div>
-
-                      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr 1fr' : '1fr 1fr 1fr', gap: '16px', marginBottom: '20px' }}>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Age Group</span><p style={{ margin: 0, color: '#1F2937' }}>{app.age_group}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Gender</span><p style={{ margin: 0, color: '#1F2937' }}>{app.gender}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Marital Status</span><p style={{ margin: 0, color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Experience</span><p style={{ margin: 0, color: '#1F2937' }}>{app.years_driving_experience} years</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Car</span><p style={{ margin: 0, color: '#1F2937' }}>{app.car_make} {app.car_model}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Licence</span><p style={{ margin: 0, color: app.has_drivers_license ? '#166534' : '#991b1b' }}>{app.has_drivers_license ? 'Yes' : 'No'}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Insured</span><p style={{ margin: 0, color: app.car_insured ? '#166534' : '#991b1b' }}>{app.car_insured ? 'Yes' : 'No'}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>MOT</span><p style={{ margin: 0, color: app.has_mot ? '#166534' : '#991b1b' }}>{app.has_mot ? 'Yes' : 'No'}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>DBS Acknowledged</span><p style={{ margin: 0, color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
-                        <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Emergency</span><p style={{ margin: 0, color: '#1F2937' }}>{app.emergency_contact_name} ({app.emergency_contact_phone})</p></div>
-                        <div style={{ gridColumn: isMobile ? 'span 2' : 'span 3' }}>
-                          <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Address</span>
-                          <p style={{ margin: 0, color: '#1F2937' }}>
-                            {[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Bank Details */}
-                      {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (
-                        <div style={{ backgroundColor: '#f0fdf4', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #bbf7d0' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#166534', display: 'block', marginBottom: '8px' }}>Bank Details</span>
-                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '12px' }}>
-                            <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Account Name</span><p style={{ margin: 0, color: '#1F2937', fontSize: '14px' }}>{app.bank_account_name || '—'}</p></div>
-                            <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Account Number</span><p style={{ margin: 0, color: '#1F2937', fontSize: '14px' }}>{app.bank_account_number || '—'}</p></div>
-                            <div><span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280' }}>Sort Code</span><p style={{ margin: 0, color: '#1F2937', fontSize: '14px' }}>{app.bank_sort_code || '—'}</p></div>
-                          </div>
-                        </div>
-                      )}
-
-                      {app.status === 'rejected' && app.admin_notes && (
-                        <div style={{ backgroundColor: '#fee2e2', borderRadius: '12px', padding: '16px', marginBottom: '20px', border: '1px solid #fca5a5' }}>
-                          <span style={{ fontSize: '13px', fontWeight: '700', color: '#991b1b', display: 'block', marginBottom: '6px' }}>Rejection Reason</span>
-                          <p style={{ margin: 0, fontSize: '14px', color: '#7f1d1d' }}>{app.admin_notes}</p>
-                        </div>
-                      )}
-
-                      {app.status === 'pending' && (
-                        <div style={{ borderTop: '1px solid #E8EBED', paddingTop: '20px' }}>
-                          <div style={{ marginBottom: '16px' }}>
-                            <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Admin Notes (optional)</label>
-                            <textarea
-                              value={adminNotes[app.id] || ''}
-                              onChange={(e) => setAdminNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
-                              placeholder="Add notes for the applicant..."
-                              rows={2}
-                              style={{ width: '100%', padding: '12px', fontSize: '14px', border: '2px solid #E8EBED', borderRadius: '12px', resize: 'vertical' }}
-                            />
-                          </div>
-                          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '12px' }}>
-                            <button
-                              onClick={() => handleAction(app.id, 'approve')}
-                              disabled={actionLoading === app.id}
-                              style={{
-                                padding: '12px', backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac',
-                                borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-                              }}
-                            >
-                              {actionLoading === app.id ? 'Processing...' : 'Approve'}
-                            </button>
-                            <button
-                              onClick={() => handleAction(app.id, 'reject')}
-                              disabled={actionLoading === app.id}
-                              style={{
-                                padding: '12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5',
-                                borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
-                              }}
-                            >
-                              {actionLoading === app.id ? 'Processing...' : 'Reject'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </>
-        )}
-
-        {/* ==================== ACTIVE DRIVERS TAB ==================== */}
-        {tab === 'active-drivers' && (
-          <>
-            {loading ? (
-              <div style={{ textAlign: 'center', padding: '80px' }}><Loading /></div>
-            ) : activeDrivers.length === 0 ? (
-              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-                <p style={{ color: '#4B5563', fontSize: '20px' }}>No active drivers</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {activeDrivers.map(driver => (
-                  <div key={driver.id} style={{
-                    backgroundColor: 'white', borderRadius: '20px', padding: '24px 30px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #166534',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <Avatar photoUrl={driver.profile_photo_url} name={driver.name} size="sm" />
-                        <div>
-                          <h3 style={{ fontSize: '17px', fontWeight: '600', color: '#1F2937', margin: 0 }}>{driver.name}</h3>
-                          <p style={{ fontSize: '13px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                            {driver.email} | {driver.gender}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span style={{
-                          padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                          backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac',
-                        }}>
-                          Active Driver
-                        </span>
-                        {driver.driver_tier === 'gold' ? (
-                          <span style={{
-                            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '700',
-                            backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
-                          }}>
-                            Gold Driver
-                          </span>
-                        ) : (
-                          <span style={{
-                            padding: '5px 14px', borderRadius: '20px', fontSize: '12px', fontWeight: '600',
-                            backgroundColor: '#f3f4f6', color: '#6B7280', border: '1px solid #d1d5db',
-                          }}>
-                            Regular
-                          </span>
-                        )}
-
-                        {confirmRevoke === driver.id ? (
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <input
-                              type="text"
-                              value={revokeReason[driver.id] || ''}
-                              onChange={(e) => setRevokeReason(prev => ({ ...prev, [driver.id]: e.target.value }))}
-                              placeholder="Reason (optional)"
-                              style={{
-                                padding: '8px 12px', fontSize: '13px', border: '2px solid #fca5a5',
-                                borderRadius: '8px', width: '200px',
-                              }}
-                            />
-                            <button
-                              onClick={() => handleRevokeDriver(driver.id)}
-                              disabled={actionLoading === driver.id}
-                              style={{
-                                padding: '8px 16px', backgroundColor: '#991b1b', color: 'white',
-                                border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
-                                cursor: 'pointer', whiteSpace: 'nowrap',
-                              }}
-                            >
-                              {actionLoading === driver.id ? 'Revoking...' : 'Confirm'}
-                            </button>
-                            <button
-                              onClick={() => { setConfirmRevoke(null); setRevokeReason(prev => { const n = { ...prev }; delete n[driver.id]; return n; }); }}
-                              style={{
-                                padding: '8px 16px', backgroundColor: '#F3F4F6', color: '#374151',
-                                border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => setConfirmRevoke(driver.id)}
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Applied</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Age</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Gender</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Car</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Exp</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>✓ Lic/Ins/MOT</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Status</th>
+                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {applications.map(app => {
+                      const sc = statusColors[app.status] || statusColors.pending;
+                      const isExpanded = expandedApp === app.id;
+                      const checks = [app.has_drivers_license, app.car_insured, app.has_mot];
+                      const allChecks = checks.every(Boolean);
+                      return (
+                        <>
+                          <tr
+                            key={app.id}
+                            onClick={() => setExpandedApp(isExpanded ? null : app.id)}
                             style={{
-                              padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b',
-                              border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px',
-                              fontWeight: '600', cursor: 'pointer',
+                              borderBottom: isExpanded ? 'none' : '1px solid #F3F4F6',
+                              cursor: 'pointer',
+                              backgroundColor: isExpanded ? '#F0FDFA' : 'white',
                             }}
+                            onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+                            onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
                           >
-                            Revoke
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                            <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1F2937' }}>
+                              {app.first_name} {app.surname}
+                            </td>
+                            <td style={{ padding: '12px 16px', color: '#6B7280' }}>{app.user?.email || '—'}</td>
+                            <td style={{ padding: '12px 16px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                              {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.age_group}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.gender}</td>
+                            <td style={{ padding: '12px 16px', color: '#374151' }}>{app.car_make} {app.car_model}</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.years_driving_experience}yr</td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                              <span title={`Licence: ${app.has_drivers_license ? '✓' : '✗'} | Insurance: ${app.car_insured ? '✓' : '✗'} | MOT: ${app.has_mot ? '✓' : '✗'}`}
+                                style={{ fontSize: '14px' }}>
+                                {allChecks ? '✅' : checks.map((c, i) => c ? '✅' : '❌').join(' ')}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', textTransform: 'capitalize', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                                {app.status}
+                              </span>
+                            </td>
+                            <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
+                              {app.status === 'pending' ? (
+                                <div style={{ display: 'flex', gap: '6px' }}>
+                                  <button
+                                    onClick={() => handleAction(app.id, 'approve')}
+                                    disabled={actionLoading === app.id}
+                                    style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: '6px', cursor: 'pointer' }}
+                                  >
+                                    {actionLoading === app.id ? '...' : 'Approve'}
+                                  </button>
+                                  <button
+                                    onClick={() => handleAction(app.id, 'reject')}
+                                    disabled={actionLoading === app.id}
+                                    style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '6px', cursor: 'pointer' }}
+                                  >
+                                    {actionLoading === app.id ? '...' : 'Reject'}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span style={{ fontSize: '12px', color: '#9CA3AF' }}>{isExpanded ? '▲ collapse' : '▼ details'}</span>
+                              )}
+                            </td>
+                          </tr>
+
+                          {/* Expanded detail row */}
+                          {isExpanded && (
+                            <tr key={`${app.id}-detail`} style={{ backgroundColor: '#F0FDFA', borderBottom: '1px solid #E5E7EB' }}>
+                              <td colSpan={10} style={{ padding: '0 16px 20px 16px' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', paddingTop: '12px' }}>
+                                  <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
+                                  <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS Acknowledged</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
+                                  <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
+                                  <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Address</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}</p></div>
+                                  {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Account Number</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
+                                  </>)}
+                                </div>
+                                {app.status === 'rejected' && app.admin_notes && (
+                                  <div style={{ marginTop: '12px', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
+                                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#991b1b' }}>Rejection reason: </span>
+                                    <span style={{ fontSize: '13px', color: '#7F1D1D' }}>{app.admin_notes}</span>
+                                  </div>
+                                )}
+                                {app.status === 'pending' && (
+                                  <div style={{ marginTop: '14px' }}>
+                                    <textarea
+                                      value={adminNotes[app.id] || ''}
+                                      onChange={(e) => setAdminNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
+                                      placeholder="Admin notes (optional, sent to applicant)..."
+                                      rows={2}
+                                      style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '8px', resize: 'vertical', boxSizing: 'border-box' }}
+                                    />
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          )}
+                        </>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                <div style={{ padding: '12px 16px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
+                  {applications.length} application{applications.length !== 1 ? 's' : ''}
+                </div>
               </div>
             )}
           </>
         )}
+
 
         {/* ==================== LICENCE REVIEWS TAB ==================== */}
         {tab === 'licence-reviews' && (
@@ -907,7 +925,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   <>
                     {/* Ride status filter */}
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                      {(['all', 'completed', 'cancelled'] as const).map(s => (
+                      {(['all', 'upcoming', 'completed', 'cancelled'] as const).map(s => (
                         <button
                           key={s}
                           onClick={() => setRideStatusFilter(s)}
@@ -1133,212 +1151,692 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           </>
         )}
 
-        {/* ==================== CONTACT USERS TAB ==================== */}
-        {tab === 'contact' && (
+        {/* ==================== SEARCH & LOOKUP TAB ==================== */}
+        {tab === 'lookup' && (
           <>
             <div style={{ marginBottom: '24px' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', marginBottom: '6px' }}>Contact a User</h2>
-              <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>Search by name to find a user's email address. Click the email link to open in Outlook.</p>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', marginBottom: '6px' }}>Search & Lookup</h2>
+              <p style={{ fontSize: '14px', color: '#6B7280', margin: 0 }}>Find any user or ride. Search by name, email, 8-char ref (e.g. <code>A1B2C3D4</code>), or driver alias (e.g. <code>#8876</code>). Every result shows both its ref and alias so you can match what passengers quote.</p>
             </div>
 
-            {/* Search controls */}
-            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '24px', alignItems: 'flex-end' }}>
-              <div style={{ flex: '1', minWidth: '220px' }}>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. John Smith"
-                  value={contactSearch}
-                  onChange={(e) => setContactSearch(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleContactSearch()}
-                  style={{
-                    width: '100%', padding: '12px 16px', fontSize: '15px',
-                    border: '2px solid #E5E7EB', borderRadius: '12px', outline: 'none', boxSizing: 'border-box',
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
-                  onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
-                />
-              </div>
-              <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Role</label>
-                <select
-                  value={contactRoleFilter}
-                  onChange={(e) => setContactRoleFilter(e.target.value as 'all' | 'drivers' | 'passengers')}
-                  style={{
-                    padding: '12px 16px', fontSize: '15px', border: '2px solid #E5E7EB',
-                    borderRadius: '12px', outline: 'none', backgroundColor: 'white', cursor: 'pointer',
-                  }}
-                  onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
-                  onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
-                >
-                  <option value="all">All users</option>
-                  <option value="drivers">Drivers only</option>
-                  <option value="passengers">Passengers only</option>
-                </select>
-              </div>
+            {/* Search bar */}
+            <div style={{ display: 'flex', gap: '12px', marginBottom: '28px' }}>
+              <input
+                type="text"
+                placeholder="Name, email, 8-char ref (A1B2C3D4), or driver alias (#8876)"
+                value={lookupQuery}
+                onChange={(e) => setLookupQuery(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleLookupSearch()}
+                style={{
+                  flex: 1, padding: '12px 16px', fontSize: '15px',
+                  border: '2px solid #E5E7EB', borderRadius: '12px', outline: 'none',
+                }}
+                onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
+                onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
+              />
               <button
-                onClick={handleContactSearch}
-                disabled={!contactSearch.trim() || contactLoading}
+                onClick={handleLookupSearch}
+                disabled={!lookupQuery.trim() || lookupLoading}
                 style={{
                   padding: '12px 28px', fontSize: '15px', fontWeight: '700', borderRadius: '12px',
-                  border: 'none', cursor: !contactSearch.trim() || contactLoading ? 'not-allowed' : 'pointer',
-                  background: !contactSearch.trim() || contactLoading ? '#E5E7EB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                  color: !contactSearch.trim() || contactLoading ? '#9CA3AF' : 'white',
+                  border: 'none', cursor: !lookupQuery.trim() || lookupLoading ? 'not-allowed' : 'pointer',
+                  background: !lookupQuery.trim() || lookupLoading ? '#E5E7EB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  color: !lookupQuery.trim() || lookupLoading ? '#9CA3AF' : 'white',
                   whiteSpace: 'nowrap',
                 }}
               >
-                {contactLoading ? 'Searching...' : 'Search'}
+                {lookupLoading ? 'Searching...' : 'Search'}
               </button>
             </div>
 
             {/* Results */}
-            {contactSearched && !contactLoading && (
-              contactResults.length === 0 ? (
-                <div style={{
-                  backgroundColor: 'white', borderRadius: '16px', padding: '40px',
-                  textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
-                }}>
-                  <p style={{ color: '#6B7280', fontSize: '15px', margin: 0 }}>No users found matching "<strong>{contactSearch}</strong>"</p>
-                </div>
-              ) : (
-                <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+            {lookupSearched && !lookupLoading && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {lookupUsers.length === 0 && lookupRides.length === 0 && (
+                  <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                    <p style={{ color: '#6B7280', fontSize: '15px', margin: 0 }}>No users or rides found for "<strong>{lookupQuery}</strong>"</p>
+                  </div>
+                )}
+
+                {/* User results */}
+                {lookupUsers.length > 0 && (
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
+                      Users found ({lookupUsers.length})
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {lookupUsers.map(u => (
+                        <div
+                          key={u.id}
+                          onClick={() => handleLookupSelect('user', u)}
+                          style={{
+                            backgroundColor: selectedLookupItem?.type === 'user' && selectedLookupItem.data.id === u.id ? '#F0FDFA' : 'white',
+                            border: selectedLookupItem?.type === 'user' && selectedLookupItem.data.id === u.id ? '2px solid #1A9D9D' : '1px solid #E5E7EB',
+                            borderRadius: '12px', padding: '14px 18px', cursor: 'pointer',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          }}
+                        >
+                          <div>
+                            <span style={{ fontWeight: '600', color: '#1F2937', fontSize: '15px' }}>{u.name || '—'}</span>
+                            <span style={{ color: '#6B7280', fontSize: '13px', marginLeft: '10px' }}>{u.email}</span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+                            <span style={{ fontSize: '12px', color: '#6B7280', backgroundColor: '#F3F4F6', padding: '3px 8px', borderRadius: '6px', fontFamily: 'monospace' }}>
+                              Ref: {getUserRef(u.id)}
+                            </span>
+                            <span style={{ fontSize: '12px', color: '#6B7280', backgroundColor: '#F3F4F6', padding: '3px 8px', borderRadius: '6px' }}>
+                              {getDriverAlias(u.id)}
+                            </span>
+                            {u.is_approved_driver && (
+                              <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
+                            )}
+                            {u.average_rating && (
+                              <span style={{ fontSize: '12px', color: '#92400e' }}>{Number(u.average_rating).toFixed(1)} ★</span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Ride results */}
+                {lookupRides.length > 0 && (
+                  <div>
+                    <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
+                      Rides found ({lookupRides.length})
+                    </h3>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                      {lookupRides.map(r => (
+                        <div
+                          key={r.id}
+                          onClick={() => handleLookupSelect('ride', r)}
+                          style={{
+                            backgroundColor: selectedLookupItem?.type === 'ride' && selectedLookupItem.data.id === r.id ? '#F0FDFA' : 'white',
+                            border: selectedLookupItem?.type === 'ride' && selectedLookupItem.data.id === r.id ? '2px solid #1A9D9D' : '1px solid #E5E7EB',
+                            borderRadius: '12px', padding: '14px 18px', cursor: 'pointer',
+                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px',
+                            boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
+                          }}
+                        >
+                          <div>
+                            <span style={{ fontWeight: '600', color: '#1F2937', fontSize: '15px' }}>{r.departure_location} → {r.arrival_location}</span>
+                            <span style={{ color: '#6B7280', fontSize: '13px', marginLeft: '10px' }}>
+                              {new Date(r.date_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                            <span style={{ fontSize: '12px', color: '#6B7280', backgroundColor: '#F3F4F6', padding: '3px 8px', borderRadius: '6px', fontFamily: 'monospace' }}>
+                              Ref: {getRideRef(r.id)}
+                            </span>
+                            <span style={{
+                              padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', textTransform: 'capitalize',
+                              backgroundColor: statusColors[r.status]?.bg || '#F3F4F6',
+                              color: statusColors[r.status]?.color || '#374151',
+                            }}>
+                              {r.status}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Detail panel */}
+            {selectedLookupItem && (
+              <div style={{ marginTop: '32px', backgroundColor: 'white', borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderTop: '4px solid #1A9D9D' }}>
+                {lookupDetailLoading ? (
+                  <div style={{ textAlign: 'center', padding: '40px' }}><Loading /></div>
+                ) : lookupDetail ? (
+                  selectedLookupItem.type === 'user' ? (
+                    /* ---- USER DETAIL ---- */
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
+                        <div>
+                          <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>{selectedLookupItem.data.name}</h3>
+                          <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>{selectedLookupItem.data.email}</p>
+                          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 2px 0', fontFamily: 'monospace' }}>Ref: {getUserRef(selectedLookupItem.data.id)}</p>
+                          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>Alias: {getDriverAlias(selectedLookupItem.data.id)}</p>
+                        </div>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                          {selectedLookupItem.data.is_approved_driver && (
+                            <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '5px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' }}>Driver</span>
+                          )}
+                          {selectedLookupItem.data.average_rating && (
+                            <span style={{ backgroundColor: '#FEF3C7', color: '#92400e', padding: '5px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' }}>
+                              {Number(selectedLookupItem.data.average_rating).toFixed(1)} ★ ({selectedLookupItem.data.total_reviews} reviews)
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Bookings as Passenger */}
+                      <div style={{ marginBottom: '24px' }}>
+                        <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
+                          Bookings as Passenger ({lookupDetail.bookingsAsPassenger.length})
+                        </h4>
+                        {lookupDetail.bookingsAsPassenger.length === 0 ? (
+                          <p style={{ color: '#9CA3AF', fontSize: '14px' }}>No bookings</p>
+                        ) : (
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#F9FAFB' }}>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Route</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Date</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Seats</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Paid</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Status</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Resend Email</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {lookupDetail.bookingsAsPassenger.map((b: any) => {
+                                  const bsc = statusColors[b.status] || statusColors.pending;
+                                  const selectedType = resendTypes[b.id] || 'booking-accepted';
+                                  const isSending = resendLoading === b.id;
+                                  return (
+                                    <tr key={b.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                                      <td style={{ padding: '10px 12px', color: '#1F2937' }}>
+                                        {b.ride ? `${b.ride.departure_location} → ${b.ride.arrival_location}` : '—'}
+                                        <span style={{ display: 'block', fontSize: '10px', color: '#9CA3AF', fontFamily: 'monospace' }}>
+                                          Ride: {b.ride_id ? getRideRef(b.ride_id) : '—'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 12px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                        {b.ride ? new Date(b.ride.date_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                      </td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{b.seats_booked}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600', color: '#1F2937' }}>£{(parseFloat(b.total_paid) || 0).toFixed(2)}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                        <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', backgroundColor: bsc.bg, color: bsc.color, textTransform: 'capitalize' }}>
+                                          {b.status?.replace('_', ' ')}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 12px' }}>
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                          <select
+                                            value={selectedType}
+                                            onChange={(e) => setResendTypes(prev => ({ ...prev, [b.id]: e.target.value }))}
+                                            disabled={isSending}
+                                            style={{
+                                              fontSize: '12px', padding: '5px 6px', border: '1px solid #D1D5DB',
+                                              borderRadius: '6px', backgroundColor: 'white', cursor: 'pointer', maxWidth: '170px',
+                                            }}
+                                          >
+                                            <option value="booking-request">Booking request → Driver</option>
+                                            <option value="booking-accepted">Booking confirmed → Passenger</option>
+                                            <option value="contact-details-passenger">Contact details → Passenger</option>
+                                            <option value="contact-details-driver">Contact details → Driver</option>
+                                          </select>
+                                          <button
+                                            onClick={() => handleResendEmail(b.id)}
+                                            disabled={isSending}
+                                            style={{
+                                              padding: '5px 10px', fontSize: '12px', fontWeight: '600',
+                                              backgroundColor: isSending ? '#E5E7EB' : '#1A9D9D', color: isSending ? '#9CA3AF' : 'white',
+                                              border: 'none', borderRadius: '6px', cursor: isSending ? 'not-allowed' : 'pointer',
+                                              whiteSpace: 'nowrap',
+                                            }}
+                                          >
+                                            {isSending ? '...' : 'Send'}
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Rides as Driver */}
+                      <div>
+                        <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
+                          Rides as Driver ({lookupDetail.ridesAsDriver.length})
+                        </h4>
+                        {lookupDetail.ridesAsDriver.length === 0 ? (
+                          <p style={{ color: '#9CA3AF', fontSize: '14px' }}>No rides posted</p>
+                        ) : (
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#F9FAFB' }}>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Route</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Date</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Bookings</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Status</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Resend Email</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {lookupDetail.ridesAsDriver.map((r: any) => {
+                                  const rsc = statusColors[r.status] || statusColors.upcoming;
+                                  const isSendingRide = resendLoading === `ride-${r.id}`;
+                                  return (
+                                    <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                                      <td style={{ padding: '10px 12px', color: '#1F2937' }}>
+                                        {r.departure_location} → {r.arrival_location}
+                                        <span style={{ display: 'block', fontSize: '10px', color: '#9CA3AF', fontFamily: 'monospace' }}>Ref: {getRideRef(r.id)}</span>
+                                      </td>
+                                      <td style={{ padding: '10px 12px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                        {new Date(r.date_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                      </td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{(r.bookings || []).length}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                        <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', backgroundColor: rsc.bg, color: rsc.color, textTransform: 'capitalize' }}>
+                                          {r.status}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 12px' }}>
+                                        <button
+                                          onClick={() => handleResendRideEmail(r.id)}
+                                          disabled={isSendingRide}
+                                          title="Resend ride posted confirmation to driver"
+                                          style={{
+                                            padding: '5px 12px', fontSize: '12px', fontWeight: '600',
+                                            backgroundColor: isSendingRide ? '#E5E7EB' : '#F0FDF4',
+                                            color: isSendingRide ? '#9CA3AF' : '#166534',
+                                            border: '1px solid #BBF7D0',
+                                            borderRadius: '6px', cursor: isSendingRide ? 'not-allowed' : 'pointer',
+                                            whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          {isSendingRide ? 'Sending...' : '✉ Ride posted → Driver'}
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        )}
+                      </div>
+                    </>
+                  ) : (
+                    /* ---- RIDE DETAIL ---- */
+                    <>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '12px', marginBottom: '24px' }}>
+                        <div>
+                          <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>
+                            {lookupDetail.departure_location} → {lookupDetail.arrival_location}
+                          </h3>
+                          <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>
+                            {new Date(lookupDetail.date_time).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                          <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0, fontFamily: 'monospace' }}>Ref: {getRideRef(lookupDetail.id)}</p>
+                        </div>
+                        <span style={{
+                          padding: '6px 16px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', textTransform: 'capitalize',
+                          backgroundColor: statusColors[lookupDetail.status]?.bg || '#F3F4F6',
+                          color: statusColors[lookupDetail.status]?.color || '#374151',
+                        }}>
+                          {lookupDetail.status}
+                        </span>
+                      </div>
+
+                      {/* Ride details grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '12px', marginBottom: '24px' }}>
+                        <div style={{ backgroundColor: '#F9FAFB', borderRadius: '10px', padding: '12px' }}>
+                          <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: '0 0 2px 0' }}>Price / Seat</p>
+                          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>£{(parseFloat(lookupDetail.price_per_seat) || 0).toFixed(2)}</p>
+                        </div>
+                        <div style={{ backgroundColor: '#F9FAFB', borderRadius: '10px', padding: '12px' }}>
+                          <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: '0 0 2px 0' }}>Seats Total</p>
+                          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>{lookupDetail.seats_total}</p>
+                        </div>
+                        <div style={{ backgroundColor: '#F9FAFB', borderRadius: '10px', padding: '12px' }}>
+                          <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: '0 0 2px 0' }}>Seats Available</p>
+                          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>{lookupDetail.seats_available}</p>
+                        </div>
+                        <div style={{ backgroundColor: '#F9FAFB', borderRadius: '10px', padding: '12px' }}>
+                          <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: '0 0 2px 0' }}>Bookings</p>
+                          <p style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>{(lookupDetail.bookings || []).length}</p>
+                        </div>
+                      </div>
+
+                      {/* Driver */}
+                      {lookupDetail.driver && (
+                        <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+                          <p style={{ fontSize: '13px', fontWeight: '700', color: '#166534', margin: '0 0 8px 0' }}>Driver</p>
+                          <p style={{ margin: '0 0 2px 0', fontWeight: '600', color: '#1F2937' }}>{lookupDetail.driver.name}</p>
+                          <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#6B7280' }}>{lookupDetail.driver.email}</p>
+                          {lookupDetail.driver.phone && <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#6B7280' }}>{lookupDetail.driver.phone}</p>}
+                          <p style={{ margin: 0, fontSize: '11px', color: '#9CA3AF', fontFamily: 'monospace' }}>Ref: {getUserRef(lookupDetail.driver.id)}</p>
+                        </div>
+                      )}
+
+                      {/* Resend ride-posted email */}
+                      {(() => {
+                        const rideId = selectedLookupItem!.data.id;
+                        const isSendingRide = resendLoading === `ride-${rideId}`;
+                        return (
+                          <div style={{ marginBottom: '24px' }}>
+                            <p style={{ fontSize: '12px', color: '#6B7280', margin: '0 0 6px 0' }}>Resend to driver:</p>
+                            <button
+                              onClick={() => handleResendRideEmail(rideId)}
+                              disabled={isSendingRide}
+                              style={{
+                                padding: '7px 16px', fontSize: '13px', fontWeight: '600',
+                                backgroundColor: isSendingRide ? '#E5E7EB' : '#F0FDF4',
+                                color: isSendingRide ? '#9CA3AF' : '#166534',
+                                border: '1px solid #BBF7D0', borderRadius: '8px',
+                                cursor: isSendingRide ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              {isSendingRide ? 'Sending...' : '✉ Ride Posted confirmation → Driver'}
+                            </button>
+                          </div>
+                        );
+                      })()}
+
+                      {/* Passengers */}
+                      {(lookupDetail.bookings || []).length > 0 && (
+                        <div style={{ marginBottom: '24px' }}>
+                          <h4 style={{ fontSize: '15px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
+                            Passengers ({(lookupDetail.bookings || []).length})
+                          </h4>
+                          <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                              <thead>
+                                <tr style={{ backgroundColor: '#F9FAFB' }}>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Passenger</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Seats</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Paid</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600', color: '#374151' }}>Driver Payout</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Status</th>
+                                  <th style={{ padding: '10px 12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Resend Email</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {lookupDetail.bookings.map((b: any) => {
+                                  const bsc = statusColors[b.status] || statusColors.pending;
+                                  const selectedType = resendTypes[b.id] || 'booking-accepted';
+                                  const isSending = resendLoading === b.id;
+                                  return (
+                                    <tr key={b.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                                      <td style={{ padding: '10px 12px', color: '#1F2937' }}>
+                                        <span style={{ fontWeight: '600' }}>{b.passenger?.name || '—'}</span>
+                                        <span style={{ display: 'block', fontSize: '12px', color: '#6B7280' }}>{b.passenger?.email}</span>
+                                        <span style={{ fontSize: '10px', color: '#9CA3AF', fontFamily: 'monospace' }}>
+                                          Ref: {b.passenger ? getUserRef(b.passenger.id) : '—'}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{b.seats_booked}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600', color: '#1F2937' }}>£{(parseFloat(b.total_paid) || 0).toFixed(2)}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(parseFloat(b.driver_payout_amount) || 0).toFixed(2)}</td>
+                                      <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                        <span style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600', backgroundColor: bsc.bg, color: bsc.color, textTransform: 'capitalize' }}>
+                                          {b.status?.replace('_', ' ')}
+                                        </span>
+                                      </td>
+                                      <td style={{ padding: '10px 12px' }}>
+                                        <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                                          <select
+                                            value={selectedType}
+                                            onChange={(e) => setResendTypes(prev => ({ ...prev, [b.id]: e.target.value }))}
+                                            disabled={isSending}
+                                            style={{
+                                              fontSize: '12px', padding: '5px 6px', border: '1px solid #D1D5DB',
+                                              borderRadius: '6px', backgroundColor: 'white', cursor: 'pointer', maxWidth: '170px',
+                                            }}
+                                          >
+                                            <option value="booking-request">Booking request → Driver</option>
+                                            <option value="booking-accepted">Booking confirmed → Passenger</option>
+                                            <option value="contact-details-passenger">Contact details → Passenger</option>
+                                            <option value="contact-details-driver">Contact details → Driver</option>
+                                          </select>
+                                          <button
+                                            onClick={() => handleResendEmail(b.id)}
+                                            disabled={isSending}
+                                            style={{
+                                              padding: '5px 10px', fontSize: '12px', fontWeight: '600',
+                                              backgroundColor: isSending ? '#E5E7EB' : '#1A9D9D', color: isSending ? '#9CA3AF' : 'white',
+                                              border: 'none', borderRadius: '6px', cursor: isSending ? 'not-allowed' : 'pointer',
+                                              whiteSpace: 'nowrap',
+                                            }}
+                                          >
+                                            {isSending ? '...' : 'Send'}
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Financial summary */}
+                      {(() => {
+                        const activeBookings = (lookupDetail.bookings || []).filter((b: any) =>
+                          ['confirmed', 'completed', 'pending_driver'].includes(b.status)
+                        );
+                        const totalRev = activeBookings.reduce((s: number, b: any) => s + (parseFloat(b.total_paid) || 0), 0);
+                        const totalComm = activeBookings.reduce((s: number, b: any) => s + (parseFloat(b.commission_amount) || 0), 0);
+                        const driverNet = totalRev - totalComm;
+                        if (totalRev === 0) return null;
+                        return (
+                          <div style={{ backgroundColor: '#F9FAFB', borderRadius: '12px', padding: '16px', border: '1px solid #E5E7EB' }}>
+                            <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', margin: '0 0 12px 0' }}>Financial Summary</p>
+                            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
+                              <div style={{ textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 2px 0' }}>Total Revenue</p>
+                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#166534', margin: 0 }}>£{totalRev.toFixed(2)}</p>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 2px 0' }}>Commission (25%)</p>
+                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#1A9D9D', margin: 0 }}>£{totalComm.toFixed(2)}</p>
+                              </div>
+                              <div style={{ textAlign: 'center' }}>
+                                <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 2px 0' }}>Driver Payout (75%)</p>
+                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#1e40af', margin: 0 }}>£{driverNet.toFixed(2)}</p>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  )
+                ) : null}
+              </div>
+            )}
+          </>
+        )}
+
+        {/* ==================== ALL USERS TAB ==================== */}
+        {tab === 'users' && (
+          <>
+            <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', marginBottom: '6px' }}>All Users</h2>
+              <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 20px 0' }}>All registered users on the platform.</p>
+
+              {/* Filter + search row */}
+              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                {(['all', 'drivers', 'passengers'] as const).map(f => (
+                  <button
+                    key={f}
+                    onClick={() => setUsersFilter(f)}
+                    style={{
+                      padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+                      border: 'none', cursor: 'pointer',
+                      backgroundColor: usersFilter === f ? '#1A9D9D' : '#F3F4F6',
+                      color: usersFilter === f ? 'white' : '#374151',
+                    }}
+                  >
+                    {f === 'all' ? `All (${usersData.length})` : f === 'drivers' ? `Drivers (${usersData.filter(u => u.is_approved_driver).length})` : `Passengers (${usersData.filter(u => !u.is_approved_driver).length})`}
+                  </button>
+                ))}
+                <input
+                  type="text"
+                  placeholder="Search name or email..."
+                  value={usersSearch}
+                  onChange={e => setUsersSearch(e.target.value)}
+                  style={{
+                    marginLeft: 'auto', padding: '8px 14px', fontSize: '13px',
+                    border: '1px solid #E5E7EB', borderRadius: '10px', outline: 'none', minWidth: '200px',
+                  }}
+                />
+              </div>
+
+              {usersLoading ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}><Loading /></div>
+              ) : (() => {
+                const filtered = usersData.filter(u => {
+                  if (usersFilter === 'drivers' && !u.is_approved_driver) return false;
+                  if (usersFilter === 'passengers' && u.is_approved_driver) return false;
+                  if (usersSearch.trim()) {
+                    const s = usersSearch.toLowerCase();
+                    if (!u.name?.toLowerCase().includes(s) && !u.email?.toLowerCase().includes(s)) return false;
+                  }
+                  return true;
+                });
+                return filtered.length === 0 ? (
+                  <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '40px 0' }}>No users match your filter.</p>
+                ) : (
                   <div style={{ overflowX: 'auto' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                       <thead>
-                        <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
-                          <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
-                          <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Role</th>
-                          <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
+                        <tr style={{ backgroundColor: '#F9FAFB' }}>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Phone</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Ref / Alias</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Role</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Activity</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Rating</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Joined</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {contactResults.map((u) => (
-                          <tr key={u.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                            <td style={{ padding: '14px 16px', fontWeight: '600', color: '#1F2937' }}>{u.name || '—'}</td>
-                            <td style={{ padding: '14px 16px' }}>
-                              {u.is_approved_driver ? (
-                                <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
-                              ) : (
-                                <span style={{ backgroundColor: '#EFF6FF', color: '#1D4ED8', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Passenger</span>
+                        {filtered.map(u => (
+                          <tr key={u.id} style={{ borderBottom: '1px solid #F3F4F6' }}
+                            onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F9FAFB')}
+                            onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                          >
+                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937' }}>
+                              {u.name || '—'}
+                              {u.is_admin && <span style={{ marginLeft: '6px', fontSize: '10px', backgroundColor: '#FEF3C7', color: '#92400E', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>Admin</span>}
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#6B7280' }}>
+                              <a href={`mailto:${u.email}`} style={{ color: '#1A9D9D', textDecoration: 'none' }}>{u.email}</a>
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#6B7280' }}>{u.phone || '—'}</td>
+                            <td style={{ padding: '10px 14px' }}>
+                              <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#374151', display: 'block' }}>{getUserRef(u.id)}</span>
+                              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{getDriverAlias(u.id)}</span>
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              {u.is_approved_driver
+                                ? <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
+                                : <span style={{ backgroundColor: '#EFF6FF', color: '#1E40AF', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Passenger</span>}
+                            </td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              {u.rides_count > 0 && (
+                                <span title="Rides driven" style={{ fontSize: '12px', color: '#166534', marginRight: '6px' }}>
+                                  🚗 {u.rides_count}
+                                </span>
+                              )}
+                              {u.bookings_count > 0 && (
+                                <span title="Rides booked as passenger" style={{ fontSize: '12px', color: '#1E40AF' }}>
+                                  🎫 {u.bookings_count}
+                                </span>
+                              )}
+                              {u.rides_count === 0 && u.bookings_count === 0 && (
+                                <span style={{ color: '#D1D5DB', fontSize: '12px' }}>—</span>
                               )}
                             </td>
-                            <td style={{ padding: '14px 16px' }}>
-                              <a
-                                href={`mailto:${u.email}`}
-                                style={{ color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', fontSize: '14px' }}
-                                onMouseEnter={(e) => (e.currentTarget.style.textDecoration = 'underline')}
-                                onMouseLeave={(e) => (e.currentTarget.style.textDecoration = 'none')}
-                              >
-                                {u.email}
-                              </a>
+                            <td style={{ padding: '10px 14px', textAlign: 'center', color: '#92400E' }}>
+                              {u.average_rating ? `${Number(u.average_rating).toFixed(1)} ★ (${u.total_reviews})` : '—'}
+                            </td>
+                            <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                              {new Date(u.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                            </td>
+                            <td style={{ padding: '10px 14px' }}>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', minWidth: '160px' }}>
+                                {/* Email */}
+                                <a
+                                  href={`mailto:${u.email}`}
+                                  style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', backgroundColor: '#EFF6FF', color: '#1E40AF', textDecoration: 'none', textAlign: 'center', fontWeight: '600' }}
+                                >
+                                  ✉ Email
+                                </a>
+                                {/* Admin toggle */}
+                                {u.id !== user?.id && (
+                                  <button
+                                    onClick={() => handleToggleAdmin(u.id, !u.is_admin)}
+                                    disabled={togglingAdmin === u.id}
+                                    style={{
+                                      fontSize: '12px', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600',
+                                      backgroundColor: u.is_admin ? '#FEE2E2' : '#F3F4F6',
+                                      color: u.is_admin ? '#991B1B' : '#374151',
+                                    }}
+                                  >
+                                    {togglingAdmin === u.id ? '...' : u.is_admin ? '✕ Remove Admin' : '+ Make Admin'}
+                                  </button>
+                                )}
+                                {/* Revoke driver */}
+                                {u.is_approved_driver && (
+                                  confirmRevoke === u.id ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="Reason (optional)"
+                                        value={revokeReason[u.id] || ''}
+                                        onChange={e => setRevokeReason(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                        style={{ fontSize: '11px', padding: '4px 6px', border: '1px solid #FCA5A5', borderRadius: '6px' }}
+                                      />
+                                      <div style={{ display: 'flex', gap: '4px' }}>
+                                        <button
+                                          onClick={() => handleRevokeDriver(u.id)}
+                                          disabled={actionLoading === u.id}
+                                          style={{ flex: 1, fontSize: '11px', padding: '4px', borderRadius: '6px', border: 'none', backgroundColor: '#991B1B', color: 'white', cursor: 'pointer', fontWeight: '600' }}
+                                        >
+                                          {actionLoading === u.id ? '...' : 'Confirm'}
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmRevoke(null)}
+                                          style={{ flex: 1, fontSize: '11px', padding: '4px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: 'white', cursor: 'pointer' }}
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmRevoke(u.id)}
+                                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#991B1B' }}
+                                    >
+                                      ✕ Revoke Driver
+                                    </button>
+                                  )
+                                )}
+                              </div>
                             </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
+                    <div style={{ padding: '12px 14px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
+                      Showing {filtered.length} of {usersData.length} users
+                    </div>
                   </div>
-                  <div style={{ padding: '12px 16px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
-                    {contactResults.length} result{contactResults.length !== 1 ? 's' : ''} found
-                  </div>
-                </div>
-              )
-            )}
-          </>
-        )}
-
-        {/* ==================== MANAGE ADMINS TAB ==================== */}
-        {tab === 'admins' && (
-          <>
-            <div style={{ marginBottom: '20px' }}>
-              <input
-                type="text"
-                placeholder="Search by name or email..."
-                value={adminSearch}
-                onChange={(e) => setAdminSearch(e.target.value)}
-                style={{
-                  width: '100%', maxWidth: '400px', padding: '12px 16px', fontSize: '15px',
-                  border: '2px solid #E5E7EB', borderRadius: '12px', outline: 'none',
-                }}
-                onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
-                onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
-              />
+                );
+              })()}
             </div>
-
-            {loading ? (
-              <Loading />
-            ) : (
-              <div style={{
-                backgroundColor: 'white', borderRadius: '16px',
-                boxShadow: '0 2px 12px rgba(0,0,0,0.06)', overflow: 'hidden',
-              }}>
-                <div style={{ overflowX: 'auto' }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
-                    <thead>
-                      <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
-                        <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>User</th>
-                        <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
-                        <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Driver</th>
-                        <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Admin</th>
-                        <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {allUsers
-                        .filter(u => {
-                          if (!adminSearch.trim()) return true;
-                          const s = adminSearch.toLowerCase();
-                          return u.name?.toLowerCase().includes(s) || u.email?.toLowerCase().includes(s);
-                        })
-                        .map((u) => (
-                          <tr key={u.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
-                            <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1F2937' }}>{u.name || '—'}</td>
-                            <td style={{ padding: '12px 16px', color: '#6B7280' }}>{u.email}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              {u.is_approved_driver ? (
-                                <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Yes</span>
-                              ) : (
-                                <span style={{ color: '#9CA3AF', fontSize: '12px' }}>No</span>
-                              )}
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              {u.is_admin ? (
-                                <span style={{ backgroundColor: '#E0E7FF', color: '#3730A3', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Admin</span>
-                              ) : (
-                                <span style={{ color: '#9CA3AF', fontSize: '12px' }}>—</span>
-                              )}
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              {u.id === user?.id ? (
-                                <span style={{ color: '#9CA3AF', fontSize: '12px', fontStyle: 'italic' }}>You</span>
-                              ) : (
-                                <button
-                                  onClick={() => handleToggleAdmin(u.id, !u.is_admin)}
-                                  disabled={togglingAdmin === u.id}
-                                  style={{
-                                    padding: '6px 16px', fontSize: '13px', fontWeight: '600', borderRadius: '8px',
-                                    border: 'none', cursor: togglingAdmin === u.id ? 'not-allowed' : 'pointer',
-                                    backgroundColor: u.is_admin ? '#FEE2E2' : '#DEF7EC',
-                                    color: u.is_admin ? '#991B1B' : '#03543F',
-                                  }}
-                                >
-                                  {togglingAdmin === u.id ? '...' : u.is_admin ? 'Remove Admin' : 'Make Admin'}
-                                </button>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                </div>
-                {allUsers.length > 0 && (
-                  <div style={{ padding: '12px 16px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
-                    {allUsers.length} registered user{allUsers.length !== 1 ? 's' : ''} &middot; {allUsers.filter(u => u.is_admin).length} admin{allUsers.filter(u => u.is_admin).length !== 1 ? 's' : ''}
-                  </div>
-                )}
-              </div>
-            )}
           </>
         )}
+
       </main>
 
       {/* ==================== PAYOUT MODAL ==================== */}

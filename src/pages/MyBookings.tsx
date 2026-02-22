@@ -645,14 +645,14 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                             View Ride
                           </button>
 
-                          {/* Contact Driver - only if confirmed and within 12 hours */}
+                          {/* Contact Driver - only if confirmed and within 24 hours */}
                           {booking.status === 'confirmed' && contactVisible && driver.phone && (
                             <button onClick={() => { window.location.href = `tel:${driver.phone}`; }} style={{ width: '100%', padding: '12px', backgroundColor: '#F5F5F5', color: '#4B5563', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
                               Contact Driver
                             </button>
                           )}
                           {booking.status === 'confirmed' && !contactVisible && (
-                            <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>Contact details available 12 hours before departure</p>
+                            <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>Contact details available 24 hours before departure</p>
                           )}
 
                           {/* Cancel Booking */}
