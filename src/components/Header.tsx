@@ -63,23 +63,23 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
   const navLinkStyle = (active?: boolean) => ({
     background: 'none', border: 'none',
     color: active ? '#1A9D9D' : '#4B5563',
-    fontSize: '15px', cursor: 'pointer' as const,
-    fontWeight: active ? '700' : '500' as any,
+    fontSize: '17px', cursor: 'pointer' as const,
+    fontWeight: active ? '800' : '700' as any,
     transition: 'color 0.3s', padding: 0,
   });
 
   const mobileLinkStyle = {
     textAlign: 'left' as const, color: '#4B5563',
-    background: 'none', border: 'none', fontSize: '16px',
+    background: 'none', border: 'none', fontSize: '18px',
     cursor: 'pointer' as const, padding: '12px 0',
-    fontWeight: '500' as any, width: '100%',
+    fontWeight: '700' as any, width: '100%',
     borderBottom: '1px solid #F3F4F6',
   };
 
   const dropdownItemStyle = (danger?: boolean) => ({
     display: 'flex', alignItems: 'center', gap: '10px',
     width: '100%', padding: '10px 16px', background: 'none', border: 'none',
-    fontSize: '14px', fontWeight: '500' as any, cursor: 'pointer' as const,
+    fontSize: '15px', fontWeight: '600' as any, cursor: 'pointer' as const,
     color: danger ? '#DC2626' : '#374151', textAlign: 'left' as const,
     transition: 'background 0.15s',
   });
@@ -162,7 +162,7 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 }}
               >
                 <Avatar photoUrl={profile?.profile_photo_url} name={profile?.name || ''} size="sm" />
-                <span style={{ fontSize: '14px', color: '#374151', fontWeight: '600' }}>My Account : {profile?.name}</span>
+                <span style={{ fontSize: '16px', color: '#374151', fontWeight: '700' }}>My Account : {profile?.name}</span>
                 {bookingNotifCount > 0 && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
