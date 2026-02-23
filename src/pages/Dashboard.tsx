@@ -1021,7 +1021,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                               {(b.passenger as any)?.email && ` | ${(b.passenger as any).email}`}
                                             </span>
                                           ) : (
-                                            <span style={{ display: 'block', fontSize: '11px', color: '#9CA3AF' }}>Contact 12h before departure</span>
+                                            <span style={{ display: 'block', fontSize: '11px', color: '#9CA3AF' }}>Contact details available 24h before departure</span>
                                           )}
                                           {(isPastDeparture || ride.status === 'completed') && !['cancelled', 'refunded'].includes(b.status) && (
                                             reviewedBookingIds.has(b.id)
@@ -1170,7 +1170,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                                       {(b.passenger as any)?.email && ` | ${(b.passenger as any).email}`}
                                                     </span>
                                                   ) : (
-                                                    <span style={{ color: '#9CA3AF' }}>Available 12h before</span>
+                                                    <span style={{ color: '#9CA3AF' }}>Available 24h before departure</span>
                                                   )}
                                                 </td>
                                                 <td style={{ padding: '8px 12px', textAlign: 'center', borderTop: '1px solid #F3F4F6' }}>

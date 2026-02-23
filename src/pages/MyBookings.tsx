@@ -656,14 +656,20 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                           </button>
 
                           {/* Contact Driver - only if confirmed and within 24 hours */}
-                          {booking.status === 'confirmed' && contactVisible && driver.phone && (
-                            <button onClick={() => { window.location.href = `tel:${driver.phone}`; }} style={{ width: '100%', padding: '12px', backgroundColor: '#F5F5F5', color: '#4B5563', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                              Contact Driver
-                            </button>
-                          )}
-                          {booking.status === 'confirmed' && !contactVisible && (
+                          {booking.status === 'confirmed' && contactVisible ? (
+                            <div style={{ padding: '14px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)' }}>
+                              <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 8px 0' }}>Driver Contact Details</p>
+                              <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 6px 0' }}>{driver.name}</p>
+                              {driver.phone && (
+                                <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '14px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '4px' }}>📞 {driver.phone}</a>
+                              )}
+                              {driver.email && (
+                                <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '13px', color: '#4198d0', fontWeight: '500', textDecoration: 'none' }}>✉ {driver.email}</a>
+                              )}
+                            </div>
+                          ) : booking.status === 'confirmed' ? (
                             <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>Contact details available 24 hours before departure</p>
-                          )}
+                          ) : null}
 
                           {/* Cancel Booking */}
                           {(booking.status === 'confirmed' || booking.status === 'pending_driver') && (
