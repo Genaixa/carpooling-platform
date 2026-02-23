@@ -140,8 +140,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Ignore Supabase errors (e.g. session already expired)
+    }
+    // Always clear local state so the app treats the user as logged out
+    setUser(null);
+    setProfile(null);
   };
 
   const updateProfile = async (data: Partial<Profile>) => {
