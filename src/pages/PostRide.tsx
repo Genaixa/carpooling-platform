@@ -347,6 +347,15 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Price per Seat (£) *</label>
                   <input name="pricePerSeat" type="number" min="0" step="0.01" value={formData.pricePerSeat} onChange={handleChange} required placeholder="0.00" style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.pricePerSeat ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }} />
                   {errors.pricePerSeat && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.pricePerSeat}</p>}
+                  {parseFloat(formData.pricePerSeat) > 0 ? (
+                    <p style={{ fontSize: '13px', color: '#166534', marginTop: '6px', fontWeight: '600' }}>
+                      You receive £{(parseFloat(formData.pricePerSeat) * 0.75).toFixed(2)} per seat after ChapaRide's 25% fee.
+                    </p>
+                  ) : (
+                    <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '6px' }}>
+                      ChapaRide deducts a 25% fee from each seat sold. You keep 75% of the price you set.
+                    </p>
+                  )}
                 </div>
                 {formData.luggageSize !== 'none' && (
                   <div>
