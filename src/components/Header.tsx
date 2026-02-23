@@ -111,9 +111,11 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
         {/* Desktop Navigation */}
         {!isMobile && (
           <div style={{ display: 'flex', gap: '28px', alignItems: 'center' }}>
-            <button onClick={() => onNavigate('home')} style={navLinkStyle(currentPage === 'home')}>
-              Find a Ride
-            </button>
+            {user && (
+              <button onClick={() => onNavigate('home')} style={navLinkStyle(currentPage === 'home')}>
+                Find a Ride
+              </button>
+            )}
             {user && profile?.is_approved_driver ? (
               <button onClick={() => onNavigate('post-ride')} style={navLinkStyle(currentPage === 'post-ride')}>
                 Post a Ride
@@ -122,11 +124,7 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
               <button onClick={() => onNavigate('driver-apply')} style={navLinkStyle(currentPage === 'driver-apply')}>
                 Become a Driver
               </button>
-            ) : (
-              <button onClick={() => onNavigate('register-driver')} style={navLinkStyle(currentPage === 'post-ride')}>
-                Post a Ride
-              </button>
-            )}
+            ) : null}
             <button onClick={() => onNavigate('how-it-works')} style={navLinkStyle(currentPage === 'how-it-works')}>
               How it Works
             </button>
@@ -297,14 +295,14 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 <span style={{ fontWeight: '600', color: '#1F2937' }}>{profile?.name}</span>
               </button>
             )}
-            <button onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Find a Ride</button>
+            {user && (
+              <button onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Find a Ride</button>
+            )}
             {user && profile?.is_approved_driver ? (
               <button onClick={() => { onNavigate('post-ride'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Post a Ride</button>
             ) : user ? (
               <button onClick={() => { onNavigate('driver-apply'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Become a Driver</button>
-            ) : (
-              <button onClick={() => { onNavigate('register-driver'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Post a Ride</button>
-            )}
+            ) : null}
             <button onClick={() => { onNavigate('how-it-works'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>How it Works</button>
             {user && (
               <>
