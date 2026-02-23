@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, Booking, RideWish, isContactVisible, getCarComposition, getCarCompositionLabel, checkRideCompatibility } from '../lib/supabase';
+import { supabase, Ride, Booking, RideWish, isContactVisible, getCarComposition, getCarCompositionLabel, checkRideCompatibility, getRideRef } from '../lib/supabase';
 import { LUGGAGE_OPTIONS, COMMISSION_RATE } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -42,6 +42,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [licenceUploading, setLicenceUploading] = useState(false);
   const [expandedRideId, setExpandedRideId] = useState<string | null>(null);
   const [expandedWishId, setExpandedWishId] = useState<string | null>(null);
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!authLoading && !user) onNavigate('login');
@@ -134,6 +135,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           grouped[b.ride_id].push(b);
         });
         setRideBookings(grouped);
+
+        // Load reviews already submitted by this driver
+        const { data: driverReviews } = await supabase
+          .from('reviews')
+          .select('booking_id')
+          .eq('reviewer_id', user.id)
+          .eq('type', 'driver-to-passenger');
+        setReviewedBookingIds(new Set((driverReviews || []).map((r: any) => r.booking_id)));
       }
 
       // Load passenger wishes for approved drivers
@@ -281,6 +290,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       toast.success('Review submitted!');
+      setReviewedBookingIds(prev => new Set([...prev, reviewingBooking.id]));
       setReviewingBooking(null);
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit review');
@@ -412,7 +422,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               >×</button>
             </div>
           )}
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Driver Dashboard</h1>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Dashboard</h1>
           <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.95)', margin: 0 }}>Manage your rides and bookings</p>
         </div>
       </div>
@@ -577,75 +587,70 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '20px' }}>
                   Pending Booking Requests ({pendingBookings.length})
                 </h2>
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-                  {pendingBookings.map((booking) => (
-                    <div key={booking.id} style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #f59e0b' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', marginBottom: '12px' }}>
-                        <div>
-                          <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>
+                <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflowX: 'auto', borderLeft: '5px solid #f59e0b' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#FFFBEB', borderBottom: '2px solid #FDE68A' }}>
+                        <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap' }}>Passenger</th>
+                        <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap' }}>Route</th>
+                        <th style={{ padding: '14px 16px', textAlign: 'left', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap' }}>Date</th>
+                        <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap' }}>Seats</th>
+                        <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap' }}>Amount</th>
+                        <th style={{ padding: '14px 16px', textAlign: 'center', fontWeight: '700', color: '#92400e', whiteSpace: 'nowrap' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pendingBookings.map((booking, idx) => (
+                        <tr key={booking.id} style={{ borderBottom: idx < pendingBookings.length - 1 ? '1px solid #F3F4F6' : 'none', backgroundColor: 'white' }}
+                          onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#FFFBEB')}
+                          onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'white')}
+                        >
+                          <td style={{ padding: '14px 16px', fontWeight: '600', color: '#1F2937' }}>
                             {(booking.passenger as any)?.name || 'Passenger'}
-                          </h3>
-                          <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047' }}>
-                            Awaiting your decision
-                          </span>
-                        </div>
-                      </div>
-                      <div style={{ borderTop: '1px solid #E8EBED', paddingTop: '12px', marginBottom: '15px' }}>
-                        <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '6px' }}>
-                          <span style={{ fontWeight: '600' }}>Route:</span> {(booking.ride as any)?.departure_location} → {(booking.ride as any)?.arrival_location}
-                        </p>
-                        <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '6px' }}>
-                          <span style={{ fontWeight: '600' }}>Date:</span> {booking.ride ? formatDate((booking.ride as any).date_time) : ''}
-                        </p>
-                        <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '6px' }}>
-                          <span style={{ fontWeight: '600' }}>Seats:</span> {booking.seats_booked}
-                        </p>
-                        <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>
-                          <span style={{ fontWeight: '600' }}>Amount:</span> £{booking.total_paid?.toFixed(2)}
-                        </p>
-                      </div>
-                      {(booking as any).third_party_passenger && (
-                        <div style={{
-                          backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px',
-                          padding: '12px', marginBottom: '15px',
-                        }}>
-                          <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#1e40af' }}>
-                            Actual Passenger (booked by {(booking.passenger as any)?.name})
-                          </p>
-                          <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 3px' }}>
-                            <span style={{ fontWeight: '600' }}>Name:</span> {(booking as any).third_party_passenger.name}
-                          </p>
-                          <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 3px' }}>
-                            <span style={{ fontWeight: '600' }}>Gender:</span> {(booking as any).third_party_passenger.gender}
-                          </p>
-                          <p style={{ fontSize: '13px', color: '#374151', margin: '0 0 3px' }}>
-                            <span style={{ fontWeight: '600' }}>Age Group:</span> {(booking as any).third_party_passenger.age_group}
-                          </p>
-                          {(booking as any).third_party_passenger.special_needs && (
-                            <p style={{ fontSize: '13px', color: '#374151', margin: 0 }}>
-                              <span style={{ fontWeight: '600' }}>Special Needs:</span> {(booking as any).third_party_passenger.special_needs}
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-                        <button
-                          onClick={() => handleAcceptBooking(booking.id)}
-                          disabled={acceptingBookingId === booking.id || rejectingBookingId === booking.id}
-                          style={{ padding: '12px', backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: acceptingBookingId === booking.id ? 'not-allowed' : 'pointer' }}
-                        >
-                          {acceptingBookingId === booking.id ? 'Accepting...' : 'Accept'}
-                        </button>
-                        <button
-                          onClick={() => handleRejectBooking(booking.id)}
-                          disabled={acceptingBookingId === booking.id || rejectingBookingId === booking.id}
-                          style={{ padding: '12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: rejectingBookingId === booking.id ? 'not-allowed' : 'pointer' }}
-                        >
-                          {rejectingBookingId === booking.id ? 'Rejecting...' : 'Reject'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
+                            {(booking as any).third_party_passenger && (
+                              <div style={{ marginTop: '4px', padding: '6px 8px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px' }}>
+                                <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: '700', color: '#1e40af' }}>Travelling: {(booking as any).third_party_passenger.name}</p>
+                                <p style={{ margin: 0, fontSize: '11px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
+                                {(booking as any).third_party_passenger.special_needs && (
+                                  <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
+                                )}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '14px 16px', color: '#4B5563' }}>
+                            {(booking.ride as any)?.departure_location} → {(booking.ride as any)?.arrival_location}
+                          </td>
+                          <td style={{ padding: '14px 16px', color: '#4B5563', whiteSpace: 'nowrap' }}>
+                            {booking.ride ? formatDate((booking.ride as any).date_time) : ''}
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'center', color: '#1F2937', fontWeight: '600' }}>
+                            {booking.seats_booked}
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'center', color: '#1F2937', fontWeight: '600' }}>
+                            £{booking.total_paid?.toFixed(2)}
+                          </td>
+                          <td style={{ padding: '14px 16px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                            <div style={{ display: 'flex', gap: '8px', justifyContent: 'center' }}>
+                              <button
+                                onClick={() => handleAcceptBooking(booking.id)}
+                                disabled={acceptingBookingId === booking.id || rejectingBookingId === booking.id}
+                                style={{ padding: '8px 16px', backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: acceptingBookingId === booking.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                              >
+                                {acceptingBookingId === booking.id ? 'Accepting...' : 'Accept'}
+                              </button>
+                              <button
+                                onClick={() => handleRejectBooking(booking.id)}
+                                disabled={acceptingBookingId === booking.id || rejectingBookingId === booking.id}
+                                style={{ padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: rejectingBookingId === booking.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                              >
+                                {rejectingBookingId === booking.id ? 'Rejecting...' : 'Reject'}
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             )}
@@ -950,7 +955,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       You have {rides.filter(r => r.status === 'upcoming' && new Date(r.date_time) < new Date()).length} ride(s) to mark as complete
                     </h3>
                     <p style={{ margin: 0, fontSize: '14px', color: '#1e40af', lineHeight: '1.5' }}>
-                      After your ride has taken place, please click <strong>"Mark as Complete"</strong> on each ride below. This confirms the journey happened, charges passengers, and allows both you and your passengers to leave reviews.
+                      After your ride has taken place, please click <strong>"Complete"</strong> to confirm the journey. You can also click <strong>"Review"</strong> to leave a review for each passenger straight away.
                     </p>
                   </div>
                 )}
@@ -987,7 +992,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   </div>
                                 </div>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '10px' }}>
-                                  <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize', ...getStatusStyle(ride.status) }}>{ride.status}</span>
+                                  {ride.status === 'completed' && !bookingsForRide.some(b => !['cancelled', 'refunded'].includes(b.status))
+                                    ? <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', color: '#D1D5DB' }}>—</span>
+                                    : <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize', ...getStatusStyle(ride.status) }}>{ride.status}</span>
+                                  }
                                   {bookingsForRide.length > 0 && (
                                     <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af' }}>{bookingsForRide.length} booked</span>
                                   )}
@@ -1015,8 +1023,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                           ) : (
                                             <span style={{ display: 'block', fontSize: '11px', color: '#9CA3AF' }}>Contact 12h before departure</span>
                                           )}
-                                          {ride.status === 'completed' && b.status === 'completed' && (
-                                            <button onClick={() => setReviewingBooking(b)} style={{ marginTop: '3px', padding: '3px 8px', fontSize: '11px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '5px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
+                                          {(isPastDeparture || ride.status === 'completed') && !['cancelled', 'refunded'].includes(b.status) && (
+                                            reviewedBookingIds.has(b.id)
+                                              ? <span style={{ marginTop: '3px', display: 'inline-block', padding: '3px 8px', fontSize: '11px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '5px', fontWeight: '500' }}>Reviewed ✓</span>
+                                              : <button onClick={() => setReviewingBooking(b)} style={{ marginTop: '3px', padding: '3px 8px', fontSize: '11px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '5px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
                                           )}
                                         </div>
                                       ))}
@@ -1028,7 +1038,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                         {completingRideId === ride.id ? 'Completing...' : 'Mark Complete'}
                                       </button>
                                     )}
-                                    {ride.status === 'upcoming' && (
+                                    {ride.status === 'upcoming' && !isPastDeparture && (
                                       <>
                                         <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                                         <button onClick={() => setCancellingRideId(ride.id)} style={{ flex: 1, padding: '10px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
@@ -1046,6 +1056,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#F8FAFB' }}>
+                            <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#6B7280', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Ref</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
                             <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Date & Time</th>
                             <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Seats</th>
@@ -1070,6 +1081,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
                                   onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
                                 >
+                                  <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '500', color: '#9CA3AF', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                    {getRideRef(ride.id)}
+                                  </td>
                                   <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                     {ride.departure_location} → {ride.arrival_location}
                                   </td>
@@ -1090,26 +1104,38 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                     )}
                                   </td>
                                   <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
-                                    <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize', ...getStatusStyle(ride.status) }}>{ride.status}</span>
+                                    {ride.status === 'completed' && !bookingsForRide.some(b => !['cancelled', 'refunded'].includes(b.status))
+                                      ? <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', color: '#D1D5DB' }}>—</span>
+                                      : <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize', ...getStatusStyle(ride.status) }}>{ride.status}</span>
+                                    }
                                   </td>
                                   <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right', whiteSpace: 'nowrap' }}>
-                                    {ride.status === 'upcoming' && (
-                                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
-                                        {isPastDeparture && (
-                                          <button onClick={() => handleCompleteRide(ride.id)} disabled={completingRideId === ride.id} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: completingRideId === ride.id ? 'not-allowed' : 'pointer' }}>
-                                            {completingRideId === ride.id ? '...' : 'Complete'}
-                                          </button>
-                                        )}
-                                        <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
-                                        <button onClick={() => setCancellingRideId(ride.id)} style={{ padding: '6px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
-                                      </div>
-                                    )}
+                                    <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+                                      {ride.status === 'upcoming' && isPastDeparture && (
+                                        <button onClick={() => handleCompleteRide(ride.id)} disabled={completingRideId === ride.id} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1e40af 0%, #3b82f6 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: completingRideId === ride.id ? 'not-allowed' : 'pointer' }}>
+                                          {completingRideId === ride.id ? '...' : 'Complete'}
+                                        </button>
+                                      )}
+                                      {(isPastDeparture || ride.status === 'completed') && (
+                                        bookingsForRide.some(b => !['cancelled', 'refunded'].includes(b.status))
+                                          ? (bookingsForRide.some(b => !['cancelled', 'refunded'].includes(b.status) && !reviewedBookingIds.has(b.id))
+                                              ? <button onClick={() => setExpandedRideId(isExpanded ? null : ride.id)} style={{ padding: '6px 12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Review</button>
+                                              : <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '6px', display: 'inline-block' }}>Reviewed ✓</span>)
+                                          : <span style={{ fontSize: '12px', color: '#D1D5DB', fontWeight: '500' }}>—</span>
+                                      )}
+                                      {ride.status === 'upcoming' && !isPastDeparture && (
+                                        <>
+                                          <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                                          <button onClick={() => setCancellingRideId(ride.id)} style={{ padding: '6px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                                        </>
+                                      )}
+                                    </div>
                                   </td>
                                 </tr>
                                 {/* Expanded row: passengers, details */}
                                 {isExpanded && (
                                   <tr>
-                                    <td colSpan={7} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                    <td colSpan={8} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
                                       <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#4B5563', marginBottom: bookingsForRide.length > 0 ? '12px' : '0', padding: '8px 0' }}>
                                         {ride.departure_spot && <span><span style={{ fontWeight: '600' }}>Pickup:</span> {ride.departure_spot}</span>}
                                         {ride.luggage_size && ride.luggage_size !== 'none' && <span><span style={{ fontWeight: '600' }}>Luggage:</span> {getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` (up to ${ride.luggage_count})` : ''}</span>}
@@ -1117,7 +1143,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                       </div>
                                       {ride.status === 'upcoming' && isPastDeparture && (
                                         <p style={{ fontSize: '12px', color: '#1e40af', marginBottom: '10px', fontWeight: '500', lineHeight: '1.4', padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>
-                                          This ride's departure has passed. Please mark it as complete so passengers are charged and you can both leave reviews.
+                                          This ride's departure has passed. Please mark it as complete and leave a review for your passengers.
                                         </p>
                                       )}
                                       {bookingsForRide.length > 0 && (
@@ -1148,8 +1174,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                                   )}
                                                 </td>
                                                 <td style={{ padding: '8px 12px', textAlign: 'center', borderTop: '1px solid #F3F4F6' }}>
-                                                  {ride.status === 'completed' && b.status === 'completed' && (
-                                                    <button onClick={() => setReviewingBooking(b)} style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '5px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
+                                                  {(isPastDeparture || ride.status === 'completed') && !['cancelled', 'refunded'].includes(b.status) && (
+                                                    reviewedBookingIds.has(b.id)
+                                                      ? <span style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '5px', fontWeight: '500', display: 'inline-block' }}>Reviewed ✓</span>
+                                                      : <button onClick={() => setReviewingBooking(b)} style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '5px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
                                                   )}
                                                 </td>
                                               </tr>
@@ -1175,6 +1203,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             {dashView === 'financials' && (() => {
               // Build flat list of booking rows with ride info
               const allRows: Array<{
+                rideId: string;
                 date: string;
                 route: string;
                 passengerName: string;
@@ -1191,6 +1220,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   const commission = b.commission_amount != null ? b.commission_amount : totalPaid * COMMISSION_RATE;
                   const earnings = b.driver_payout_amount != null ? b.driver_payout_amount : totalPaid * (1 - COMMISSION_RATE);
                   allRows.push({
+                    rideId: ride.id,
                     date: ride.date_time,
                     route: `${ride.departure_location} → ${ride.arrival_location}`,
                     passengerName: (b.passenger as any)?.name || 'Unknown',
@@ -1363,6 +1393,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '720px' }}>
                         <thead>
                           <tr>
+                            <th style={{ ...thStyle, cursor: 'default', color: '#6B7280' }}>Ref</th>
                             <th onClick={() => handleSort('date')} style={thStyle}>Date{sortIndicator('date')}</th>
                             <th onClick={() => handleSort('route')} style={thStyle}>Route{sortIndicator('route')}</th>
                             <th onClick={() => handleSort('passenger')} style={thStyle}>Passenger{sortIndicator('passenger')}</th>
@@ -1375,6 +1406,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                         <tbody>
                           {sorted.map((row, idx) => (
                             <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? 'white' : '#FAFBFC' }}>
+                              <td style={{ ...tdStyle, color: '#9CA3AF', fontFamily: 'monospace', fontSize: '12px' }}>{getRideRef(row.rideId)}</td>
                               <td style={tdStyle}>{formatDate(row.date)}</td>
                               <td style={{ ...tdStyle, whiteSpace: 'normal', minWidth: '160px' }}>{row.route}</td>
                               <td style={tdStyle}>{row.passengerName}</td>
@@ -1387,7 +1419,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                         </tbody>
                         <tfoot>
                           <tr style={{ backgroundColor: '#F0FDFA' }}>
-                            <td colSpan={3} style={{ ...tdStyle, fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>Grand Total</td>
+                            <td colSpan={4} style={{ ...tdStyle, fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>Grand Total</td>
                             <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>
                               {filtered.reduce((sum, r) => sum + r.seats, 0)}
                             </td>
