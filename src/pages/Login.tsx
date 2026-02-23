@@ -46,7 +46,9 @@ export default function Login({ onNavigate }: LoginProps) {
 
     try {
       await signIn(email, password);
-      onNavigate('home');
+      const redirect = sessionStorage.getItem('loginRedirect') as import('../lib/types').Page | null;
+      sessionStorage.removeItem('loginRedirect');
+      onNavigate(redirect || 'home');
     } catch (err: any) {
       setError(err.message || 'Failed to sign in. Please check your credentials.');
     } finally {

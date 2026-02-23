@@ -45,7 +45,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    if (!authLoading && !user) onNavigate('login');
+    if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'dashboard');
+      onNavigate('login');
+    }
   }, [user, authLoading, onNavigate]);
 
   // Show toast messages from email action redirects

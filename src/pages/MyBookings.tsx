@@ -37,7 +37,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const [statusFilter, setStatusFilter] = useState<'all' | 'confirmed' | 'completed' | 'cancelled' | 'pending'>('all');
 
   useEffect(() => {
-    if (!authLoading && !user) onNavigate('login');
+    if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'my-bookings');
+      onNavigate('login');
+    }
   }, [user, authLoading, onNavigate]);
 
   useEffect(() => {
