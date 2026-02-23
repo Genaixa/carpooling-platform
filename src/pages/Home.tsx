@@ -1087,7 +1087,7 @@ export default function Home({ onNavigate }: HomeProps) {
               display: 'inline-block'
             }}>
               <p style={{ fontSize: '14px', color: '#1F2937', fontWeight: '500', margin: 0 }}>
-                Sign in to see compatible rides and book your journey
+                Login to see compatible rides and book your journey
               </p>
             </div>
           )}
