@@ -47,7 +47,10 @@ export default function Profile({ onNavigate }: ProfileProps) {
   }, [profile]);
 
   useEffect(() => {
-    if (!user) onNavigate('login');
+    if (!user) {
+      sessionStorage.setItem('loginRedirect', 'profile');
+      onNavigate('login');
+    }
   }, [user, onNavigate]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {

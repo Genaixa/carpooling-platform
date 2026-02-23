@@ -43,6 +43,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
   useEffect(() => {
     if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'driver-apply');
       onNavigate('login');
     }
   }, [user, authLoading, onNavigate]);

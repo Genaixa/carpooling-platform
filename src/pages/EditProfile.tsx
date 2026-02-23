@@ -43,6 +43,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'profile-edit');
       onNavigate('login');
     }
   }, [user, authLoading, onNavigate]);

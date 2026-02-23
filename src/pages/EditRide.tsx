@@ -42,6 +42,7 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
 
   useEffect(() => {
     if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'dashboard');
       onNavigate('login');
     }
   }, [user, authLoading, onNavigate]);

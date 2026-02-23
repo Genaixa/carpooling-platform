@@ -34,7 +34,10 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
   });
 
   useEffect(() => {
-    if (!authLoading && !user) onNavigate('login');
+    if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'ride-wishes');
+      onNavigate('login');
+    }
   }, [user, authLoading, onNavigate]);
 
   useEffect(() => {

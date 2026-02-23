@@ -57,6 +57,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
   // Redirect to login if not authenticated
   useEffect(() => {
     if (!authLoading && !user) {
+      sessionStorage.setItem('loginRedirect', 'post-ride');
       onNavigate('login');
     }
   }, [user, authLoading, onNavigate]);
