@@ -53,11 +53,12 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
   const handleSignOut = async () => {
     try {
       await signOut();
-      setProfileDropdownOpen(false);
-      onNavigate('home');
-    } catch (error) {
-      toast.error('Error signing out');
+    } catch {
+      // Ignore signOut errors (e.g. session already expired) — proceed anyway
     }
+    setProfileDropdownOpen(false);
+    setMobileMenuOpen(false);
+    onNavigate('home');
   };
 
   const navLinkStyle = (active?: boolean) => ({
