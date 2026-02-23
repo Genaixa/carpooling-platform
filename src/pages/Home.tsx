@@ -75,21 +75,6 @@ export default function Home({ onNavigate }: HomeProps) {
   const [cityFilter, setCityFilter] = useState<string>('All');
   const cityFilterInitialized = useRef(false);
 
-  // Debug: Log profile changes (commented out for production)
-  useEffect(() => {
-    /* DEBUG: Profile monitoring
-    console.log('=== PROFILE DEBUG ===');
-    console.log('User object:', user);
-    console.log('Profile object:', profile);
-    console.log('Profile details:', {
-      id: profile?.id,
-      name: profile?.name,
-      email: profile?.email,
-      gender: profile?.gender,
-      gender: profile?.gender
-    });
-    */
-  }, [user, profile]);
 
   useEffect(() => {
     loadRides();
@@ -1417,7 +1402,7 @@ export default function Home({ onNavigate }: HomeProps) {
                               transition: 'all 0.3s', whiteSpace: 'nowrap',
                             }}
                           >
-                            {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Sign in'}
+                            {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
                           </button>
 
                           {/* Details */}
