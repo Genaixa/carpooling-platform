@@ -25,6 +25,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const [cancelling, setCancelling] = useState(false);
   const [reviewingBooking, setReviewingBooking] = useState<Booking | null>(null);
   const [expandedPastId, setExpandedPastId] = useState<string | null>(null);
+  const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set());
 
   // Financial Report state
   const [bookingsView, setBookingsView] = useState<'bookings' | 'financials'>('bookings');
@@ -86,6 +87,14 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
 
       if (error) throw error;
       setBookings(data || []);
+
+      // Load reviews already submitted by this passenger
+      const { data: myReviews } = await supabase
+        .from('reviews')
+        .select('booking_id')
+        .eq('reviewer_id', user.id)
+        .eq('type', 'passenger-to-driver');
+      setReviewedBookingIds(new Set((myReviews || []).map((r: any) => r.booking_id)));
     } catch (error: any) {
       console.error('Error loading bookings:', error);
       setError('Failed to load bookings');
@@ -147,6 +156,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       toast.success('Review submitted!');
+      setReviewedBookingIds(prev => new Set([...prev, reviewingBooking.id]));
       setReviewingBooking(null);
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit review');
@@ -320,7 +330,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
           <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
             <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '32px', maxWidth: '500px', width: '100%', margin: '16px' }}>
               <h3 style={{ fontSize: '20px', fontWeight: 'bold', color: '#1F2937', marginBottom: '16px' }}>
-                Review {(reviewingBooking.ride as any)?.driver?.name || 'Driver'}
+                Review {(reviewingBooking.ride as any)?.driver ? getDriverAlias((reviewingBooking.ride as any).driver.id) : 'Driver'}
               </h3>
               <ReviewForm onSubmit={handleReviewSubmit} onCancel={() => setReviewingBooking(null)} />
             </div>
@@ -708,7 +718,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   {booking.seats_booked} seat(s) — £{booking.total_paid?.toFixed(2)}
                                 </div>
                                 {driver && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '8px' }}>{getDriverAlias(driver.id)}</div>}
-                                {booking.status === 'completed' && (
+                                {['confirmed', 'completed'].includes(booking.status) && !reviewedBookingIds.has(booking.id) && (
                                   <button onClick={() => setReviewingBooking(booking)} style={{ padding: '6px 14px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Leave Review</button>
                                 )}
                               </div>
@@ -761,7 +771,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 </span>
                               </td>
                               <td style={{ padding: '12px 16px', borderBottom: '1px solid #E8EBED', textAlign: 'right' }}>
-                                {booking.status === 'completed' && (
+                                {['confirmed', 'completed'].includes(booking.status) && !reviewedBookingIds.has(booking.id) && (
                                   <button onClick={() => setReviewingBooking(booking)} style={{ padding: '5px 12px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
                                 )}
                               </td>

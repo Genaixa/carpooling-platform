@@ -3,6 +3,8 @@ import toast from 'react-hot-toast';
 import { NavigateFn } from '../lib/types';
 import { useIsMobile } from '../hooks/useIsMobile';
 
+const API_URL = import.meta.env.VITE_API_URL || 'https://srv1291941.hstgr.cloud';
+
 interface ContactUsProps {
   onNavigate: NavigateFn;
 }
@@ -14,14 +16,29 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
   const [subject, setSubject] = useState('General Enquiry');
   const [message, setMessage] = useState('');
   const [focusedField, setFocusedField] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast.success("Message sent! We'll get back to you soon.");
-    setName('');
-    setEmail('');
-    setSubject('General Enquiry');
-    setMessage('');
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/contact`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, email, subject, message }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to send');
+      toast.success("Message sent! We'll get back to you within 1–2 business days.");
+      setName('');
+      setEmail('');
+      setSubject('General Enquiry');
+      setMessage('');
+    } catch {
+      toast.error('Failed to send message. Please email us directly at info@chaparide.com');
+    } finally {
+      setSending(false);
+    }
   };
 
   const inputStyle = (field: string): React.CSSProperties => ({
@@ -158,63 +175,6 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
               </div>
             </div>
 
-            {/* Phone */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '24px' }}>
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07 19.5 19.5 0 01-6-6 19.79 19.79 0 01-3.07-8.67A2 2 0 014.11 2h3a2 2 0 012 1.72 12.84 12.84 0 00.7 2.81 2 2 0 01-.45 2.11L8.09 9.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45 12.84 12.84 0 002.81.7A2 2 0 0122 16.92z" />
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                  Phone
-                </div>
-                <div style={{ color: '#9CA3AF', fontSize: '15px', fontStyle: 'italic' }}>
-                  Coming soon
-                </div>
-              </div>
-            </div>
-
-            {/* Address */}
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px', marginBottom: '24px' }}>
-              <div
-                style={{
-                  width: '40px',
-                  height: '40px',
-                  borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  flexShrink: 0,
-                }}
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" />
-                  <circle cx="12" cy="10" r="3" />
-                </svg>
-              </div>
-              <div>
-                <div style={{ fontSize: '14px', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                  Address
-                </div>
-                <div style={{ color: '#9CA3AF', fontSize: '15px', fontStyle: 'italic' }}>
-                  Coming soon
-                </div>
-              </div>
-            </div>
-
             {/* Business Hours */}
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: '14px' }}>
               <div
@@ -346,6 +306,7 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
               {/* Submit Button */}
               <button
                 type="submit"
+                disabled={sending}
                 style={{
                   width: '100%',
                   padding: '14px 24px',
@@ -355,7 +316,8 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
                   borderRadius: '12px',
                   fontSize: '16px',
                   fontWeight: 600,
-                  cursor: 'pointer',
+                  cursor: sending ? 'not-allowed' : 'pointer',
+                  opacity: sending ? 0.7 : 1,
                   transition: 'opacity 0.2s ease, transform 0.2s ease',
                 }}
                 onMouseEnter={(e) => {
@@ -367,7 +329,7 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
                   (e.target as HTMLButtonElement).style.transform = 'translateY(0)';
                 }}
               >
-                Send Message
+                {sending ? 'Sending...' : 'Send Message'}
               </button>
             </form>
           </div>

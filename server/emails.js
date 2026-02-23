@@ -8,8 +8,8 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY
 );
 
-const SITE_URL = process.env.SITE_URL || '${SITE_URL}';
-const API_URL = process.env.API_URL || '${API_URL}';
+const SITE_URL = process.env.SITE_URL || 'https://chaparide.com';
+const API_URL = process.env.API_URL || 'https://chaparide.com';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'info@chaparide.com';
 
 function formatDate(dateString) {
@@ -296,11 +296,13 @@ export async function sendDriverPostRideReminder(ride) {
     <p>If the ride has taken place, please mark it as complete on your dashboard. This will:</p>
     <ul>
       <li>Finalise passenger payments</li>
-      <li>Allow you and your passengers to leave reviews for each other</li>
       <li>Update your ride history</li>
     </ul>
-    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1e40af; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Go to Dashboard &amp; Mark as Complete</a></p>
-    <p style="color: #666; font-size: 13px; margin-top: 20px;">Don't forget to leave reviews for your passengers after marking the ride complete!</p>
+    <p>Don't forget to leave reviews for your passengers after marking the ride complete!</p>
+    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin: 20px 0;">
+      <a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1e40af; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Mark as Complete</a>
+      <a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a>
+    </div>
     <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
       Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong><br>
       <span style="font-size:11px;">Quote these if you contact support.</span>
@@ -332,10 +334,11 @@ export async function sendPassengerReviewReminder(booking, ride) {
   const { data: driver } = await supabase.from('profiles').select('*').eq('id', ride.driver_id).single();
   if (!passenger || !driver) return false;
   return sendEmail(passenger.email, `Leave a review for ${getDriverAlias(driver.id)} - Ride Ref: ${getRideRef(ride.id)}`,
-    `<h2>Your ride is complete!</h2>
+    `<h2>Thank you for travelling with ChapaRide!</h2>
     <p>Hi ${passenger.name},</p>
-    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> has been marked as complete by the driver.</p>
-    <p>How was your experience with <strong>${getDriverAlias(driver.id)}</strong>? Your review helps other passengers choose great drivers and helps build trust in the ChapaRide community.</p>
+    <p>We hope you had a great journey! Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> on <strong>${formatDate(ride.date_time)}</strong> has been marked as complete by the driver.</p>
+    <p>We'd love to hear how it went. How was your experience with <strong>${getDriverAlias(driver.id)}</strong>? Your honest review helps other passengers choose great drivers and keeps the ChapaRide community safe and trusted.</p>
+    <p>It only takes a moment — and it makes a real difference.</p>
     <p><a href="${SITE_URL}/#my-bookings" style="display: inline-block; padding: 14px 28px; background: #1A9D9D; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Leave a Review</a></p>
     <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
       Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;&middot;&nbsp; Your Ref: <strong>${getUserRef(passenger.id)}</strong> &nbsp;&middot;&nbsp; Driver Ref: <strong>${getUserRef(driver.id)}</strong><br>
@@ -566,6 +569,22 @@ export async function sendBookingConfirmationEmail(passengerEmail, passengerName
       <p><strong>Driver:</strong> ${driverName}</p>
     </div>
     <p>Contact details will be available 24 hours before departure.</p>`
+  );
+}
+
+// 19. Contact form submission (to admin)
+export async function sendContactFormEmail({ name, email, subject, message }) {
+  return sendEmail(ADMIN_EMAIL, `Contact Form: ${subject} — from ${name}`,
+    `<h2>New Contact Form Submission</h2>
+    <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:20px 0;">
+      <p><strong>Name:</strong> ${name}</p>
+      <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+      <p><strong>Subject:</strong> ${subject}</p>
+    </div>
+    <div style="background:#fff;border:1px solid #e5e7eb;padding:15px;border-radius:8px;margin:20px 0;">
+      <p style="margin:0;white-space:pre-wrap;">${message}</p>
+    </div>
+    <p style="color:#6B7280;font-size:13px;">Reply directly to this email to respond to ${name}.</p>`
   );
 }
 

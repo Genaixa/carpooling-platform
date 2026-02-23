@@ -1390,15 +1390,15 @@ export default function Home({ onNavigate }: HomeProps) {
 
                           {/* Book */}
                           <button
-                            onClick={() => handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id))}
-                            disabled={bookingRide === ride.id || !user || !ride.compatible}
+                            onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
+                            disabled={bookingRide === ride.id || !ride.compatible}
                             style={{
                               padding: '8px 22px', borderRadius: '50px', border: 'none',
                               fontWeight: '700', fontSize: '13px',
-                              cursor: (bookingRide === ride.id || !user || !ride.compatible) ? 'not-allowed' : 'pointer',
-                              background: (!user || !ride.compatible) ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                              cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer',
+                              background: !ride.compatible ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
                               color: 'white',
-                              boxShadow: (!user || !ride.compatible) ? 'none' : '0 3px 10px rgba(26,157,157,0.2)',
+                              boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(26,157,157,0.2)',
                               transition: 'all 0.3s', whiteSpace: 'nowrap',
                             }}
                           >

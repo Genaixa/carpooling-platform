@@ -132,7 +132,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
             }}>{intent === 'driver' ? 'Become a Driver' : 'Create your account'}</h1>
             <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
               {intent === 'driver'
-                ? 'Join thousands of travellers saving money on rides'
+                ? 'Start saving money by sharing your journeys across the UK'
                 : 'Join thousands of travellers saving money on rides'}
             </p>
           </div>

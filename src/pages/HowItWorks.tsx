@@ -147,7 +147,7 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
               { step: '1', title: 'Set Up an Alert', desc: 'Can\'t find a ride that suits you? Go to Ride Alerts and tell us your departure, destination, date, preferred time, and number of passengers.' },
               { step: '2', title: 'Get Notified by Email', desc: 'When a driver posts a ride that matches your alert, we\'ll send you an email straightaway so you can book it before seats fill up.' },
               { step: '3', title: 'Manage Your Alerts', desc: 'View all your active alerts on the Ride Alerts page. Remove any you no longer need. Past-date alerts are automatically marked as expired.' },
-              { step: '4', title: 'Ride Alerts', desc: 'Are you travelling? Why not check if anyone wants a ride and share the cost.' },
+              { step: '4', title: 'Already Driving? Check for Passengers', desc: 'Are you planning a journey? Check if any passengers have set up alerts for your route — you could share your costs and help someone out at the same time.' },
             ].map((item) => (
               <div key={item.step} style={{
                 padding: '24px', borderRadius: '16px', border: '1px solid #E8EBED',

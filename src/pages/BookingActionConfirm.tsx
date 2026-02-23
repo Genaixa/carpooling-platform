@@ -69,12 +69,11 @@ export default function BookingActionConfirm({ onNavigate, action }: Props) {
                 What happens next:
               </p>
               {[
-                "The passenger's card has been charged.",
                 'The passenger has been notified by email that their booking is confirmed.',
                 "The passenger's contact details will become available to you 24 hours before the ride.",
                 'You can view and manage all your bookings from your dashboard.',
               ].map((step, i) => (
-                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 3 ? '10px' : 0 }}>
+                <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 2 ? '10px' : 0 }}>
                   <span style={{
                     flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%',
                     backgroundColor: '#16a34a', color: 'white', fontSize: '12px',
