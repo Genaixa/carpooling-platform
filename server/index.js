@@ -373,6 +373,9 @@ app.post('/api/create-payment', async (req, res) => {
     if (hasCode('INSUFFICIENT_FUNDS')) {
       return res.status(402).json({ error: 'Your card has insufficient funds. Please try a different card.' });
     }
+    if (hasCode('GENERIC_DECLINE')) {
+      return res.status(402).json({ error: 'Your card was declined by your bank. This is sometimes due to online payment restrictions or fraud prevention. Please contact your bank or try a different card.' });
+    }
     res.status(500).json({ error: errMsg || 'Payment failed' });
   }
 });
