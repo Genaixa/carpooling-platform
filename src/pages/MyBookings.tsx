@@ -614,76 +614,135 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                   <p style={{ color: '#4B5563', margin: 0 }}>No upcoming bookings</p>
                 </div>
               ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fill, minmax(350px, 1fr))', gap: '20px' }}>
-                  {upcomingBookings.map((booking) => {
-                    if (!booking.ride || !(booking.ride as any).driver) return null;
-                    const driver = (booking.ride as any).driver;
-                    const contactVisible = isContactVisible(booking.ride.date_time);
-
-                    return (
-                      <div key={booking.id} style={{ backgroundColor: 'white', borderRadius: '20px', padding: '25px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: `5px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#1A9D9D'}` }}>
-                        <div>
-                          <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '12px' }}>
-                            {booking.ride.departure_location} → {booking.ride.arrival_location}
-                          </h3>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '14px', color: '#4B5563' }}>{formatDate(booking.ride.date_time)}</span>
-                            <span style={{ color: '#D1D5DB' }}>|</span>
-                            <span style={{ fontSize: '14px', color: '#4B5563' }}>{formatTime(booking.ride.date_time)}</span>
-                          </div>
-                          <span style={{ display: 'inline-block', padding: '6px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                            {getStatusLabel(booking.status, booking.driver_action)}
-                          </span>
-                        </div>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: '20px', marginBottom: '20px' }}>
-                          <div>
-                            <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: 0, cursor: 'pointer' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>
-                              {getDriverAlias(driver.id)} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
-                            </p>
-                          </div>
-                        </div>
-
-                        <div style={{ borderTop: '1px solid #E8EBED', paddingTop: '15px', marginBottom: '20px' }}>
-                          <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '8px' }}>
-                            <span style={{ fontWeight: '600' }}>Seats booked:</span> {booking.seats_booked}
-                          </p>
-                          <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>
-                            <span style={{ fontWeight: '600' }}>Total paid:</span> £{booking.total_paid?.toFixed(2)}
-                          </p>
-                        </div>
-
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                          <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ width: '100%', padding: '12px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 2px 8px rgba(26, 157, 157, 0.15)' }}>
-                            View Ride
-                          </button>
-
-                          {/* Contact Driver - only if confirmed and within 24 hours */}
-                          {booking.status === 'confirmed' && contactVisible ? (
-                            <div style={{ padding: '14px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)' }}>
-                              <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', marginBottom: '8px', textTransform: 'uppercase', letterSpacing: '0.5px', margin: '0 0 8px 0' }}>Driver Contact Details</p>
-                              <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 6px 0' }}>{driver.name}</p>
-                              {driver.phone && (
-                                <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '14px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '4px' }}>📞 {driver.phone}</a>
-                              )}
-                              {driver.email && (
-                                <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '13px', color: '#4198d0', fontWeight: '500', textDecoration: 'none' }}>✉ {driver.email}</a>
-                              )}
+                <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                  {isMobile ? (
+                    /* Mobile: compact expandable list */
+                    <div>
+                      {upcomingBookings.map((booking) => {
+                        if (!booking.ride || !(booking.ride as any).driver) return null;
+                        const driver = (booking.ride as any).driver;
+                        const contactVisible = isContactVisible(booking.ride.date_time);
+                        const isExpanded = expandedPastId === booking.id;
+                        return (
+                          <div key={booking.id} style={{ borderBottom: '1px solid #E8EBED', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#1A9D9D'}` }}>
+                            <div onClick={() => setExpandedPastId(isExpanded ? null : booking.id)} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {booking.ride.departure_location} → {booking.ride.arrival_location}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#6B7280' }}>{formatDate(booking.ride.date_time)} at {formatTime(booking.ride.date_time)}</div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '10px' }}>
+                                <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>{getStatusLabel(booking.status, booking.driver_action)}</span>
+                                <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                              </div>
                             </div>
-                          ) : booking.status === 'confirmed' ? (
-                            <p style={{ fontSize: '12px', color: '#9CA3AF', textAlign: 'center', margin: 0 }}>Contact details available 24 hours before departure</p>
-                          ) : null}
-
-                          {/* Cancel Booking */}
-                          {(booking.status === 'confirmed' || booking.status === 'pending_driver') && (
-                            <button onClick={() => setCancellingBooking(booking)} style={{ width: '100%', padding: '12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
-                              Cancel Booking
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
+                            {isExpanded && (
+                              <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
+                                <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '10px' }}>
+                                  <span style={{ fontWeight: '600', cursor: 'pointer', color: '#1A9D9D' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>{getDriverAlias(driver.id)}</span>
+                                  <span style={{ color: '#9CA3AF' }}> ({driver.gender === 'Male' ? 'M' : 'F'})</span>
+                                  {' · '}{booking.seats_booked} seat(s) · £{booking.total_paid?.toFixed(2)}
+                                </div>
+                                {booking.status === 'confirmed' && contactVisible ? (
+                                  <div style={{ padding: '10px', backgroundColor: '#F0FAFA', borderRadius: '8px', border: '1px solid rgba(26,157,157,0.25)', marginBottom: '10px' }}>
+                                    <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
+                                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px 0' }}>{driver.name}</p>
+                                    {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
+                                    {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '12px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
+                                  </div>
+                                ) : booking.status === 'confirmed' ? (
+                                  <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px 0' }}>Contact details available 24 hours before departure</p>
+                                ) : null}
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                  <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>View Ride</button>
+                                  {(booking.status === 'confirmed' || booking.status === 'pending_driver') && (
+                                    <button onClick={() => setCancellingBooking(booking)} style={{ padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* Desktop: table */
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#F8FAFB' }}>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Date & Time</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Driver</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Seats</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Paid</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Status</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {upcomingBookings.map((booking) => {
+                          if (!booking.ride || !(booking.ride as any).driver) return null;
+                          const driver = (booking.ride as any).driver;
+                          const contactVisible = isContactVisible(booking.ride.date_time);
+                          const isExpanded = expandedPastId === booking.id;
+                          return (
+                            <React.Fragment key={booking.id}>
+                              <tr
+                                onClick={() => setExpandedPastId(isExpanded ? null : booking.id)}
+                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#1A9D9D'}` }}
+                                onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
+                                onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+                              >
+                                <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {booking.ride.departure_location} → {booking.ride.arrival_location}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
+                                  {formatDate(booking.ride.date_time)}<br /><span style={{ color: '#9CA3AF', fontSize: '12px' }}>{formatTime(booking.ride.date_time)}</span>
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#1A9D9D', fontWeight: '500', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
+                                  <span style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onNavigate('public-profile', undefined, driver.id); }}>
+                                    {getDriverAlias(driver.id)} <span style={{ color: '#9CA3AF', fontWeight: '400' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', textAlign: 'center', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED' }}>{booking.seats_booked}</td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#4B5563', textAlign: 'right', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED' }}>£{booking.total_paid?.toFixed(2)}</td>
+                                <td style={{ padding: '12px 16px', textAlign: 'center', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED' }}>
+                                  <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
+                                    {getStatusLabel(booking.status, booking.driver_action)}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                  <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
+                                    <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View</button>
+                                    {(booking.status === 'confirmed' || booking.status === 'pending_driver') && (
+                                      <button onClick={() => setCancellingBooking(booking)} style={{ padding: '6px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr>
+                                  <td colSpan={7} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                    {booking.status === 'confirmed' && contactVisible ? (
+                                      <div style={{ display: 'inline-block', padding: '12px 16px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)', marginTop: '8px' }}>
+                                        <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
+                                        <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px 0' }}>{driver.name}</p>
+                                        {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '14px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
+                                        {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '13px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
+                                      </div>
+                                    ) : booking.status === 'confirmed' ? (
+                                      <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '8px 0 0 0' }}>Contact details available 24 hours before departure</p>
+                                    ) : null}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
                 </div>
               )}
             </div>
