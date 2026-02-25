@@ -1005,7 +1005,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                     : <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', textTransform: 'capitalize', ...getStatusStyle(ride.status) }}>{ride.status}</span>
                                   }
                                   {bookingsForRide.length > 0 && (
-                                    <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af' }}>{bookingsForRide.length} booked</span>
+                                    <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af' }}>{bookingsForRide.reduce((sum, b) => sum + b.seats_booked, 0)} booked</span>
                                   )}
                                   <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                                 </div>
@@ -1019,7 +1019,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   {ride.luggage_size && ride.luggage_size !== 'none' && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '6px' }}><span style={{ fontWeight: '600' }}>Luggage:</span> {getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` (up to ${ride.luggage_count})` : ''}</div>}
                                   {bookingsForRide.length > 0 && (
                                     <div style={{ marginTop: '10px', padding: '10px', backgroundColor: 'white', borderRadius: '10px', border: '1px solid #E8EBED' }}>
-                                      <p style={{ fontSize: '12px', fontWeight: '600', color: '#1F2937', marginBottom: '6px' }}>Passengers ({bookingsForRide.length}):</p>
+                                      <p style={{ fontSize: '12px', fontWeight: '600', color: '#1F2937', marginBottom: '6px' }}>Passengers ({bookingsForRide.reduce((sum, b) => sum + b.seats_booked, 0)}):</p>
                                       {bookingsForRide.map(b => (
                                         <div key={b.id} style={{ fontSize: '12px', color: '#4B5563', marginBottom: '5px', paddingBottom: '5px', borderBottom: '1px solid #F3F4F6' }}>
                                           <span style={{ fontWeight: '600' }}>{(b.passenger as any)?.name}</span> — {b.seats_booked} seat(s), £{b.total_paid?.toFixed(2)}
@@ -1106,7 +1106,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   </td>
                                   <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
                                     {bookingsForRide.length > 0 ? (
-                                      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af' }}>{bookingsForRide.length}</span>
+                                      <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', backgroundColor: '#dbeafe', color: '#1e40af' }}>{bookingsForRide.reduce((sum, b) => sum + b.seats_booked, 0)}</span>
                                     ) : (
                                       <span style={{ color: '#D1D5DB' }}>—</span>
                                     )}
