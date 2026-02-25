@@ -77,6 +77,7 @@ export interface Booking {
   driver_action_at: string | null;
   cancellation_refund_amount: number | null;
   cancelled_at: string | null;
+  contact_email_sent?: boolean;
   completed_at: string | null;
   created_at: string;
   updated_at: string;

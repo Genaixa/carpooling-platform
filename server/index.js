@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import squarePkg from 'square';
 const { SquareClient, SquareEnvironment } = squarePkg;
 import { createClient } from '@supabase/supabase-js';
@@ -34,6 +35,14 @@ const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://chaparide.com,https://www.chaparide.com,http://localhost:5173').split(',');
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
+
+const contactLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many messages sent. Please try again in 15 minutes.' },
+});
 
 // Security headers
 app.use((req, res, next) => {
@@ -1131,8 +1140,9 @@ app.get('/api/admin/payouts', async (req, res) => {
 app.get('/api/admin/users', async (req, res) => {
   try {
     const { adminId } = req.query;
-    console.log('Admin users request, adminId:', adminId);
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -1398,11 +1408,18 @@ app.post('/api/test-email', async (req, res) => {
 });
 
 // Public contact form
-app.post('/api/contact', async (req, res) => {
+app.post('/api/contact', contactLimiter, async (req, res) => {
   try {
     const { name, email, subject, message } = req.body;
     if (!name || !email || !subject || !message) {
       return res.status(400).json({ error: 'All fields are required' });
+    }
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({ error: 'Invalid email address' });
+    }
+    if (name.length > 100 || subject.length > 200 || message.length > 5000) {
+      return res.status(400).json({ error: 'Input exceeds maximum length' });
     }
     const { sendContactFormEmail } = await import('./emails.js');
     const result = await sendContactFormEmail({ name, email, subject, message });
