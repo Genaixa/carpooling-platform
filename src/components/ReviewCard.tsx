@@ -1,5 +1,5 @@
 import React from 'react';
-import { Review } from '../lib/supabase';
+import { Review, getDriverAlias } from '../lib/supabase';
 import StarRating from './StarRating';
 import Avatar from './Avatar';
 
@@ -27,8 +27,8 @@ export default function ReviewCard({ review, onViewProfile }: ReviewCardProps) {
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '8px' }}>
         {reviewer && (
           <Avatar
-            photoUrl={reviewer.profile_photo_url}
-            name={reviewer.name}
+            photoUrl={null}
+            name={getDriverAlias(reviewer.id)}
             size="sm"
           />
         )}
@@ -37,7 +37,7 @@ export default function ReviewCard({ review, onViewProfile }: ReviewCardProps) {
             style={{ fontSize: '14px', fontWeight: '600', color: onViewProfile && reviewer ? '#1A9D9D' : '#1F2937', margin: 0, cursor: onViewProfile && reviewer ? 'pointer' : 'default' }}
             onClick={() => onViewProfile && reviewer && onViewProfile(reviewer.id)}
           >
-            {reviewer?.name || 'Anonymous'}
+            {reviewer ? getDriverAlias(reviewer.id) : 'Anonymous'}
           </p>
           <p style={{ fontSize: '12px', color: '#6B7280', margin: 0 }}>{dateStr}</p>
         </div>
