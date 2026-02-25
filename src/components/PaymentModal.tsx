@@ -275,11 +275,11 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
                       style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '2px solid #E5E7EB', borderRadius: '8px', backgroundColor: 'white', boxSizing: 'border-box' }}
                     >
                       <option value="">Select</option>
-                      <option value="12-17">12–17</option>
                       <option value="18-25">18–25</option>
-                      <option value="26-40">26–40</option>
-                      <option value="41-60">41–60</option>
-                      <option value="60+">60+</option>
+                      <option value="26-35">26–35</option>
+                      <option value="36-45">36–45</option>
+                      <option value="46-55">46–55</option>
+                      <option value="56+">56+</option>
                     </select>
                   </div>
                 </div>

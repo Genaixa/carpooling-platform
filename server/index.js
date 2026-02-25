@@ -31,7 +31,7 @@ const squareClient = new SquareClient({
 
 const supabase = createClient(VITE_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://srv1291941.hstgr.cloud,https://chaparide.com,http://localhost:5173').split(',');
+const allowedOrigins = (process.env.ALLOWED_ORIGINS || 'https://chaparide.com,https://www.chaparide.com,http://localhost:5173').split(',');
 app.use(cors({ origin: allowedOrigins, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 
