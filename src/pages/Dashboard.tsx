@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, Booking, RideWish, isContactVisible, getCarComposition, getCarCompositionLabel, checkRideCompatibility, getRideRef } from '../lib/supabase';
+import { supabase, Ride, Booking, RideWish, isContactVisible, getCarLabel, checkRideCompatibility, getRideRef } from '../lib/supabase';
 import { LUGGAGE_OPTIONS, COMMISSION_RATE } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -1147,7 +1147,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                       <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#4B5563', marginBottom: bookingsForRide.length > 0 ? '12px' : '0', padding: '8px 0' }}>
                                         {ride.departure_spot && <span><span style={{ fontWeight: '600' }}>Pickup:</span> {ride.departure_spot}</span>}
                                         {ride.luggage_size && ride.luggage_size !== 'none' && <span><span style={{ fontWeight: '600' }}>Luggage:</span> {getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` (up to ${ride.luggage_count})` : ''}</span>}
-                                        {profile && <span><span style={{ fontWeight: '600' }}>In car:</span> {getCarCompositionLabel(getCarComposition(profile.gender, ride.existing_occupants as { males: number; females: number; couples: number } | null))}</span>}
+                                        {profile && <span><span style={{ fontWeight: '600' }}>In car:</span> {getCarLabel(profile.gender, ride.existing_occupants as { males: number; females: number; couples: number } | null)}</span>}
                                       </div>
                                       {ride.status === 'upcoming' && isPastDeparture && (
                                         <p style={{ fontSize: '12px', color: '#1e40af', marginBottom: '10px', fontWeight: '500', lineHeight: '1.4', padding: '8px 12px', backgroundColor: '#eff6ff', borderRadius: '8px', border: '1px solid #bfdbfe' }}>

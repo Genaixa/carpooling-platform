@@ -189,6 +189,23 @@ export function getCarCompositionLabel(composition: { males: number; females: nu
 }
 
 /**
+ * Returns a plain-English car occupants label, e.g. "Driver (Male), 1 man, 1 woman".
+ * Couples are expanded into individual men/women.
+ */
+export function getCarLabel(
+  driverGender: string | null,
+  existingOccupants: { males: number; females: number; couples: number } | null
+): string {
+  const parts: string[] = [];
+  if (driverGender) parts.push(`Driver (${driverGender})`);
+  const males = (existingOccupants?.males || 0) + (existingOccupants?.couples || 0);
+  const females = (existingOccupants?.females || 0) + (existingOccupants?.couples || 0);
+  if (males > 0) parts.push(`${males} ${males === 1 ? 'man' : 'men'}`);
+  if (females > 0) parts.push(`${females} ${females === 1 ? 'woman' : 'women'}`);
+  return parts.length > 0 ? parts.join(', ') : 'No occupants listed';
+}
+
+/**
  * CRITICAL: Checks if a passenger can book a ride based on total car composition.
  * Each couple counts as 1 man + 1 woman (already expanded in getCarComposition).
  *

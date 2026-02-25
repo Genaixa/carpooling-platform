@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarComposition, getCarCompositionLabel, getDriverAlias } from '../lib/supabase';
+import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarLabel, getDriverAlias } from '../lib/supabase';
 import { NavigateFn } from '../lib/types';
 import { useIsMobile } from '../hooks/useIsMobile';
 import Loading from '../components/Loading';
@@ -1329,7 +1329,7 @@ export default function Home({ onNavigate }: HomeProps) {
                               )}
                               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
                               <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                                {getCarCompositionLabel(getCarComposition(ride.driver.gender, ride.existing_occupants as { males: number; females: number; couples: number } | null))}
+                                {getCarLabel(ride.driver?.gender || null, ride.existing_occupants as { males: number; females: number; couples: number } | null)}
                               </span>
                               {ride.driver.average_rating != null && ride.driver.average_rating > 0 && (
                                 <>
