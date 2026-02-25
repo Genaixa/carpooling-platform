@@ -60,6 +60,19 @@ const upload = multer({
 });
 
 // ============================================================
+// AUTH HELPER — verify Bearer token matches claimed userId
+// ============================================================
+async function verifyUser(req, res, claimedUserId) {
+  const auth = req.headers['authorization'] || '';
+  const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
+  if (!token) { res.status(401).json({ error: 'Missing auth token' }); return false; }
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+  if (error || !user) { res.status(401).json({ error: 'Invalid auth token' }); return false; }
+  if (user.id !== claimedUserId) { res.status(403).json({ error: 'Forbidden' }); return false; }
+  return true;
+}
+
+// ============================================================
 // PROFILE PHOTO UPLOAD
 // ============================================================
 
@@ -69,6 +82,7 @@ app.post('/api/upload-profile-photo', upload.single('photo'), async (req, res) =
     if (!userId || !req.file) {
       return res.status(400).json({ error: 'Missing userId or photo file' });
     }
+    if (!await verifyUser(req, res, userId)) return;
 
     // Ensure bucket exists (service role can create it)
     const { data: buckets } = await supabase.storage.listBuckets();
@@ -124,6 +138,7 @@ app.delete('/api/delete-profile-photo', async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    if (!await verifyUser(req, res, userId)) return;
 
     // Delete files from storage
     const { data: existingFiles } = await supabase.storage.from('profile-photos').list('', { search: userId });
@@ -152,6 +167,7 @@ app.post('/api/upload-licence-photo', upload.single('photo'), async (req, res) =
     if (!userId || !req.file) {
       return res.status(400).json({ error: 'Missing userId or photo file' });
     }
+    if (!await verifyUser(req, res, userId)) return;
 
     // Verify user is an approved driver
     const { data: profile } = await supabase.from('profiles').select('is_approved_driver').eq('id', userId).single();
@@ -214,6 +230,7 @@ app.delete('/api/delete-licence-photo', async (req, res) => {
   try {
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    if (!await verifyUser(req, res, userId)) return;
 
     // Delete files from storage
     const { data: existingFiles } = await supabase.storage.from('licence-photos').list('', { search: userId });
@@ -246,6 +263,7 @@ app.post('/api/upload-application-licence-photo', upload.single('photo'), async 
     if (!userId || !req.file) {
       return res.status(400).json({ error: 'Missing userId or photo file' });
     }
+    if (!await verifyUser(req, res, userId)) return;
 
     // Ensure bucket exists (private bucket for licence photos)
     const { data: buckets } = await supabase.storage.listBuckets();

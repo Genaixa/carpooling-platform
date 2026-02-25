@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 
 import Avatar from '../components/Avatar';
 import toast from 'react-hot-toast';
@@ -96,9 +97,11 @@ export default function Profile({ onNavigate }: ProfileProps) {
       formData.append('photo', selectedFile);
       formData.append('userId', user.id);
 
+      const { data: { session } } = await supabase.auth.getSession();
       const API_URL = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${API_URL}/api/upload-profile-photo`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
         body: formData,
       });
 

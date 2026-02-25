@@ -140,8 +140,10 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
       const formData = new FormData();
       formData.append('photo', licencePhotoFile);
       formData.append('userId', user.id);
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/upload-application-licence-photo`, {
         method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
         body: formData,
       });
       const data = await res.json();
@@ -159,9 +161,10 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
   const handleLicenceDelete = async () => {
     if (!user) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       await fetch(`${API_URL}/api/delete-licence-photo`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ userId: user.id }),
       });
       setLicencePhotoUrl(null);
