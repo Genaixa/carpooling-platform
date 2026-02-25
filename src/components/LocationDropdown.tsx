@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ROUTE_LOCATIONS } from '../lib/constants';
+import { ROUTE_LOCATIONS, ROUTE_LOCATIONS_CITIES, ROUTE_LOCATIONS_AIRPORTS } from '../lib/constants';
 
 interface LocationDropdownProps {
   value: string;
@@ -52,10 +52,19 @@ export default function LocationDropdown({ value, onChange, label, required, err
         }}
       >
         <option value="">{placeholder || 'Select location'}</option>
-        {ROUTE_LOCATIONS.filter(loc => !exclude || loc !== exclude).map((loc) => (
-          <option key={loc} value={loc}>{loc}</option>
-        ))}
-        <option value="__other__">Other (type your own)</option>
+        <optgroup label="Cities">
+          {ROUTE_LOCATIONS_CITIES.filter(loc => !exclude || loc !== exclude).map(loc => (
+            <option key={loc} value={loc}>{loc}</option>
+          ))}
+        </optgroup>
+        <optgroup label="Airports">
+          {ROUTE_LOCATIONS_AIRPORTS.filter(loc => !exclude || loc !== exclude).map(loc => (
+            <option key={loc} value={loc}>{loc}</option>
+          ))}
+        </optgroup>
+        <optgroup label="Other">
+          <option value="__other__">Other (type your own)</option>
+        </optgroup>
       </select>
       {showOther && (
         <input

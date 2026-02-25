@@ -1,16 +1,25 @@
-export const ROUTE_LOCATIONS = [
-  'London - Stamford Hill',
-  'London - Golders Green/Hendon',
-  'Edgware',
-  'Manchester',
-  'Gateshead',
+export const ROUTE_LOCATIONS_CITIES = [
   'Canvey Island',
-  'Heathrow Airport',
+  'Edgware',
+  'Gateshead',
+  'London - Golders Green/Hendon',
+  'London - Stamford Hill',
+  'Manchester',
+] as const;
+
+export const ROUTE_LOCATIONS_AIRPORTS = [
   'Gatwick Airport',
-  'Stansted Airport',
+  'Heathrow Airport',
   'Luton Airport',
   'Manchester Airport',
   'Newcastle Airport',
+  'Stansted Airport',
+] as const;
+
+// Flat array for compatibility checks (e.g. isOther detection)
+export const ROUTE_LOCATIONS = [
+  ...ROUTE_LOCATIONS_CITIES,
+  ...ROUTE_LOCATIONS_AIRPORTS,
 ] as const;
 
 export const COMMISSION_RATE = 0.25; // 25% platform commission
