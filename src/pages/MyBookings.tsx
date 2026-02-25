@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Booking, isContactVisible, getDriverAlias } from '../lib/supabase';
+import { supabase, Booking, isContactVisible, getDriverAlias, getRideRef } from '../lib/supabase';
 import { REFUND_POLICY } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -641,6 +641,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                             </div>
                             {isExpanded && (
                               <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
+                                <div style={{ fontSize: '11px', color: '#9CA3AF', fontFamily: 'monospace', fontWeight: '600', marginBottom: '6px' }}>
+                                  Ref: {getRideRef(booking.ride_id)}
+                                </div>
                                 <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '10px' }}>
                                   <span style={{ fontWeight: '600', cursor: 'pointer', color: '#1A9D9D' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>{getDriverAlias(driver.id)}</span>
                                   <span style={{ color: '#9CA3AF' }}> ({driver.gender === 'Male' ? 'M' : 'F'})</span>
@@ -673,6 +676,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#F8FAFB' }}>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Ref</th>
                           <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
                           <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Date & Time</th>
                           <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Driver</th>
@@ -696,6 +700,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
                                 onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
                               >
+                                <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '600', color: '#6B7280', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                  {getRideRef(booking.ride_id)}
+                                </td>
                                 <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', maxWidth: '240px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {booking.ride.departure_location} → {booking.ride.arrival_location}
                                 </td>
@@ -725,7 +732,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                               </tr>
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan={7} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                  <td colSpan={8} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
                                     {booking.status === 'confirmed' && contactVisible ? (
                                       <div style={{ display: 'inline-block', padding: '12px 16px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)', marginTop: '8px' }}>
                                         <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
@@ -784,6 +791,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                             </div>
                             {isExpanded && (
                               <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
+                                <div style={{ fontSize: '11px', color: '#9CA3AF', fontFamily: 'monospace', fontWeight: '600', marginBottom: '6px' }}>
+                                  Ref: {getRideRef(booking.ride_id)}
+                                </div>
                                 <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '4px' }}>
                                   {booking.seats_booked} seat(s) — £{booking.total_paid?.toFixed(2)}
                                 </div>
@@ -802,6 +812,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                     <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                       <thead>
                         <tr style={{ backgroundColor: '#F8FAFB' }}>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Ref</th>
                           <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
                           <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Date</th>
                           <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Seats</th>
@@ -820,6 +831,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                               onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FAFBFC'}
                               onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
                             >
+                              <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                {getRideRef(booking.ride_id)}
+                              </td>
                               <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                 {booking.ride.departure_location} → {booking.ride.arrival_location}
                               </td>
