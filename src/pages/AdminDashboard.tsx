@@ -725,8 +725,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                               </span>
                             </td>
                             <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
-                              {app.status === 'pending' ? (
-                                <div style={{ display: 'flex', gap: '6px' }}>
+                              {app.status !== 'approved' ? (
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                                   <button
                                     onClick={() => handleAction(app.id, 'approve')}
                                     disabled={actionLoading === app.id}
@@ -734,13 +734,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                   >
                                     {actionLoading === app.id ? '...' : 'Approve'}
                                   </button>
-                                  <button
-                                    onClick={() => handleAction(app.id, 'reject')}
-                                    disabled={actionLoading === app.id}
-                                    style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '6px', cursor: 'pointer' }}
-                                  >
-                                    {actionLoading === app.id ? '...' : 'Reject'}
-                                  </button>
+                                  {app.status === 'pending' && (
+                                    <button
+                                      onClick={() => handleAction(app.id, 'reject')}
+                                      disabled={actionLoading === app.id}
+                                      style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '6px', cursor: 'pointer' }}
+                                    >
+                                      {actionLoading === app.id ? '...' : 'Reject'}
+                                    </button>
+                                  )}
                                 </div>
                               ) : (
                                 <span style={{ fontSize: '12px', color: '#9CA3AF' }}>{isExpanded ? '▲ collapse' : '▼ details'}</span>
