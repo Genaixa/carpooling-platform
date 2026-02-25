@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Booking, isContactVisible, getDriverAlias, getRideRef } from '../lib/supabase';
-import { REFUND_POLICY } from '../lib/constants';
+import { REFUND_POLICY, LUGGAGE_OPTIONS } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import ReviewForm from '../components/ReviewForm';
@@ -10,6 +10,11 @@ import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+
+const getLuggageLabel = (size: string | null) => {
+  const opt = LUGGAGE_OPTIONS.find(o => o.value === size);
+  return opt ? opt.label : '';
+};
 
 interface MyBookingsProps {
   onNavigate: NavigateFn;
@@ -525,6 +530,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                 <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '700px' }}>
                   <thead>
                     <tr style={{ backgroundColor: '#F8FAFB', borderBottom: '2px solid #E8EBED' }}>
+                      <th style={{ padding: '14px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#4B5563', whiteSpace: 'nowrap' }}>Ref</th>
                       {([
                         { field: 'date' as const, label: 'Date' },
                         { field: 'route' as const, label: 'Route' },
@@ -557,6 +563,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                       const driver = (booking.ride as any)?.driver;
                       return (
                         <tr key={booking.id} style={{ borderBottom: '1px solid #F3F4F6' }}>
+                          <td style={{ padding: '14px 16px', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                            {getRideRef(booking.ride_id)}
+                          </td>
                           <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937', whiteSpace: 'nowrap' }}>
                             {formatDate(booking.ride!.date_time)}
                           </td>
@@ -592,7 +601,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                   </tbody>
                   <tfoot>
                     <tr style={{ borderTop: '2px solid #E8EBED', backgroundColor: '#F8FAFB' }}>
-                      <td colSpan={4} style={{ padding: '14px 16px', fontSize: '14px', fontWeight: 'bold', color: '#1F2937', textAlign: 'right' }}>
+                      <td colSpan={5} style={{ padding: '14px 16px', fontSize: '14px', fontWeight: 'bold', color: '#1F2937', textAlign: 'right' }}>
                         Grand Total ({financialBookings.length} booking{financialBookings.length !== 1 ? 's' : ''})
                       </td>
                       <td style={{ padding: '14px 16px', fontSize: '16px', fontWeight: 'bold', color: '#1A9D9D', textAlign: 'right' }}>
@@ -649,6 +658,25 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   <span style={{ color: '#9CA3AF' }}> ({driver.gender === 'Male' ? 'M' : 'F'})</span>
                                   {' · '}{booking.seats_booked} seat(s) · £{booking.total_paid?.toFixed(2)}
                                 </div>
+                                {booking.ride.departure_spot && (
+                                  <div style={{ fontSize: '12px', color: '#4B5563', marginBottom: '6px' }}>
+                                    <span style={{ fontWeight: '600' }}>Pickup point:</span> {booking.ride.departure_spot}
+                                  </div>
+                                )}
+                                {booking.ride.luggage_size && booking.ride.luggage_size !== 'none' && (
+                                  <div style={{ fontSize: '12px', color: '#4B5563', marginBottom: '6px' }}>
+                                    <span style={{ fontWeight: '600' }}>Luggage allowed:</span> {getLuggageLabel(booking.ride.luggage_size)}{booking.ride.luggage_count ? ` (up to ${booking.ride.luggage_count})` : ''}
+                                  </div>
+                                )}
+                                {(booking as any).third_party_passenger && (
+                                  <div style={{ padding: '8px 10px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', marginBottom: '8px' }}>
+                                    <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: '700', color: '#1e40af' }}>Travelling: {(booking as any).third_party_passenger.name}</p>
+                                    <p style={{ margin: 0, fontSize: '11px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
+                                    {(booking as any).third_party_passenger.special_needs && (
+                                      <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
+                                    )}
+                                  </div>
+                                )}
                                 {booking.status === 'confirmed' && contactVisible ? (
                                   <div style={{ padding: '10px', backgroundColor: '#F0FAFA', borderRadius: '8px', border: '1px solid rgba(26,157,157,0.25)', marginBottom: '10px' }}>
                                     <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
@@ -732,16 +760,33 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                               </tr>
                               {isExpanded && (
                                 <tr>
-                                  <td colSpan={8} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                  <td colSpan={8} style={{ padding: '8px 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                    <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '13px', color: '#4B5563', marginBottom: '10px' }}>
+                                      {booking.ride.departure_spot && (
+                                        <span><span style={{ fontWeight: '600' }}>Pickup point:</span> {booking.ride.departure_spot}</span>
+                                      )}
+                                      {booking.ride.luggage_size && booking.ride.luggage_size !== 'none' && (
+                                        <span><span style={{ fontWeight: '600' }}>Luggage allowed:</span> {getLuggageLabel(booking.ride.luggage_size)}{booking.ride.luggage_count ? ` (up to ${booking.ride.luggage_count})` : ''}</span>
+                                      )}
+                                    </div>
+                                    {(booking as any).third_party_passenger && (
+                                      <div style={{ display: 'inline-block', padding: '8px 12px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px', marginBottom: '10px' }}>
+                                        <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1e40af' }}>Travelling: {(booking as any).third_party_passenger.name}</p>
+                                        <p style={{ margin: 0, fontSize: '12px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
+                                        {(booking as any).third_party_passenger.special_needs && (
+                                          <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
+                                        )}
+                                      </div>
+                                    )}
                                     {booking.status === 'confirmed' && contactVisible ? (
-                                      <div style={{ display: 'inline-block', padding: '12px 16px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)', marginTop: '8px' }}>
+                                      <div style={{ display: 'inline-block', padding: '12px 16px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)' }}>
                                         <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
                                         <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px 0' }}>{driver.name}</p>
                                         {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '14px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
                                         {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '13px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
                                       </div>
                                     ) : booking.status === 'confirmed' ? (
-                                      <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '8px 0 0 0' }}>Contact details available 24 hours before departure</p>
+                                      <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0' }}>Contact details available 24 hours before departure</p>
                                     ) : null}
                                   </td>
                                 </tr>
@@ -798,6 +843,12 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   {booking.seats_booked} seat(s) — £{booking.total_paid?.toFixed(2)}
                                 </div>
                                 {driver && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '8px' }}>{getDriverAlias(driver.id)}</div>}
+                                {(booking as any).third_party_passenger && (
+                                  <div style={{ padding: '6px 10px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', marginBottom: '8px' }}>
+                                    <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: '700', color: '#1e40af' }}>Travelled: {(booking as any).third_party_passenger.name}</p>
+                                    <p style={{ margin: 0, fontSize: '11px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
+                                  </div>
+                                )}
                                 {['confirmed', 'completed'].includes(booking.status) && !reviewedBookingIds.has(booking.id) && (
                                   <button onClick={() => setReviewingBooking(booking)} style={{ padding: '6px 14px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Leave Review</button>
                                 )}
@@ -826,40 +877,59 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                         {pastBookings.map((booking) => {
                           if (!booking.ride) return null;
                           const driver = (booking.ride as any)?.driver;
+                          const isExpanded = expandedPastId === booking.id;
+                          const hasExtra = !!(booking as any).third_party_passenger;
                           return (
-                            <tr key={booking.id} style={{ backgroundColor: 'white' }}
-                              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#FAFBFC'}
-                              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'white'}
-                            >
-                              <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '600', color: '#6B7280', borderBottom: '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
-                                {getRideRef(booking.ride_id)}
-                              </td>
-                              <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                {booking.ride.departure_location} → {booking.ride.arrival_location}
-                              </td>
-                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
-                                {formatDate(booking.ride.date_time)}
-                              </td>
-                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED', textAlign: 'center' }}>
-                                {booking.seats_booked}
-                              </td>
-                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED', textAlign: 'right', fontWeight: '600' }}>
-                                £{booking.total_paid?.toFixed(2)}
-                              </td>
-                              <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: '1px solid #E8EBED' }}>
-                                {driver ? getDriverAlias(driver.id) : '—'}
-                              </td>
-                              <td style={{ padding: '12px 16px', borderBottom: '1px solid #E8EBED', textAlign: 'center' }}>
-                                <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                                  {getStatusLabel(booking.status, booking.driver_action)}
-                                </span>
-                              </td>
-                              <td style={{ padding: '12px 16px', borderBottom: '1px solid #E8EBED', textAlign: 'right' }}>
-                                {['confirmed', 'completed'].includes(booking.status) && !reviewedBookingIds.has(booking.id) && (
-                                  <button onClick={() => setReviewingBooking(booking)} style={{ padding: '5px 12px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
-                                )}
-                              </td>
-                            </tr>
+                            <React.Fragment key={booking.id}>
+                              <tr
+                                onClick={() => hasExtra ? setExpandedPastId(isExpanded ? null : booking.id) : undefined}
+                                style={{ backgroundColor: isExpanded ? '#F8FAFB' : 'white', cursor: hasExtra ? 'pointer' : 'default' }}
+                                onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
+                                onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+                              >
+                                <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '600', color: '#6B7280', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
+                                  {getRideRef(booking.ride_id)}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {booking.ride.departure_location} → {booking.ride.arrival_location}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
+                                  {formatDate(booking.ride.date_time)}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  {booking.seats_booked}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right', fontWeight: '600' }}>
+                                  £{booking.total_paid?.toFixed(2)}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED' }}>
+                                  {driver ? getDriverAlias(driver.id) : '—'}
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
+                                    {getStatusLabel(booking.status, booking.driver_action)}
+                                  </span>
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                                  {['confirmed', 'completed'].includes(booking.status) && !reviewedBookingIds.has(booking.id) && (
+                                    <button onClick={() => setReviewingBooking(booking)} style={{ padding: '5px 12px', fontSize: '12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
+                                  )}
+                                </td>
+                              </tr>
+                              {isExpanded && (booking as any).third_party_passenger && (
+                                <tr>
+                                  <td colSpan={8} style={{ padding: '0 16px 12px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                    <div style={{ display: 'inline-block', padding: '8px 12px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
+                                      <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1e40af' }}>Travelled: {(booking as any).third_party_passenger.name}</p>
+                                      <p style={{ margin: 0, fontSize: '12px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
+                                      {(booking as any).third_party_passenger.special_needs && (
+                                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
+                                      )}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
                           );
                         })}
                       </tbody>
