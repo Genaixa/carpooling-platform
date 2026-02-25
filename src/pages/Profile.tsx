@@ -96,7 +96,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
       formData.append('photo', selectedFile);
       formData.append('userId', user.id);
 
-      const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
+      const API_URL = import.meta.env.VITE_API_URL || '';
       const response = await fetch(`${API_URL}/api/upload-profile-photo`, {
         method: 'POST',
         body: formData,

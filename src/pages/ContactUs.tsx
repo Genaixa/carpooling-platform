@@ -3,7 +3,7 @@ import toast from 'react-hot-toast';
 import { NavigateFn } from '../lib/types';
 import { useIsMobile } from '../hooks/useIsMobile';
 
-const API_URL = import.meta.env.VITE_API_URL || 'https://srv1291941.hstgr.cloud';
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface ContactUsProps {
   onNavigate: NavigateFn;

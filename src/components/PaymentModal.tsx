@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useIsMobile } from '../hooks/useIsMobile';
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 declare global {
   interface Window {

@@ -7,7 +7,7 @@ import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 import toast from 'react-hot-toast';
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface AdminDashboardProps {
   onNavigate: NavigateFn;

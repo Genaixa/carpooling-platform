@@ -7,7 +7,7 @@ import LocationDropdown from '../components/LocationDropdown';
 import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
 
-const API_URL = import.meta.env.VITE_API_URL || (window.location.protocol === 'https:' ? '' : 'http://srv1291941.hstgr.cloud:3001');
+const API_URL = import.meta.env.VITE_API_URL || '';
 
 interface RideWishesProps {
   onNavigate: NavigateFn;

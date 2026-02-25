@@ -264,3 +264,13 @@ export function getDriverAlias(driverId: string): string {
   const num = Math.abs(hash) % 10000;
   return `Driver #${num.toString().padStart(4, '0')}`;
 }
+
+// Generate a consistent anonymous passenger number from a UUID
+export function getPassengerAlias(passengerId: string): string {
+  let hash = 0;
+  for (let i = 0; i < passengerId.length; i++) {
+    hash = ((hash << 5) - hash + passengerId.charCodeAt(i)) | 0;
+  }
+  const num = Math.abs(hash) % 10000;
+  return `Passenger #${num.toString().padStart(4, '0')}`;
+}

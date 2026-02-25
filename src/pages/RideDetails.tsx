@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, Profile, Booking, isContactVisible, checkRideCompatibility, getIncompatibilityReason, getDriverAlias } from '../lib/supabase';
+import { supabase, Ride, Profile, Booking, isContactVisible, checkRideCompatibility, getIncompatibilityReason, getDriverAlias, getPassengerAlias } from '../lib/supabase';
 import { LUGGAGE_OPTIONS } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -206,7 +206,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                   <div key={booking.id} style={{ padding: '15px', marginBottom: '12px', border: '1px solid #E8EBED', borderRadius: '12px', backgroundColor: '#F8FAFB' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div>
-                        <p style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>{passenger?.name}</p>
+                        <p style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>{passenger ? getPassengerAlias(passenger.id) : 'Passenger'}</p>
                         <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>{booking.seats_booked} seat(s) - £{booking.total_paid?.toFixed(2)}</p>
                       </div>
                       <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', backgroundColor: booking.status === 'confirmed' ? '#dcfce7' : '#fef3c7', color: booking.status === 'confirmed' ? '#166534' : '#92400e' }}>
@@ -319,7 +319,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
             <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
               <div style={{ padding: '20px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', textAlign: 'center' }}>
                 <p style={{ margin: '0 0 12px', color: '#1e40af', fontSize: '16px', fontWeight: '600' }}>Log in to book this ride</p>
-                <button onClick={() => onNavigate('login')} style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Log In</button>
+                <button onClick={() => onNavigate('login')} style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Login</button>
               </div>
             </div>
           )}
