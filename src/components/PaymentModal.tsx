@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { supabase } from '../lib/supabase';
 import { useIsMobile } from '../hooks/useIsMobile';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
@@ -151,9 +152,13 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
         special_needs: tpSpecialNeeds || null,
       } : null;
 
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`${API_URL}/api/create-payment`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.access_token}`,
+        },
         body: JSON.stringify({
           sourceId,
           verificationToken,

@@ -138,9 +138,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const handleApproveLicence = async (userId: string) => {
     setActionLoading(userId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/admin/approve-licence`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ adminId: user!.id, userId }),
       });
       const data = await res.json();
@@ -157,9 +158,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const handleRejectLicence = async (userId: string) => {
     setActionLoading(userId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/admin/reject-licence`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ adminId: user!.id, userId }),
       });
       const data = await res.json();
@@ -300,9 +302,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     const emailType = resendTypes[bookingId] || 'booking-accepted';
     setResendLoading(bookingId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/admin/resend-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ adminId: user!.id, bookingId, emailType }),
       });
       const data = await res.json();
@@ -318,9 +321,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const handleResendRideEmail = async (rideId: string) => {
     setResendLoading(`ride-${rideId}`);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/admin/resend-email`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ adminId: user!.id, rideId, emailType: 'ride-posted' }),
       });
       const data = await res.json();
@@ -336,9 +340,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const handleToggleAdmin = async (userId: string, makeAdmin: boolean) => {
     setTogglingAdmin(userId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/admin/toggle-admin`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ adminId: user!.id, userId, makeAdmin }),
       });
       const data = await res.json();
@@ -378,15 +383,17 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     if (!user) return;
     try {
       setLoading(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      const authHeader = { 'Authorization': `Bearer ${session?.access_token}` };
 
       // Fetch rides overview
-      const ridesRes = await fetch(`${API_URL}/api/admin/rides-overview?adminId=${user.id}`);
+      const ridesRes = await fetch(`${API_URL}/api/admin/rides-overview?adminId=${user.id}`, { headers: authHeader });
       const ridesData = await ridesRes.json();
       if (ridesData.error) throw new Error(ridesData.error);
       setRidesOverview(ridesData.rides || []);
 
       // Fetch payouts
-      const payoutsRes = await fetch(`${API_URL}/api/admin/payouts?adminId=${user.id}`);
+      const payoutsRes = await fetch(`${API_URL}/api/admin/payouts?adminId=${user.id}`, { headers: authHeader });
       const payoutsData = await payoutsRes.json();
       if (payoutsData.error) throw new Error(payoutsData.error);
       setPayouts(payoutsData.payouts || []);
@@ -472,10 +479,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     setActionLoading(applicationId);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const endpoint = action === 'approve' ? `${API_URL}/api/admin/approve-driver` : `${API_URL}/api/admin/reject-driver`;
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           applicationId,
           adminId: user.id,
@@ -500,9 +508,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     setActionLoading(userId);
 
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`${API_URL}/api/admin/revoke-driver`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           userId,
           adminId: user.id,
@@ -533,9 +542,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
     setActionLoading('payout');
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`${API_URL}/api/admin/record-payout`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           driverId: payoutModal.driverId,
           amount,
@@ -1018,9 +1028,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                           if (!user) return;
                                           setActionLoading(`reminder-${ride.id}`);
                                           try {
+                                            const { data: { session } } = await supabase.auth.getSession();
                                             const res = await fetch(`${API_URL}/api/admin/resend-email`, {
                                               method: 'POST',
-                                              headers: { 'Content-Type': 'application/json' },
+                                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
                                               body: JSON.stringify({ adminId: user.id, rideId: ride.id, emailType: 'driver-post-ride-reminder' }),
                                             });
                                             const data = await res.json();

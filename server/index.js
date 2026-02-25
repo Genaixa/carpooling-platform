@@ -329,6 +329,20 @@ app.post('/api/create-payment', async (req, res) => {
       return res.status(400).json({ error: 'Missing required fields' });
     }
 
+    if (!await verifyUser(req, res, userId)) return;
+
+    // Validate seats and amount server-side against the actual ride price
+    const seatsCount = parseInt(seatsToBook, 10) || 1;
+    const { data: rideCheck } = await supabase.from('rides').select('price_per_seat, seats_available').eq('id', rideId).single();
+    if (!rideCheck) return res.status(404).json({ error: 'Ride not found' });
+    if (seatsCount < 1 || seatsCount > rideCheck.seats_available) {
+      return res.status(400).json({ error: 'Invalid seat count' });
+    }
+    const expectedAmount = rideCheck.price_per_seat * seatsCount;
+    if (Math.abs(amount - expectedAmount) > 0.01) {
+      return res.status(400).json({ error: 'Invalid payment amount' });
+    }
+
     const totalAmountCents = BigInt(Math.round(amount * 100));
 
     const result = await squareClient.payments.create({
@@ -501,6 +515,7 @@ app.post('/api/driver/accept-booking', async (req, res) => {
   try {
     const { bookingId, driverId } = req.body;
     if (!bookingId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, driverId)) return;
 
     // Get booking
     const { data: booking, error: bookingError } = await supabase
@@ -556,6 +571,7 @@ app.post('/api/driver/reject-booking', async (req, res) => {
   try {
     const { bookingId, driverId } = req.body;
     if (!bookingId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, driverId)) return;
 
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
@@ -610,6 +626,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
   try {
     const { bookingId, passengerId } = req.body;
     if (!bookingId || !passengerId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, passengerId)) return;
 
     const { data: booking, error: bookingError } = await supabase
       .from('bookings')
@@ -694,6 +711,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
   try {
     const { rideId, driverId } = req.body;
     if (!rideId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, driverId)) return;
 
     // Verify driver owns ride
     const { data: ride, error: rideError } = await supabase
@@ -773,6 +791,7 @@ app.post('/api/driver/complete-ride', async (req, res) => {
   try {
     const { rideId, driverId } = req.body;
     if (!rideId || !driverId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, driverId)) return;
 
     // Verify the driver owns this ride
     const { data: ride, error: rideError } = await supabase
@@ -906,6 +925,7 @@ app.post('/api/admin/approve-driver', async (req, res) => {
   try {
     const { applicationId, adminId, adminNotes } = req.body;
     if (!applicationId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     // Verify admin
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
@@ -952,6 +972,7 @@ app.post('/api/admin/reject-driver', async (req, res) => {
   try {
     const { applicationId, adminId, adminNotes } = req.body;
     if (!applicationId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -981,6 +1002,7 @@ app.post('/api/admin/revoke-driver', async (req, res) => {
   try {
     const { userId, adminId, reason } = req.body;
     if (!userId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -1026,6 +1048,7 @@ app.get('/api/admin/rides-overview', async (req, res) => {
   try {
     const { adminId } = req.query;
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -1088,6 +1111,7 @@ app.post('/api/admin/record-payout', async (req, res) => {
   try {
     const { driverId, amount, adminId, notes } = req.body;
     if (!driverId || !amount || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -1118,6 +1142,7 @@ app.get('/api/admin/payouts', async (req, res) => {
   try {
     const { adminId } = req.query;
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -1165,6 +1190,7 @@ app.post('/api/admin/approve-licence', async (req, res) => {
   try {
     const { adminId, userId } = req.body;
     if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     // Verify admin
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
@@ -1188,6 +1214,7 @@ app.post('/api/admin/reject-licence', async (req, res) => {
   try {
     const { adminId, userId } = req.body;
     if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     // Verify admin
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
@@ -1211,6 +1238,7 @@ app.post('/api/admin/toggle-admin', async (req, res) => {
   try {
     const { adminId, userId, makeAdmin } = req.body;
     if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
@@ -1243,6 +1271,7 @@ app.post('/api/reviews/submit', async (req, res) => {
     if (!reviewerId || !revieweeId || !rideId || !bookingId || !rating || !type) {
       return res.status(400).json({ error: 'Missing required fields' });
     }
+    if (!await verifyUser(req, res, reviewerId)) return;
 
     if (rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
 
@@ -1316,13 +1345,14 @@ async function recalculateSeats(rideId) {
   await supabase.from('rides').update({ seats_available: available }).eq('id', rideId);
 }
 
-// Admin: resend a specific email for a booking
+/// Admin: resend a specific email for a booking
 app.post('/api/admin/resend-email', async (req, res) => {
   try {
     const { adminId, bookingId, rideId, emailType } = req.body;
     if (!adminId || !emailType || (!bookingId && !rideId)) {
       return res.status(400).json({ error: 'adminId, emailType, and either bookingId or rideId are required' });
     }
+    if (!await verifyUser(req, res, adminId)) return;
 
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });

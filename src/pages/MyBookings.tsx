@@ -123,9 +123,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     if (!user || !cancellingBooking) return;
     setCancelling(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/passenger/cancel-booking`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ bookingId: cancellingBooking.id, passengerId: user.id }),
       });
       const data = await res.json();
@@ -143,9 +144,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const handleReviewSubmit = async (rating: number, comment: string) => {
     if (!user || !reviewingBooking || !reviewingBooking.ride) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/reviews/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           reviewerId: user.id,
           revieweeId: (reviewingBooking.ride as any).driver_id,

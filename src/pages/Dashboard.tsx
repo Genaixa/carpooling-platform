@@ -197,9 +197,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setAcceptingBookingId(bookingId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/driver/accept-booking`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ bookingId, driverId: user.id }),
       });
       const data = await res.json();
@@ -217,9 +218,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setRejectingBookingId(bookingId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/driver/reject-booking`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ bookingId, driverId: user.id }),
       });
       const data = await res.json();
@@ -237,9 +239,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setCancellingRide(true);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/driver/cancel-ride`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ rideId, driverId: user.id }),
       });
       const data = await res.json();
@@ -258,9 +261,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!user) return;
     setCompletingRideId(rideId);
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/driver/complete-ride`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ rideId, driverId: user.id }),
       });
       const data = await res.json();
@@ -277,9 +281,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const handleReviewSubmit = async (rating: number, comment: string) => {
     if (!user || !reviewingBooking) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/reviews/submit`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({
           reviewerId: user.id,
           revieweeId: reviewingBooking.passenger_id,

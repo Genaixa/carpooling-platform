@@ -12,6 +12,16 @@ const SITE_URL = process.env.SITE_URL || 'https://chaparide.com';
 const API_URL = process.env.API_URL || 'https://chaparide.com';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'info@chaparide.com';
 
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;');
+}
+
 function formatDate(dateString) {
   try {
     return new Date(dateString).toLocaleDateString('en-GB', {
@@ -219,7 +229,7 @@ export async function sendDriverApprovedEmail(application) {
     `<h2>Welcome to ChapaRide Drivers! ✅</h2>
     <p>Hi ${application.first_name},</p>
     <p>Congratulations! Your driver application has been approved. You can now post rides on the ChapaRide platform.</p>
-    ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Note from admin:</strong> ${application.admin_notes}</p></div>` : ''}
+    ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Note from admin:</strong> ${escapeHtml(application.admin_notes)}</p></div>` : ''}
     <p>Log in to your dashboard and start posting rides today!</p>
     <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
       Your Ref: <strong>${getUserRef(user.id)}</strong><br>
@@ -236,7 +246,7 @@ export async function sendDriverRejectedEmail(application) {
     `<h2>Driver Application Update</h2>
     <p>Hi ${application.first_name},</p>
     <p>Thank you for your interest in becoming a ChapaRide driver. Unfortunately, we are unable to approve your application at this time.</p>
-    ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Reason:</strong> ${application.admin_notes}</p></div>` : ''}
+    ${application.admin_notes ? `<div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;"><p><strong>Reason:</strong> ${escapeHtml(application.admin_notes)}</p></div>` : ''}
     <p>If you have questions, please contact us at support@chaparide.com.</p>
     <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
       Your Ref: <strong>${getUserRef(user.id)}</strong><br>
@@ -577,14 +587,14 @@ export async function sendContactFormEmail({ name, email, subject, message }) {
   return sendEmail(ADMIN_EMAIL, `Contact Form: ${subject} — from ${name}`,
     `<h2>New Contact Form Submission</h2>
     <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:20px 0;">
-      <p><strong>Name:</strong> ${name}</p>
-      <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
-      <p><strong>Subject:</strong> ${subject}</p>
+      <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+      <p><strong>Email:</strong> <a href="mailto:${escapeHtml(email)}">${escapeHtml(email)}</a></p>
+      <p><strong>Subject:</strong> ${escapeHtml(subject)}</p>
     </div>
     <div style="background:#fff;border:1px solid #e5e7eb;padding:15px;border-radius:8px;margin:20px 0;">
-      <p style="margin:0;white-space:pre-wrap;">${message}</p>
+      <p style="margin:0;white-space:pre-wrap;">${escapeHtml(message)}</p>
     </div>
-    <p style="color:#6B7280;font-size:13px;">Reply directly to this email to respond to ${name}.</p>`
+    <p style="color:#6B7280;font-size:13px;">Reply directly to this email to respond to ${escapeHtml(name)}.</p>`
   );
 }
 
