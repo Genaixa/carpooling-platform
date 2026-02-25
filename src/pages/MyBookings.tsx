@@ -842,7 +842,14 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '4px' }}>
                                   {booking.seats_booked} seat(s) — £{booking.total_paid?.toFixed(2)}
                                 </div>
-                                {driver && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '8px' }}>{getDriverAlias(driver.id)}</div>}
+                                {driver && (
+                                  <div style={{ padding: '10px', backgroundColor: '#F0FAFA', borderRadius: '8px', border: '1px solid rgba(26,157,157,0.25)', marginBottom: '8px' }}>
+                                    <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</p>
+                                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#1F2937', margin: '0 0 3px 0' }}>{driver.name}</p>
+                                    {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '2px' }}>📞 {driver.phone}</a>}
+                                    {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '12px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
+                                  </div>
+                                )}
                                 {(booking as any).third_party_passenger && (
                                   <div style={{ padding: '6px 10px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px', marginBottom: '8px' }}>
                                     <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: '700', color: '#1e40af' }}>Travelled: {(booking as any).third_party_passenger.name}</p>
@@ -878,12 +885,11 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                           if (!booking.ride) return null;
                           const driver = (booking.ride as any)?.driver;
                           const isExpanded = expandedPastId === booking.id;
-                          const hasExtra = !!(booking as any).third_party_passenger;
                           return (
                             <React.Fragment key={booking.id}>
                               <tr
-                                onClick={() => hasExtra ? setExpandedPastId(isExpanded ? null : booking.id) : undefined}
-                                style={{ backgroundColor: isExpanded ? '#F8FAFB' : 'white', cursor: hasExtra ? 'pointer' : 'default' }}
+                                onClick={() => setExpandedPastId(isExpanded ? null : booking.id)}
+                                style={{ backgroundColor: isExpanded ? '#F8FAFB' : 'white', cursor: 'pointer' }}
                                 onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
                                 onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
                               >
@@ -916,14 +922,27 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   )}
                                 </td>
                               </tr>
-                              {isExpanded && (booking as any).third_party_passenger && (
+                              {isExpanded && (
                                 <tr>
                                   <td colSpan={8} style={{ padding: '0 16px 12px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
-                                    <div style={{ display: 'inline-block', padding: '8px 12px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '8px' }}>
-                                      <p style={{ margin: '0 0 2px', fontSize: '12px', fontWeight: '700', color: '#1e40af' }}>Travelled: {(booking as any).third_party_passenger.name}</p>
-                                      <p style={{ margin: 0, fontSize: '12px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
-                                      {(booking as any).third_party_passenger.special_needs && (
-                                        <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
+                                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '8px' }}>
+                                      {driver && (
+                                        <div style={{ padding: '10px 14px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)' }}>
+                                          <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</p>
+                                          <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 3px 0' }}>{driver.name}</p>
+                                          {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '2px' }}>📞 {driver.phone}</a>}
+                                          {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '12px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
+                                        </div>
+                                      )}
+                                      {(booking as any).third_party_passenger && (
+                                        <div style={{ padding: '10px 14px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '10px' }}>
+                                          <p style={{ margin: '0 0 4px', fontSize: '11px', fontWeight: '700', color: '#1e40af', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Travelled</p>
+                                          <p style={{ margin: '0 0 2px', fontSize: '13px', fontWeight: '600', color: '#1F2937' }}>{(booking as any).third_party_passenger.name}</p>
+                                          <p style={{ margin: 0, fontSize: '12px', color: '#374151' }}>{(booking as any).third_party_passenger.gender} · {(booking as any).third_party_passenger.age_group}</p>
+                                          {(booking as any).third_party_passenger.special_needs && (
+                                            <p style={{ margin: '2px 0 0', fontSize: '12px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
+                                          )}
+                                        </div>
                                       )}
                                     </div>
                                   </td>
