@@ -256,13 +256,67 @@ export function getIncompatibilityReason(
 }
 
 /**
- * Returns true if contact details should be visible (within 24 hours of ride departure).
+ * Returns true if a given date falls on Shabbat (Saturday) or a Yom Tov (major Jewish festival).
+ * Uses @hebcal/core for accurate diaspora (UK) holiday calculation.
+ */
+function isShabbatOrYomTov(date: Date): boolean {
+  if (date.getDay() === 6) return true; // Saturday = Shabbat
+  try {
+    const { HDate, HebrewCalendar, flags } = require('@hebcal/core');
+    const hdate = new HDate(date);
+    const events = HebrewCalendar.getHolidaysOnDate(hdate, false); // false = diaspora
+    if (events && events.length > 0) {
+      return events.some((ev: any) => (ev.getFlags() & flags.CHAG) !== 0);
+    }
+  } catch {}
+  return false;
+}
+
+/**
+ * Walks back from a restricted day to find 8am on the day the Shabbat/YomTov block started.
+ * Handles multi-day restrictions (e.g. 2-day Yom Tov, or Yom Tov running into Shabbat).
+ */
+function getEarlyRevealTime(restrictedDay: Date): Date {
+  const day = new Date(restrictedDay);
+  day.setHours(12, 0, 0, 0); // use noon to avoid DST edge cases
+  while (isShabbatOrYomTov(day)) {
+    day.setDate(day.getDate() - 1);
+  }
+  // day is now the last non-restricted day — move forward one to get the start of restriction
+  day.setDate(day.getDate() + 1);
+  day.setHours(8, 0, 0, 0);
+  return day;
+}
+
+/**
+ * Returns true if contact details should be visible.
+ *
+ * Normal rule: within 24 hours of departure.
+ *
+ * Shabbat/Yom Tov override: if the ride is before noon on the day after a Shabbat or
+ * Yom Tov block, reveal from 8am on the day the restricted period started — so that
+ * passengers and drivers can make arrangements before Shabbat/Yom Tov begins.
  */
 export function isContactVisible(rideDateTime: string): boolean {
-  const rideTime = new Date(rideDateTime).getTime();
+  const rideTime = new Date(rideDateTime);
   const now = Date.now();
   const twentyFourHoursMs = 24 * 60 * 60 * 1000;
-  return (rideTime - now) <= twentyFourHoursMs;
+
+  // Standard 24h rule
+  if ((rideTime.getTime() - now) <= twentyFourHoursMs) return true;
+
+  // Shabbat/Yom Tov early reveal: ride is before noon on the day after a restricted period
+  if (rideTime.getHours() < 12) {
+    const dayBefore = new Date(rideTime);
+    dayBefore.setDate(dayBefore.getDate() - 1);
+    dayBefore.setHours(12, 0, 0, 0);
+    if (isShabbatOrYomTov(dayBefore)) {
+      const earlyReveal = getEarlyRevealTime(dayBefore);
+      if (now >= earlyReveal.getTime()) return true;
+    }
+  }
+
+  return false;
 }
 
 // Short 8-char human-readable reference codes from UUID prefix

@@ -13,6 +13,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@hebcal/core": "^6.0.8",
     "@supabase/supabase-js": "^2.91.0",
     "@tailwindcss/postcss": "^4.1.18",
     "cors": "^2.8.6",
