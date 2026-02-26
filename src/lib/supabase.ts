@@ -282,8 +282,7 @@ function getEarlyRevealTime(restrictedDay: Date): Date {
   while (isShabbatOrYomTov(day)) {
     day.setDate(day.getDate() - 1);
   }
-  // day is now the last non-restricted day — move forward one to get the start of restriction
-  day.setDate(day.getDate() + 1);
+  // day is now the day before the restricted period starts — reveal from 8am that day
   day.setHours(8, 0, 0, 0);
   return day;
 }
