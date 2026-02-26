@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { HDate, HebrewCalendar, flags } from '@hebcal/core';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -178,17 +179,6 @@ export function getCarComposition(
 }
 
 /**
- * Returns a human-readable summary of who's in the car, e.g. "2 men, 1 woman"
- */
-export function getCarCompositionLabel(composition: { males: number; females: number; couples: number }): string {
-  const parts: string[] = [];
-  if (composition.males > 0) parts.push(`${composition.males} ${composition.males === 1 ? 'man' : 'men'}`);
-  if (composition.females > 0) parts.push(`${composition.females} ${composition.females === 1 ? 'woman' : 'women'}`);
-  if (composition.couples > 0) parts.push(`${composition.couples} ${composition.couples === 1 ? 'couple' : 'couples'}`);
-  return parts.length > 0 ? parts.join(', ') : 'No occupants listed';
-}
-
-/**
  * Returns a plain-English car occupants label, e.g. "Driver (Male), 1 man, 1 woman".
  * Couples are expanded into individual men/women.
  */
@@ -262,13 +252,14 @@ export function getIncompatibilityReason(
 function isShabbatOrYomTov(date: Date): boolean {
   if (date.getDay() === 6) return true; // Saturday = Shabbat
   try {
-    const { HDate, HebrewCalendar, flags } = require('@hebcal/core');
     const hdate = new HDate(date);
     const events = HebrewCalendar.getHolidaysOnDate(hdate, false); // false = diaspora
     if (events && events.length > 0) {
       return events.some((ev: any) => (ev.getFlags() & flags.CHAG) !== 0);
     }
-  } catch {}
+  } catch (e) {
+    console.warn('Hebcal holiday check failed:', e);
+  }
   return false;
 }
 
