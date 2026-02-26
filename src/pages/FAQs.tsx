@@ -70,7 +70,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
         },
         {
           question: 'When can I see the driver\'s contact details?',
-          answer: 'For privacy and safety, contact details are normally shared 24 hours before the scheduled departure time. However, if your journey is before midday on the day after Shabbat or a Yom Tov, contact details will be made available from 8am on the day Shabbat or Yom Tov begins — so that both driver and passenger have time to make arrangements before the restricted period starts.',
+          answer: 'For privacy and safety, contact details are normally shared 24 hours before the scheduled departure time. However, if your journey is before midday on the day after Shabbat or a Yom Tov, contact details will be made available from 8am on the day before Shabbat or Yom Tov begins — giving both driver and passenger time to make arrangements before the restricted period starts.',
         },
         {
           question: 'Can children travel on ChapaRide?',
