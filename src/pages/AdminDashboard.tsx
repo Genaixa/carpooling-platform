@@ -617,20 +617,21 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
       <main style={{ maxWidth: '1600px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         {/* Top-level Tabs */}
-        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '2px' }}>
           {([
             { key: 'applications' as const, label: 'Applications' },
-            { key: 'licence-reviews' as const, label: `Licence Reviews (${pendingLicences.length || '...'})` },
+            { key: 'licence-reviews' as const, label: `Licences (${pendingLicences.length || '...'})` },
             { key: 'finances' as const, label: 'Rides & Finances' },
-            { key: 'lookup' as const, label: '🔍 Search & Lookup' },
+            { key: 'lookup' as const, label: '🔍 Search' },
             { key: 'users' as const, label: 'All Users' },
           ]).map(t => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
               style={{
-                padding: '12px 28px', fontWeight: '700', fontSize: '15px', borderRadius: '50px',
-                border: 'none', cursor: 'pointer',
+                padding: isMobile ? '10px 16px' : '12px 28px',
+                fontWeight: '700', fontSize: isMobile ? '13px' : '15px', borderRadius: '50px',
+                border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
                 backgroundColor: tab === t.key ? '#1A9D9D' : '#F3F4F6',
                 color: tab === t.key ? 'white' : '#374151',
               }}
@@ -643,13 +644,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         {/* ==================== APPLICATIONS TAB ==================== */}
         {tab === 'applications' && (
           <>
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '30px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
               {(['pending', 'approved', 'rejected', 'all'] as const).map(f => (
                 <button
                   key={f}
                   onClick={() => setFilter(f)}
                   style={{
-                    padding: '10px 24px', fontWeight: '600', fontSize: '14px', borderRadius: '50px',
+                    padding: '10px 20px', fontWeight: '600', fontSize: '14px', borderRadius: '50px',
                     border: 'none', cursor: 'pointer', textTransform: 'capitalize',
                     backgroundColor: filter === f ? '#1F2937' : '#F3F4F6',
                     color: filter === f ? 'white' : '#374151',
@@ -666,75 +667,196 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
                 <p style={{ color: '#4B5563', fontSize: '20px' }}>No {filter === 'all' ? '' : filter} applications</p>
               </div>
-            ) : (
-              <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                  <thead>
-                    <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Applied</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Age</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Gender</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Car</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Exp</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>✓ Lic/Ins/MOT</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Status</th>
-                      <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {applications.map(app => {
-                      const sc = statusColors[app.status] || statusColors.pending;
-                      const isExpanded = expandedApp === app.id;
-                      const checks = [app.has_drivers_license, app.car_insured, app.has_mot];
-                      const allChecks = checks.every(Boolean);
-                      return (
-                        <>
-                          <tr
-                            key={app.id}
-                            onClick={() => setExpandedApp(isExpanded ? null : app.id)}
-                            style={{
-                              borderBottom: isExpanded ? 'none' : '1px solid #F3F4F6',
-                              cursor: 'pointer',
-                              backgroundColor: isExpanded ? '#F0FDFA' : 'white',
-                            }}
-                            onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
-                            onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+            ) : isMobile ? (
+              /* ---- MOBILE CARD LAYOUT ---- */
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {applications.map(app => {
+                  const sc = statusColors[app.status] || statusColors.pending;
+                  const isExpanded = expandedApp === app.id;
+                  const checks = [app.has_drivers_license, app.car_insured, app.has_mot];
+                  const allChecks = checks.every(Boolean);
+                  return (
+                    <div key={app.id} style={{ backgroundColor: 'white', borderRadius: '16px', padding: '18px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', border: '1px solid #F3F4F6' }}>
+                      {/* Card header */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', gap: '10px' }}>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <p style={{ fontWeight: '700', fontSize: '16px', color: '#1F2937', margin: 0 }}>{app.first_name} {app.surname}</p>
+                          <p style={{ fontSize: '12px', color: '#6B7280', margin: '2px 0 0 0', wordBreak: 'break-all' }}>{app.user?.email || '—'}</p>
+                          <p style={{ fontSize: '11px', color: '#9CA3AF', margin: '2px 0 0 0' }}>
+                            Applied: {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                        </div>
+                        <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', textTransform: 'capitalize', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}`, flexShrink: 0 }}>
+                          {app.status}
+                        </span>
+                      </div>
+
+                      {/* Details grid */}
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '14px' }}>
+                        <div>
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase' }}>Age Group</span>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#374151' }}>{app.age_group}</p>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase' }}>Gender</span>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#374151' }}>{app.gender}</p>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase' }}>Vehicle</span>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#374151' }}>{app.car_make} {app.car_model}</p>
+                        </div>
+                        <div>
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase' }}>Experience</span>
+                          <p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#374151' }}>{app.years_driving_experience} yrs</p>
+                        </div>
+                        <div style={{ gridColumn: 'span 2' }}>
+                          <span style={{ fontSize: '10px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase' }}>Licence / Insurance / MOT</span>
+                          <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>
+                            {checks.map((c, i) => c ? '✅' : '❌').join('  ')}
+                            {allChecks && <span style={{ fontSize: '12px', color: '#166534', fontWeight: '600', marginLeft: '8px' }}>All good</span>}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Action buttons */}
+                      <div style={{ display: 'flex', gap: '8px', marginBottom: '10px' }}>
+                        {app.status !== 'approved' && (
+                          <button
+                            onClick={() => handleAction(app.id, 'approve')}
+                            disabled={actionLoading === app.id}
+                            style={{ flex: 1, padding: '11px', fontSize: '15px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: '10px', cursor: actionLoading === app.id ? 'not-allowed' : 'pointer' }}
                           >
-                            <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1F2937' }}>
-                              {app.first_name} {app.surname}
-                            </td>
-                            <td style={{ padding: '12px 16px', color: '#6B7280' }}>{app.user?.email || '—'}</td>
-                            <td style={{ padding: '12px 16px', color: '#6B7280', whiteSpace: 'nowrap' }}>
-                              {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.age_group}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.gender}</td>
-                            <td style={{ padding: '12px 16px', color: '#374151' }}>{app.car_make} {app.car_model}</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.years_driving_experience}yr</td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              <span title={`Licence: ${app.has_drivers_license ? '✓' : '✗'} | Insurance: ${app.car_insured ? '✓' : '✗'} | MOT: ${app.has_mot ? '✓' : '✗'}`}
-                                style={{ fontSize: '14px' }}>
-                                {allChecks ? '✅' : checks.map((c, i) => c ? '✅' : '❌').join(' ')}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 16px', textAlign: 'center' }}>
-                              <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', textTransform: 'capitalize', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
-                                {app.status}
-                              </span>
-                            </td>
-                            <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
-                              {app.status !== 'approved' ? (
-                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
-                                  <button
-                                    onClick={() => handleAction(app.id, 'approve')}
-                                    disabled={actionLoading === app.id}
-                                    style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: '6px', cursor: 'pointer' }}
-                                  >
-                                    {actionLoading === app.id ? '...' : 'Approve'}
-                                  </button>
-                                  {app.status === 'pending' && (
+                            {actionLoading === app.id ? '...' : '✓ Approve'}
+                          </button>
+                        )}
+                        {(app.status === 'pending' || app.status === 'approved') && (
+                          <button
+                            onClick={() => handleAction(app.id, 'reject')}
+                            disabled={actionLoading === app.id}
+                            style={{ flex: 1, padding: '11px', fontSize: '15px', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#991B1B', border: '1px solid #FCA5A5', borderRadius: '10px', cursor: actionLoading === app.id ? 'not-allowed' : 'pointer' }}
+                          >
+                            {actionLoading === app.id ? '...' : '✕ Reject'}
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Expand toggle */}
+                      <button
+                        onClick={() => setExpandedApp(isExpanded ? null : app.id)}
+                        style={{ fontSize: '12px', color: '#6B7280', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' }}
+                      >
+                        {isExpanded ? '▲ Hide details' : '▼ More details'}
+                      </button>
+
+                      {/* Expanded details */}
+                      {isExpanded && (
+                        <div style={{ marginTop: '12px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
+                          <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
+                          <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS</span><p style={{ margin: '2px 0 0 0', color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Acknowledged' : 'No'}</p></div>
+                          <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
+                          {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
+                            <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                            <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Account No.</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
+                            <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
+                          </>)}
+                          {app.status === 'rejected' && app.admin_notes && (
+                            <div style={{ gridColumn: 'span 2', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
+                              <span style={{ fontSize: '12px', fontWeight: '700', color: '#991b1b' }}>Rejection reason: </span>
+                              <span style={{ fontSize: '13px', color: '#7F1D1D' }}>{app.admin_notes}</span>
+                            </div>
+                          )}
+                          {app.status === 'pending' && (
+                            <div style={{ gridColumn: 'span 2' }}>
+                              <textarea
+                                value={adminNotes[app.id] || ''}
+                                onChange={(e) => setAdminNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
+                                placeholder="Admin notes (optional, sent to applicant)..."
+                                rows={2}
+                                style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '8px', resize: 'vertical', boxSizing: 'border-box' }}
+                              />
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+                <div style={{ color: '#6B7280', fontSize: '13px', textAlign: 'center', paddingTop: '4px' }}>
+                  {applications.length} application{applications.length !== 1 ? 's' : ''}
+                </div>
+              </div>
+            ) : (
+              /* ---- DESKTOP TABLE LAYOUT ---- */
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Applied</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Age</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Gender</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Car</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Exp</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>✓ Lic/Ins/MOT</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Status</th>
+                        <th style={{ padding: '12px 16px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {applications.map(app => {
+                        const sc = statusColors[app.status] || statusColors.pending;
+                        const isExpanded = expandedApp === app.id;
+                        const checks = [app.has_drivers_license, app.car_insured, app.has_mot];
+                        const allChecks = checks.every(Boolean);
+                        return (
+                          <>
+                            <tr
+                              key={app.id}
+                              onClick={() => setExpandedApp(isExpanded ? null : app.id)}
+                              style={{
+                                borderBottom: isExpanded ? 'none' : '1px solid #F3F4F6',
+                                cursor: 'pointer',
+                                backgroundColor: isExpanded ? '#F0FDFA' : 'white',
+                              }}
+                              onMouseEnter={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#F9FAFB'; }}
+                              onMouseLeave={e => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+                            >
+                              <td style={{ padding: '12px 16px', fontWeight: '600', color: '#1F2937' }}>
+                                {app.first_name} {app.surname}
+                              </td>
+                              <td style={{ padding: '12px 16px', color: '#6B7280' }}>{app.user?.email || '—'}</td>
+                              <td style={{ padding: '12px 16px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                {new Date(app.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.age_group}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.gender}</td>
+                              <td style={{ padding: '12px 16px', color: '#374151' }}>{app.car_make} {app.car_model}</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center', color: '#374151' }}>{app.years_driving_experience}yr</td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <span title={`Licence: ${app.has_drivers_license ? '✓' : '✗'} | Insurance: ${app.car_insured ? '✓' : '✗'} | MOT: ${app.has_mot ? '✓' : '✗'}`}
+                                  style={{ fontSize: '14px' }}>
+                                  {allChecks ? '✅' : checks.map((c, i) => c ? '✅' : '❌').join(' ')}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px', textAlign: 'center' }}>
+                                <span style={{ padding: '4px 12px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', textTransform: 'capitalize', backgroundColor: sc.bg, color: sc.color, border: `1px solid ${sc.border}` }}>
+                                  {app.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 16px' }} onClick={e => e.stopPropagation()}>
+                                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+                                  {app.status !== 'approved' && (
+                                    <button
+                                      onClick={() => handleAction(app.id, 'approve')}
+                                      disabled={actionLoading === app.id}
+                                      style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: '6px', cursor: 'pointer' }}
+                                    >
+                                      {actionLoading === app.id ? '...' : 'Approve'}
+                                    </button>
+                                  )}
+                                  {(app.status === 'pending' || app.status === 'approved') && (
                                     <button
                                       onClick={() => handleAction(app.id, 'reject')}
                                       disabled={actionLoading === app.id}
@@ -743,53 +865,54 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       {actionLoading === app.id ? '...' : 'Reject'}
                                     </button>
                                   )}
+                                  {app.status === 'approved' && (
+                                    <span style={{ fontSize: '12px', color: '#9CA3AF' }}>{isExpanded ? '▲' : '▼'}</span>
+                                  )}
                                 </div>
-                              ) : (
-                                <span style={{ fontSize: '12px', color: '#9CA3AF' }}>{isExpanded ? '▲ collapse' : '▼ details'}</span>
-                              )}
-                            </td>
-                          </tr>
-
-                          {/* Expanded detail row */}
-                          {isExpanded && (
-                            <tr key={`${app.id}-detail`} style={{ backgroundColor: '#F0FDFA', borderBottom: '1px solid #E5E7EB' }}>
-                              <td colSpan={10} style={{ padding: '0 16px 20px 16px' }}>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', paddingTop: '12px' }}>
-                                  <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
-                                  <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS Acknowledged</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
-                                  <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
-                                  <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Address</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}</p></div>
-                                  {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
-                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
-                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Account Number</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
-                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
-                                  </>)}
-                                </div>
-                                {app.status === 'rejected' && app.admin_notes && (
-                                  <div style={{ marginTop: '12px', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
-                                    <span style={{ fontSize: '12px', fontWeight: '700', color: '#991b1b' }}>Rejection reason: </span>
-                                    <span style={{ fontSize: '13px', color: '#7F1D1D' }}>{app.admin_notes}</span>
-                                  </div>
-                                )}
-                                {app.status === 'pending' && (
-                                  <div style={{ marginTop: '14px' }}>
-                                    <textarea
-                                      value={adminNotes[app.id] || ''}
-                                      onChange={(e) => setAdminNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
-                                      placeholder="Admin notes (optional, sent to applicant)..."
-                                      rows={2}
-                                      style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '8px', resize: 'vertical', boxSizing: 'border-box' }}
-                                    />
-                                  </div>
-                                )}
                               </td>
                             </tr>
-                          )}
-                        </>
-                      );
-                    })}
-                  </tbody>
-                </table>
+
+                            {/* Expanded detail row */}
+                            {isExpanded && (
+                              <tr key={`${app.id}-detail`} style={{ backgroundColor: '#F0FDFA', borderBottom: '1px solid #E5E7EB' }}>
+                                <td colSpan={10} style={{ padding: '0 16px 20px 16px' }}>
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', paddingTop: '12px' }}>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS Acknowledged</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
+                                    <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Address</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}</p></div>
+                                    {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Account Number</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
+                                    </>)}
+                                  </div>
+                                  {app.status === 'rejected' && app.admin_notes && (
+                                    <div style={{ marginTop: '12px', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
+                                      <span style={{ fontSize: '12px', fontWeight: '700', color: '#991b1b' }}>Rejection reason: </span>
+                                      <span style={{ fontSize: '13px', color: '#7F1D1D' }}>{app.admin_notes}</span>
+                                    </div>
+                                  )}
+                                  {app.status === 'pending' && (
+                                    <div style={{ marginTop: '14px' }}>
+                                      <textarea
+                                        value={adminNotes[app.id] || ''}
+                                        onChange={(e) => setAdminNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
+                                        placeholder="Admin notes (optional, sent to applicant)..."
+                                        rows={2}
+                                        style={{ width: '100%', padding: '10px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '8px', resize: 'vertical', boxSizing: 'border-box' }}
+                                      />
+                                    </div>
+                                  )}
+                                </td>
+                              </tr>
+                            )}
+                          </>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
                 <div style={{ padding: '12px 16px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
                   {applications.length} application{applications.length !== 1 ? 's' : ''}
                 </div>
@@ -908,7 +1031,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             )}
 
             {/* Sub-tabs: All Rides / Payouts */}
-            <div style={{ display: 'flex', gap: '12px', marginBottom: '24px' }}>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setFinanceSubTab('rides')}
                 style={{
@@ -1739,29 +1862,33 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 20px 0' }}>All registered users on the platform.</p>
 
               {/* Filter + search row */}
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
-                {(['all', 'drivers', 'passengers'] as const).map(f => (
-                  <button
-                    key={f}
-                    onClick={() => setUsersFilter(f)}
-                    style={{
-                      padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
-                      border: 'none', cursor: 'pointer',
-                      backgroundColor: usersFilter === f ? '#1A9D9D' : '#F3F4F6',
-                      color: usersFilter === f ? 'white' : '#374151',
-                    }}
-                  >
-                    {f === 'all' ? `All (${usersData.length})` : f === 'drivers' ? `Drivers (${usersData.filter(u => u.is_approved_driver).length})` : `Passengers (${usersData.filter(u => !u.is_approved_driver).length})`}
-                  </button>
-                ))}
+              <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  {(['all', 'drivers', 'passengers'] as const).map(f => (
+                    <button
+                      key={f}
+                      onClick={() => setUsersFilter(f)}
+                      style={{
+                        padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+                        border: 'none', cursor: 'pointer',
+                        backgroundColor: usersFilter === f ? '#1A9D9D' : '#F3F4F6',
+                        color: usersFilter === f ? 'white' : '#374151',
+                      }}
+                    >
+                      {f === 'all' ? `All (${usersData.length})` : f === 'drivers' ? `Drivers (${usersData.filter(u => u.is_approved_driver).length})` : `Passengers (${usersData.filter(u => !u.is_approved_driver).length})`}
+                    </button>
+                  ))}
+                </div>
                 <input
                   type="text"
                   placeholder="Search name or email..."
                   value={usersSearch}
                   onChange={e => setUsersSearch(e.target.value)}
                   style={{
-                    marginLeft: 'auto', padding: '8px 14px', fontSize: '13px',
-                    border: '1px solid #E5E7EB', borderRadius: '10px', outline: 'none', minWidth: '200px',
+                    marginLeft: isMobile ? 0 : 'auto', padding: '8px 14px', fontSize: '13px',
+                    border: '1px solid #E5E7EB', borderRadius: '10px', outline: 'none',
+                    width: isMobile ? '100%' : 'auto', minWidth: isMobile ? 'unset' : '200px',
+                    boxSizing: 'border-box',
                   }}
                 />
               </div>

@@ -311,7 +311,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                           </span>
                           {' '}and{' '}
                           <span
-                            onClick={(e) => { e.preventDefault(); onNavigate('privacy'); }}
+                            onClick={(e) => { e.preventDefault(); onNavigate('privacy-policy'); }}
                             style={{ color: '#1A9D9D', textDecoration: 'underline', cursor: 'pointer' }}
                           >
                             Privacy Policy
