@@ -435,7 +435,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                   <p style={{ fontWeight: '700', color: '#166534', margin: '0 0 8px 0', fontSize: '14px' }}>
                     Passenger Responsibility
                   </p>
-                  <p style={{ margin: '0 0 8px 0' }}>
+                  <p style={{ margin: '0 0 8px 0', lineHeight: '1.4' }}>
                     By joining a ride on ChapaRide, I agree to arrive at the pick-up point on time, pay my share of fuel and travel costs as agreed with the driver, behave respectfully and follow the driver's reasonable instructions, and understand that ChapaRide is only a platform and my safety is my responsibility.
                   </p>
                   <p style={{ fontWeight: '700', color: '#166534', margin: '12px 0 8px 0', fontSize: '14px' }}>
@@ -472,7 +472,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                     }}
                   />
                   <span style={{ fontSize: '14px', lineHeight: '1.5', color: '#374151' }}>
-                    I confirm that I am 18 years of age or over.
+                    I confirm that I am 18 years of age or over. I hereby also give my consent in the event I book a ride for a passenger aged 12–17.
                   </span>
                 </label>
               </div>

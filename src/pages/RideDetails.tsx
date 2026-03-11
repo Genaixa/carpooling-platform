@@ -25,6 +25,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [bookingFor, setBookingFor] = useState<'myself' | 'someone-else'>('myself');
   const [bookingForGender, setBookingForGender] = useState<'Male' | 'Female'>('Male');
+  const [termsAccepted, setTermsAccepted] = useState(false);
 
   useEffect(() => {
     if (rideId) loadRideDetails();
@@ -291,6 +292,35 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                       </span>
                     </div>
 
+                    {/* Terms & consent checkbox */}
+                    <div style={{ marginBottom: '16px', padding: '16px', backgroundColor: '#f9fafb', border: '1px solid #E8EBED', borderRadius: '12px' }}>
+                      <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer', accentColor: '#1A9D9D' }}
+                        />
+                        <span style={{ fontSize: '13px', color: '#374151', lineHeight: '1.5' }}>
+                          I accept ChapaRide's{' '}
+                          <span
+                            onClick={(e) => { e.preventDefault(); onNavigate('terms'); }}
+                            style={{ color: '#1A9D9D', textDecoration: 'underline', cursor: 'pointer' }}
+                          >
+                            Terms & Conditions
+                          </span>
+                          {' '}and{' '}
+                          <span
+                            onClick={(e) => { e.preventDefault(); onNavigate('privacy'); }}
+                            style={{ color: '#1A9D9D', textDecoration: 'underline', cursor: 'pointer' }}
+                          >
+                            Privacy Policy
+                          </span>
+                          . Where I am booking on behalf of a passenger under the age of 18, I confirm that I hold full parental or guardian consent for that passenger to travel on this ride, and I accept responsibility for their participation.
+                        </span>
+                      </label>
+                    </div>
+
                     {!compatible ? (
                       <div style={{ padding: '16px 20px', backgroundColor: '#fee2e2', border: '1px solid #fca5a5', borderRadius: '12px' }}>
                         <p style={{ margin: 0, color: '#991b1b', fontSize: '14px', fontWeight: '600' }}>{incompatReason}</p>
@@ -298,11 +328,14 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                     ) : (
                       <button
                         onClick={() => setShowPaymentModal(true)}
+                        disabled={!termsAccepted}
                         style={{
                           padding: '14px 32px', border: 'none', borderRadius: '12px',
-                          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                          color: 'white', fontSize: '16px', fontWeight: '600', cursor: 'pointer',
-                          boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
+                          background: termsAccepted ? 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)' : '#D1D5DB',
+                          color: 'white', fontSize: '16px', fontWeight: '600',
+                          cursor: termsAccepted ? 'pointer' : 'not-allowed',
+                          boxShadow: termsAccepted ? '0 4px 12px rgba(26, 157, 157, 0.15)' : 'none',
+                          transition: 'background 0.2s',
                         }}
                       >
                         Book {selectedSeats} seat{selectedSeats > 1 ? 's' : ''} — £{totalAmount.toFixed(2)}
