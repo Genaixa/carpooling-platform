@@ -264,9 +264,9 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <div style={{ fontSize: '48px', marginBottom: '16px' }}>&#10003;</div>
-            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#166534', marginBottom: '12px' }}>You are an approved driver!</h2>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#000000', marginBottom: '12px' }}>You are an approved driver!</h2>
             <p style={{ color: '#4B5563', marginBottom: '24px' }}>You can post rides from the dashboard.</p>
-            <button onClick={() => onNavigate('post-ride')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
+            <button onClick={() => onNavigate('post-ride')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
               Post a Ride
             </button>
           </div>
@@ -278,7 +278,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
   if (existingApplication && existingApplication.status !== 'rejected') {
     const statusColors: Record<string, { bg: string; color: string; border: string }> = {
       pending: { bg: '#fef3c7', color: '#92400e', border: '#fde047' },
-      approved: { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+      approved: { bg: '#fef9e0', color: '#000000', border: '#fcd03a' },
     };
     const sc = statusColors[existingApplication.status] || statusColors.pending;
 
@@ -299,7 +299,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                 <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>{existingApplication.admin_notes}</p>
               </div>
             )}
-            <button onClick={() => onNavigate('home')} style={{ marginTop: '24px', padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
+            <button onClick={() => onNavigate('home')} style={{ marginTop: '24px', padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>
               Back to Home
             </button>
           </div>
@@ -319,13 +319,13 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      <section style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
+      <section style={{ background: '#fcd03a', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '40px' }}>
-            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: 'white', marginBottom: '15px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>
+            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: '#000000', marginBottom: '15px' }}>
               {isReapplying ? 'Reapply as Driver' : 'Become a Driver'}
             </h1>
-            <p style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
+            <p style={{ fontSize: '20px', color: 'rgba(0,0,0,0.7)' }}>
               {isReapplying ? 'Submit a new application for review' : 'Complete this application to start offering rides'}
             </p>
           </div>
@@ -333,11 +333,11 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
           {!isReapplying && (
             <div style={{ marginBottom: '24px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.6)' }}>Step 1: Create Account</span>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Step 2: Driver Application</span>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(0,0,0,0.5)' }}>Step 1: Create Account</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>Step 2: Driver Application</span>
               </div>
-              <div style={{ backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '99px', height: '8px' }}>
-                <div style={{ width: '100%', backgroundColor: 'white', borderRadius: '99px', height: '8px' }} />
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '99px', height: '8px' }}>
+                <div style={{ width: '100%', backgroundColor: '#000000', borderRadius: '99px', height: '8px' }} />
               </div>
             </div>
           )}
@@ -410,7 +410,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                   { name: 'has_mot', label: 'My car has a valid MOT certificate' },
                 ].map(({ name, label }) => (
                   <label key={name} style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
-                    <input type="checkbox" name={name} checked={(formData as any)[name]} onChange={handleChange} style={{ width: '20px', height: '20px', accentColor: '#1A9D9D' }} />
+                    <input type="checkbox" name={name} checked={(formData as any)[name]} onChange={handleChange} style={{ width: '20px', height: '20px', accentColor: '#fcd03a' }} />
                     <span style={{ fontSize: '14px', color: '#1F2937' }}>{label} *</span>
                   </label>
                 ))}
@@ -422,12 +422,12 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
               {/* Licence Photo Upload */}
               <div style={{
                 marginTop: '28px', marginBottom: '10px',
-                backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0',
+                backgroundColor: '#fef9e0', border: '1px solid #fcd03a',
                 borderRadius: '16px', padding: '20px',
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
                   <span style={{ fontSize: '20px' }}>⭐</span>
-                  <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#166534', margin: 0 }}>
+                  <h4 style={{ fontSize: '16px', fontWeight: '700', color: '#000000', margin: 0 }}>
                     Upload Your Driving Licence Photo — Unlock Gold Status
                   </h4>
                 </div>
@@ -443,10 +443,10 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                     <img
                       src={licencePhotoUrl}
                       alt="Driving licence"
-                      style={{ height: '80px', borderRadius: '8px', border: '2px solid #86EFAC', objectFit: 'cover' }}
+                      style={{ height: '80px', borderRadius: '8px', border: '2px solid #fcd03a', objectFit: 'cover' }}
                     />
                     <div>
-                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#166534', margin: '0 0 8px 0' }}>
+                      <p style={{ fontSize: '13px', fontWeight: '600', color: '#000000', margin: '0 0 8px 0' }}>
                         ✓ Licence photo uploaded
                       </p>
                       <button
@@ -478,7 +478,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                         disabled={uploadingLicencePhoto}
                         style={{
                           padding: '10px 24px',
-                          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                          background: '#000000',
                           color: 'white', border: 'none', borderRadius: '8px',
                           fontSize: '14px', fontWeight: '600', cursor: 'pointer',
                           opacity: uploadingLicencePhoto ? 0.7 : 1,
@@ -529,10 +529,10 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
               <button type="submit" disabled={submitting} style={{
                 width: '100%', padding: '18px', fontSize: '18px', fontWeight: '600',
-                background: submitting ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                color: 'white', border: 'none', borderRadius: '12px',
+                background: submitting ? '#D1D5DB' : '#000000',
+                color: submitting ? '#9CA3AF' : '#fcd03a', border: 'none', borderRadius: '12px',
                 cursor: submitting ? 'not-allowed' : 'pointer',
-                boxShadow: submitting ? 'none' : '0 8px 20px rgba(26, 157, 157, 0.15)',
+                boxShadow: submitting ? 'none' : '0 8px 20px rgba(252,208,58,0.25)',
                 marginBottom: '15px',
               }}>
                 {submitting ? 'Submitting...' : 'Submit Application'}
@@ -549,7 +549,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
       </section>
 
       <style>{`
-        input:focus, select:focus { outline: none; border-color: #1A9D9D !important; box-shadow: 0 0 0 4px rgba(26, 157, 157, 0.1); }
+        input:focus, select:focus { outline: none; border-color: #fcd03a !important; box-shadow: 0 0 0 4px rgba(252,208,58,0.15); }
         button:hover:not(:disabled) { transform: translateY(-2px); }
       `}</style>
     </div>

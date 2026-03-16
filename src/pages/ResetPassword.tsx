@@ -47,27 +47,20 @@ export default function ResetPassword({ onNavigate }: ResetPasswordProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       <section style={{
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+        background: '#fcd03a',
         padding: isMobile ? '32px 16px 60px' : '60px 20px 100px',
         position: 'relative',
         overflow: 'hidden'
       }}>
-        <div style={{
-          position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
-          backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
-          pointerEvents: 'none'
-        }}></div>
-
         <div style={{ maxWidth: '500px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
             <h1 style={{
               fontSize: isMobile ? '28px' : '48px',
               fontWeight: 'bold',
-              color: 'white',
+              color: '#000000',
               marginBottom: '12px',
-              textShadow: '2px 2px 4px rgba(0,0,0,0.2)'
             }}>Set New Password</h1>
-            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
+            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(0,0,0,0.7)' }}>
               Enter your new password below
             </p>
           </div>
@@ -139,12 +132,12 @@ export default function ResetPassword({ onNavigate }: ResetPasswordProps) {
                   padding: '18px',
                   fontSize: '18px',
                   fontWeight: '600',
-                  background: loading ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                  color: 'white',
+                  background: loading ? '#D1D5DB' : '#000000',
+                  color: loading ? '#9CA3AF' : '#fcd03a',
                   border: 'none',
                   borderRadius: '12px',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: loading ? 'none' : '0 8px 20px rgba(26, 157, 157, 0.15)',
+                  boxShadow: loading ? 'none' : '0 8px 20px rgba(252,208,58,0.25)',
                   transition: 'all 0.3s'
                 }}
               >
@@ -158,8 +151,8 @@ export default function ResetPassword({ onNavigate }: ResetPasswordProps) {
       <style>{`
         input:focus {
           outline: none;
-          border-color: #1A9D9D !important;
-          box-shadow: 0 0 0 4px rgba(26, 157, 157, 0.1);
+          border-color: #fcd03a !important;
+          box-shadow: 0 0 0 4px rgba(252,208,58,0.15);
         }
         button:hover:not(:disabled) {
           transform: translateY(-2px);

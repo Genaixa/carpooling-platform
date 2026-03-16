@@ -579,12 +579,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   const statusColors: Record<string, { bg: string; color: string; border: string }> = {
     pending: { bg: '#fef3c7', color: '#92400e', border: '#fde047' },
-    approved: { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+    approved: { bg: '#fef9e0', color: '#000000', border: '#fcd03a' },
     rejected: { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
     upcoming: { bg: '#dbeafe', color: '#1e40af', border: '#93c5fd' },
-    completed: { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+    completed: { bg: '#fef9e0', color: '#000000', border: '#fcd03a' },
     cancelled: { bg: '#fee2e2', color: '#991b1b', border: '#fca5a5' },
-    confirmed: { bg: '#dcfce7', color: '#166534', border: '#86efac' },
+    confirmed: { bg: '#fef9e0', color: '#000000', border: '#fcd03a' },
     pending_driver: { bg: '#fef3c7', color: '#92400e', border: '#fde047' },
     refunded: { bg: '#e0e7ff', color: '#3730a3', border: '#a5b4fc' },
   };
@@ -608,10 +608,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px' }}>
+      <div style={{ background: '#fcd03a', padding: isMobile ? '24px 16px' : '40px 20px' }}>
         <div style={{ maxWidth: '1600px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Admin Dashboard</h1>
-          <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.95)', margin: 0 }}>Manage drivers, rides, and finances</p>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: '#000000', marginBottom: '10px' }}>Admin Dashboard</h1>
+          <p style={{ fontSize: '18px', color: 'rgba(0,0,0,0.7)', margin: 0 }}>Manage drivers, rides, and finances</p>
         </div>
       </div>
 
@@ -632,7 +632,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 padding: isMobile ? '10px 16px' : '12px 28px',
                 fontWeight: '700', fontSize: isMobile ? '13px' : '15px', borderRadius: '50px',
                 border: 'none', cursor: 'pointer', whiteSpace: 'nowrap', flexShrink: 0,
-                backgroundColor: tab === t.key ? '#1A9D9D' : '#F3F4F6',
+                backgroundColor: tab === t.key ? '#fcd03a' : '#F3F4F6',
                 color: tab === t.key ? 'white' : '#374151',
               }}
             >
@@ -713,7 +713,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           <span style={{ fontSize: '10px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase' }}>Licence / Insurance / MOT</span>
                           <p style={{ margin: '4px 0 0 0', fontSize: '14px' }}>
                             {checks.map((c, i) => c ? '✅' : '❌').join('  ')}
-                            {allChecks && <span style={{ fontSize: '12px', color: '#166534', fontWeight: '600', marginLeft: '8px' }}>All good</span>}
+                            {allChecks && <span style={{ fontSize: '12px', color: '#000000', fontWeight: '600', marginLeft: '8px' }}>All good</span>}
                           </p>
                         </div>
                       </div>
@@ -724,7 +724,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           <button
                             onClick={() => handleAction(app.id, 'approve')}
                             disabled={actionLoading === app.id}
-                            style={{ flex: 1, padding: '11px', fontSize: '15px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: '10px', cursor: actionLoading === app.id ? 'not-allowed' : 'pointer' }}
+                            style={{ flex: 1, padding: '11px', fontSize: '15px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a', borderRadius: '10px', cursor: actionLoading === app.id ? 'not-allowed' : 'pointer' }}
                           >
                             {actionLoading === app.id ? '...' : '✓ Approve'}
                           </button>
@@ -752,12 +752,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       {isExpanded && (
                         <div style={{ marginTop: '12px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
                           <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
-                          <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS</span><p style={{ margin: '2px 0 0 0', color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Acknowledged' : 'No'}</p></div>
+                          <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS</span><p style={{ margin: '2px 0 0 0', color: app.dbs_check_acknowledged ? '#000000' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Acknowledged' : 'No'}</p></div>
                           <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
                           {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
-                            <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
-                            <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Account No.</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
-                            <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
+                            <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                            <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Account No.</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
+                            <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
                           </>)}
                           {app.status === 'rejected' && app.admin_notes && (
                             <div style={{ gridColumn: 'span 2', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
@@ -851,7 +851,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                     <button
                                       onClick={() => handleAction(app.id, 'approve')}
                                       disabled={actionLoading === app.id}
-                                      style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534', border: '1px solid #86EFAC', borderRadius: '6px', cursor: 'pointer' }}
+                                      style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a', borderRadius: '6px', cursor: 'pointer' }}
                                     >
                                       {actionLoading === app.id ? '...' : 'Approve'}
                                     </button>
@@ -878,13 +878,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 <td colSpan={10} style={{ padding: '0 16px 20px 16px' }}>
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', paddingTop: '12px' }}>
                                     <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
-                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS Acknowledged</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: app.dbs_check_acknowledged ? '#166534' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
+                                    <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS Acknowledged</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: app.dbs_check_acknowledged ? '#000000' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
                                     <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
                                     <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Address</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}</p></div>
                                     {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
-                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
-                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Account Number</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
-                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#166534', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Account Number</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
                                     </>)}
                                   </div>
                                   {app.status === 'rejected' && app.admin_notes && (
@@ -978,8 +978,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           onClick={() => handleApproveLicence(driver.id)}
                           disabled={actionLoading === driver.id}
                           style={{
-                            padding: '8px 16px', backgroundColor: '#dcfce7', color: '#166534',
-                            border: '1px solid #86efac', borderRadius: '8px', fontSize: '13px',
+                            padding: '8px 16px', backgroundColor: '#fef9e0', color: '#000000',
+                            border: '1px solid #fcd03a', borderRadius: '8px', fontSize: '13px',
                             fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
                           }}
                         >
@@ -1011,13 +1011,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             {/* Summary Cards */}
             {!loading && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
-                <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #1A9D9D' }}>
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #fcd03a' }}>
                   <p style={{ fontSize: '13px', fontWeight: '600', color: '#6B7280', margin: '0 0 4px 0' }}>Total Revenue</p>
                   <p style={{ fontSize: '28px', fontWeight: '700', color: '#1F2937', margin: 0 }}>£{totalRevenue.toFixed(2)}</p>
                 </div>
-                <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #8BC34A' }}>
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #fcd03a' }}>
                   <p style={{ fontSize: '13px', fontWeight: '600', color: '#6B7280', margin: '0 0 4px 0' }}>Platform Commission</p>
-                  <p style={{ fontSize: '28px', fontWeight: '700', color: '#166534', margin: 0 }}>£{totalCommission.toFixed(2)}</p>
+                  <p style={{ fontSize: '28px', fontWeight: '700', color: '#000000', margin: 0 }}>£{totalCommission.toFixed(2)}</p>
                 </div>
                 <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #3b82f6' }}>
                   <p style={{ fontSize: '13px', fontWeight: '600', color: '#6B7280', margin: '0 0 4px 0' }}>Driver Earnings</p>
@@ -1136,11 +1136,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Revenue</p>
-                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#166534', margin: 0 }}>£{(parseFloat(ride.totalRevenue as any) || 0).toFixed(2)}</p>
+                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#000000', margin: 0 }}>£{(parseFloat(ride.totalRevenue as any) || 0).toFixed(2)}</p>
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Commission</p>
-                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1A9D9D', margin: 0 }}>£{(parseFloat(ride.totalCommission as any) || 0).toFixed(2)}</p>
+                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#fcd03a', margin: 0 }}>£{(parseFloat(ride.totalCommission as any) || 0).toFixed(2)}</p>
                                     </div>
                                     <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Driver</p>
@@ -1222,7 +1222,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                                 </span>
                                               </td>
                                               <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1F2937', fontWeight: '600' }}>£{(parseFloat(booking.total_paid as any) || 0).toFixed(2)}</td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1A9D9D', fontWeight: '600' }}>£{(parseFloat(booking.commission_amount as any) || 0).toFixed(2)}</td>
+                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#fcd03a', fontWeight: '600' }}>£{(parseFloat(booking.commission_amount as any) || 0).toFixed(2)}</td>
                                               <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(parseFloat(booking.driver_payout_amount as any) || 0).toFixed(2)}</td>
                                             </tr>
                                           );
@@ -1258,7 +1258,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           <div key={ds.driverId} style={{
                             backgroundColor: 'white', borderRadius: '16px', padding: '24px',
                             boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-                            borderLeft: ds.balanceOwed > 0 ? '4px solid #f59e0b' : '4px solid #86efac',
+                            borderLeft: ds.balanceOwed > 0 ? '4px solid #f59e0b' : '4px solid #fcd03a',
                           }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '16px' }}>
                               <div>
@@ -1266,8 +1266,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>{ds.driverEmail}</p>
                                 {/* Bank details */}
                                 {(ds.bankAccountName || ds.bankAccountNumber) && (
-                                  <div style={{ marginTop: '8px', padding: '8px 12px', backgroundColor: '#f0fdf4', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
-                                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#166534' }}>Bank: </span>
+                                  <div style={{ marginTop: '8px', padding: '8px 12px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid #fcd03a' }}>
+                                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#000000' }}>Bank: </span>
                                     <span style={{ fontSize: '12px', color: '#1F2937' }}>
                                       {ds.bankAccountName || '—'} | Acc: {ds.bankAccountNumber || '—'} | SC: {ds.bankSortCode || '—'}
                                     </span>
@@ -1282,11 +1282,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
                                   <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Paid Out</p>
-                                  <p style={{ fontSize: '20px', fontWeight: '700', color: '#166534', margin: 0 }}>£{ds.totalPaidOut.toFixed(2)}</p>
+                                  <p style={{ fontSize: '20px', fontWeight: '700', color: '#000000', margin: 0 }}>£{ds.totalPaidOut.toFixed(2)}</p>
                                 </div>
                                 <div style={{ textAlign: 'center' }}>
                                   <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Balance Owed</p>
-                                  <p style={{ fontSize: '20px', fontWeight: '700', color: ds.balanceOwed > 0 ? '#dc2626' : '#166534', margin: 0 }}>
+                                  <p style={{ fontSize: '20px', fontWeight: '700', color: ds.balanceOwed > 0 ? '#dc2626' : '#000000', margin: 0 }}>
                                     £{ds.balanceOwed.toFixed(2)}
                                   </p>
                                 </div>
@@ -1298,7 +1298,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       setPayoutNotes('');
                                     }}
                                     style={{
-                                      padding: '10px 20px', backgroundColor: '#1A9D9D', color: 'white',
+                                      padding: '10px 20px', backgroundColor: '#fcd03a', color: '#000000',
                                       border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
                                       cursor: 'pointer', whiteSpace: 'nowrap',
                                     }}
@@ -1320,7 +1320,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                         {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
                                         {p.notes && <span style={{ color: '#9CA3AF', marginLeft: '8px' }}>— {p.notes}</span>}
                                       </span>
-                                      <span style={{ fontWeight: '600', color: '#166534' }}>£{(parseFloat(p.amount as any) || 0).toFixed(2)}</span>
+                                      <span style={{ fontWeight: '600', color: '#000000' }}>£{(parseFloat(p.amount as any) || 0).toFixed(2)}</span>
                                     </div>
                                   ))}
                                 </div>
@@ -1357,7 +1357,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   flex: 1, padding: '12px 16px', fontSize: '15px',
                   border: '2px solid #E5E7EB', borderRadius: '12px', outline: 'none',
                 }}
-                onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
+                onFocus={(e) => (e.target.style.borderColor = '#fcd03a')}
                 onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
               />
               <button
@@ -1366,7 +1366,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 style={{
                   padding: '12px 28px', fontSize: '15px', fontWeight: '700', borderRadius: '12px',
                   border: 'none', cursor: !lookupQuery.trim() || lookupLoading ? 'not-allowed' : 'pointer',
-                  background: !lookupQuery.trim() || lookupLoading ? '#E5E7EB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  background: !lookupQuery.trim() || lookupLoading ? '#E5E7EB' : '#000000',
                   color: !lookupQuery.trim() || lookupLoading ? '#9CA3AF' : 'white',
                   whiteSpace: 'nowrap',
                 }}
@@ -1397,7 +1397,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           onClick={() => handleLookupSelect('user', u)}
                           style={{
                             backgroundColor: selectedLookupItem?.type === 'user' && selectedLookupItem.data.id === u.id ? '#F0FDFA' : 'white',
-                            border: selectedLookupItem?.type === 'user' && selectedLookupItem.data.id === u.id ? '2px solid #1A9D9D' : '1px solid #E5E7EB',
+                            border: selectedLookupItem?.type === 'user' && selectedLookupItem.data.id === u.id ? '2px solid #fcd03a' : '1px solid #E5E7EB',
                             borderRadius: '12px', padding: '14px 18px', cursor: 'pointer',
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
@@ -1440,7 +1440,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           onClick={() => handleLookupSelect('ride', r)}
                           style={{
                             backgroundColor: selectedLookupItem?.type === 'ride' && selectedLookupItem.data.id === r.id ? '#F0FDFA' : 'white',
-                            border: selectedLookupItem?.type === 'ride' && selectedLookupItem.data.id === r.id ? '2px solid #1A9D9D' : '1px solid #E5E7EB',
+                            border: selectedLookupItem?.type === 'ride' && selectedLookupItem.data.id === r.id ? '2px solid #fcd03a' : '1px solid #E5E7EB',
                             borderRadius: '12px', padding: '14px 18px', cursor: 'pointer',
                             display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px',
                             boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
@@ -1474,7 +1474,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
             {/* Detail panel */}
             {selectedLookupItem && (
-              <div style={{ marginTop: '32px', backgroundColor: 'white', borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderTop: '4px solid #1A9D9D' }}>
+              <div style={{ marginTop: '32px', backgroundColor: 'white', borderRadius: '20px', padding: '28px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)', borderTop: '4px solid #fcd03a' }}>
                 {lookupDetailLoading ? (
                   <div style={{ textAlign: 'center', padding: '40px' }}><Loading /></div>
                 ) : lookupDetail ? (
@@ -1579,7 +1579,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                             disabled={isSending}
                                             style={{
                                               padding: '5px 10px', fontSize: '12px', fontWeight: '600',
-                                              backgroundColor: isSending ? '#E5E7EB' : '#1A9D9D', color: isSending ? '#9CA3AF' : 'white',
+                                              backgroundColor: isSending ? '#E5E7EB' : '#fcd03a', color: isSending ? '#9CA3AF' : 'white',
                                               border: 'none', borderRadius: '6px', cursor: isSending ? 'not-allowed' : 'pointer',
                                               whiteSpace: 'nowrap',
                                             }}
@@ -1642,9 +1642,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                           title="Resend ride posted confirmation to driver"
                                           style={{
                                             padding: '5px 12px', fontSize: '12px', fontWeight: '600',
-                                            backgroundColor: isSendingRide ? '#E5E7EB' : '#F0FDF4',
-                                            color: isSendingRide ? '#9CA3AF' : '#166534',
-                                            border: '1px solid #BBF7D0',
+                                            backgroundColor: isSendingRide ? '#E5E7EB' : '#fef9e0',
+                                            color: isSendingRide ? '#9CA3AF' : '#000000',
+                                            border: '1px solid #fcd03a',
                                             borderRadius: '6px', cursor: isSendingRide ? 'not-allowed' : 'pointer',
                                             whiteSpace: 'nowrap',
                                           }}
@@ -1705,8 +1705,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
                       {/* Driver */}
                       {lookupDetail.driver && (
-                        <div style={{ backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
-                          <p style={{ fontSize: '13px', fontWeight: '700', color: '#166534', margin: '0 0 8px 0' }}>Driver</p>
+                        <div style={{ backgroundColor: '#fef9e0', border: '1px solid #fcd03a', borderRadius: '12px', padding: '16px', marginBottom: '16px' }}>
+                          <p style={{ fontSize: '13px', fontWeight: '700', color: '#000000', margin: '0 0 8px 0' }}>Driver</p>
                           <p style={{ margin: '0 0 2px 0', fontWeight: '600', color: '#1F2937' }}>{lookupDetail.driver.name}</p>
                           <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#6B7280' }}>{lookupDetail.driver.email}</p>
                           {lookupDetail.driver.phone && <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#6B7280' }}>{lookupDetail.driver.phone}</p>}
@@ -1726,9 +1726,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                               disabled={isSendingRide}
                               style={{
                                 padding: '7px 16px', fontSize: '13px', fontWeight: '600',
-                                backgroundColor: isSendingRide ? '#E5E7EB' : '#F0FDF4',
-                                color: isSendingRide ? '#9CA3AF' : '#166534',
-                                border: '1px solid #BBF7D0', borderRadius: '8px',
+                                backgroundColor: isSendingRide ? '#E5E7EB' : '#fef9e0',
+                                color: isSendingRide ? '#9CA3AF' : '#000000',
+                                border: '1px solid #fcd03a', borderRadius: '8px',
                                 cursor: isSendingRide ? 'not-allowed' : 'pointer',
                               }}
                             >
@@ -1799,7 +1799,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                             disabled={isSending}
                                             style={{
                                               padding: '5px 10px', fontSize: '12px', fontWeight: '600',
-                                              backgroundColor: isSending ? '#E5E7EB' : '#1A9D9D', color: isSending ? '#9CA3AF' : 'white',
+                                              backgroundColor: isSending ? '#E5E7EB' : '#fcd03a', color: isSending ? '#9CA3AF' : 'white',
                                               border: 'none', borderRadius: '6px', cursor: isSending ? 'not-allowed' : 'pointer',
                                               whiteSpace: 'nowrap',
                                             }}
@@ -1832,11 +1832,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '12px' }}>
                               <div style={{ textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 2px 0' }}>Total Revenue</p>
-                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#166534', margin: 0 }}>£{totalRev.toFixed(2)}</p>
+                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#000000', margin: 0 }}>£{totalRev.toFixed(2)}</p>
                               </div>
                               <div style={{ textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 2px 0' }}>Commission (25%)</p>
-                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#1A9D9D', margin: 0 }}>£{totalComm.toFixed(2)}</p>
+                                <p style={{ fontSize: '18px', fontWeight: '700', color: '#fcd03a', margin: 0 }}>£{totalComm.toFixed(2)}</p>
                               </div>
                               <div style={{ textAlign: 'center' }}>
                                 <p style={{ fontSize: '11px', color: '#6B7280', margin: '0 0 2px 0' }}>Driver Payout (75%)</p>
@@ -1871,7 +1871,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       style={{
                         padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
                         border: 'none', cursor: 'pointer',
-                        backgroundColor: usersFilter === f ? '#1A9D9D' : '#F3F4F6',
+                        backgroundColor: usersFilter === f ? '#fcd03a' : '#F3F4F6',
                         color: usersFilter === f ? 'white' : '#374151',
                       }}
                     >
@@ -1950,7 +1950,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                               {u.is_admin && <span style={{ marginLeft: '6px', fontSize: '10px', backgroundColor: '#FEF3C7', color: '#92400E', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>Admin</span>}
                             </td>
                             <td style={{ padding: '10px 14px', color: '#6B7280' }}>
-                              <a href={`mailto:${u.email}`} style={{ color: '#1A9D9D', textDecoration: 'none' }}>{u.email}</a>
+                              <a href={`mailto:${u.email}`} style={{ color: '#fcd03a', textDecoration: 'none' }}>{u.email}</a>
                             </td>
                             <td style={{ padding: '10px 14px', color: '#6B7280' }}>{u.phone || '—'}</td>
                             <td style={{ padding: '10px 14px' }}>
@@ -1964,7 +1964,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             </td>
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                               {u.rides_count > 0 && (
-                                <span title="Rides driven" style={{ fontSize: '12px', color: '#166534', marginRight: '6px' }}>
+                                <span title="Rides driven" style={{ fontSize: '12px', color: '#000000', marginRight: '6px' }}>
                                   🚗 {u.rides_count}
                                 </span>
                               )}
@@ -2132,7 +2132,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 onClick={handleRecordPayout}
                 disabled={actionLoading === 'payout'}
                 style={{
-                  padding: '12px', backgroundColor: '#1A9D9D', color: 'white',
+                  padding: '12px', backgroundColor: '#fcd03a', color: '#000000',
                   border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer',
                 }}
               >

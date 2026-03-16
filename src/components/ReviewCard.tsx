@@ -34,7 +34,7 @@ export default function ReviewCard({ review, onViewProfile }: ReviewCardProps) {
         )}
         <div style={{ flex: 1 }}>
           <p
-            style={{ fontSize: '14px', fontWeight: '600', color: onViewProfile && reviewer ? '#1A9D9D' : '#1F2937', margin: 0, cursor: onViewProfile && reviewer ? 'pointer' : 'default' }}
+            style={{ fontSize: '14px', fontWeight: '600', color: onViewProfile && reviewer ? '#fcd03a' : '#1F2937', margin: 0, cursor: onViewProfile && reviewer ? 'pointer' : 'default' }}
             onClick={() => onViewProfile && reviewer && onViewProfile(reviewer.id)}
           >
             {reviewer ? getDriverAlias(reviewer.id) : 'Anonymous'}

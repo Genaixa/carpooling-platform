@@ -44,7 +44,7 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
   const inputStyle = (field: string): React.CSSProperties => ({
     width: '100%',
     padding: '12px 16px',
-    border: `2px solid ${focusedField === field ? '#1A9D9D' : '#E5E7EB'}`,
+    border: `2px solid ${focusedField === field ? '#fcd03a' : '#E5E7EB'}`,
     borderRadius: '12px',
     fontSize: '15px',
     outline: 'none',
@@ -74,14 +74,14 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
       {/* Hero Section */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
+          background: '#fcd03a',
           padding: isMobile ? '48px 20px' : '64px 20px',
           textAlign: 'center',
         }}
       >
         <h1
           style={{
-            color: '#fff',
+            color: '#000000',
             fontSize: isMobile ? '32px' : '42px',
             fontWeight: 700,
             margin: '0 0 12px 0',
@@ -91,7 +91,7 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
         </h1>
         <p
           style={{
-            color: 'rgba(255,255,255,0.9)',
+            color: 'rgba(0,0,0,0.7)',
             fontSize: isMobile ? '16px' : '18px',
             margin: 0,
             fontWeight: 400,
@@ -145,14 +145,14 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
+                  background: '#fef9e0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <rect x="2" y="4" width="20" height="16" rx="2" />
                   <path d="M22 4L12 13L2 4" />
                 </svg>
@@ -164,7 +164,7 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
                 <a
                   href="mailto:info@chaparide.com"
                   style={{
-                    color: '#1A9D9D',
+                    color: '#fcd03a',
                     textDecoration: 'none',
                     fontSize: '15px',
                     fontWeight: 500,
@@ -182,14 +182,14 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
                   width: '40px',
                   height: '40px',
                   borderRadius: '10px',
-                  background: 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
+                  background: '#fef9e0',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
                   flexShrink: 0,
                 }}
               >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#000000" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <circle cx="12" cy="12" r="10" />
                   <polyline points="12 6 12 12 16 14" />
                 </svg>
@@ -310,8 +310,8 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
                 style={{
                   width: '100%',
                   padding: '14px 24px',
-                  background: 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
-                  color: '#fff',
+                  background: '#000000',
+                  color: '#fcd03a',
                   border: 'none',
                   borderRadius: '12px',
                   fontSize: '16px',
@@ -350,7 +350,7 @@ export default function ContactUs({ onNavigate }: ContactUsProps) {
             For urgent matters, please email us directly at{' '}
             <a
               href="mailto:info@chaparide.com"
-              style={{ color: '#1A9D9D', textDecoration: 'none', fontWeight: 600 }}
+              style={{ color: '#fcd03a', textDecoration: 'none', fontWeight: 600 }}
             >
               info@chaparide.com
             </a>

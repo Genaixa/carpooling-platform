@@ -258,7 +258,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
                     onChange={(e) => setTpName(e.target.value)}
                     placeholder="Full name of the passenger"
                     style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '2px solid #E5E7EB', borderRadius: '8px', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
-                    onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                     onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                   />
                 </div>
@@ -296,7 +296,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
                     onChange={(e) => setTpSpecialNeeds(e.target.value)}
                     placeholder="e.g. walker, wheelchair (optional)"
                     style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '2px solid #E5E7EB', borderRadius: '8px', transition: 'border-color 0.3s', boxSizing: 'border-box' }}
-                    onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                     onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                   />
                 </div>
@@ -308,8 +308,8 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
           <div>
             {/* Passenger Responsibility Declaration */}
             <div style={{
-              backgroundColor: '#f0fdf4',
-              border: '1px solid #bbf7d0',
+              backgroundColor: '#fef9e0',
+              border: '1px solid #fcd03a',
               borderRadius: '12px',
               padding: '14px',
               marginBottom: '16px',
@@ -317,7 +317,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
               lineHeight: '1.5',
               color: '#374151',
             }}>
-              <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+              <p style={{ margin: '0 0 8px 0', fontSize: '13px', fontWeight: '700', color: '#000000' }}>
                 Passenger Responsibility
               </p>
               <p style={{ margin: '0 0 10px 0' }}>
@@ -333,7 +333,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
                     height: '18px',
                     marginTop: '1px',
                     flexShrink: 0,
-                    accentColor: '#1A9D9D',
+                    accentColor: '#fcd03a',
                     cursor: 'pointer',
                   }}
                 />
@@ -394,10 +394,10 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
                   disabled={processing || !cardReady || !passengerAgreed}
                   style={{
                     flex: 1, padding: '14px', border: 'none', borderRadius: '12px',
-                    background: processing || !cardReady || !passengerAgreed ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                    color: 'white', fontSize: '16px', fontWeight: '600',
+                    background: processing || !cardReady || !passengerAgreed ? '#D1D5DB' : '#000000',
+                    color: processing || !cardReady || !passengerAgreed ? '#9CA3AF' : '#fcd03a', fontSize: '16px', fontWeight: '600',
                     cursor: processing || !cardReady || !passengerAgreed ? 'not-allowed' : 'pointer',
-                    boxShadow: processing || !cardReady || !passengerAgreed ? 'none' : '0 4px 12px rgba(26, 157, 157, 0.15)',
+                    boxShadow: processing || !cardReady || !passengerAgreed ? 'none' : '0 4px 12px rgba(252,208,58,0.25)',
                   }}
                 >
                   {processing ? 'Processing...' : `Pay £${amount.toFixed(2)}`}

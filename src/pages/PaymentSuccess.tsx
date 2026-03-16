@@ -44,10 +44,10 @@ export default function PaymentSuccess({ onNavigate }: PaymentSuccessProps) {
         {/* Icon */}
         <div style={{
           width: '80px', height: '80px', borderRadius: '50%',
-          backgroundColor: '#dcfce7', display: 'flex', alignItems: 'center',
+          backgroundColor: '#fef9e0', display: 'flex', alignItems: 'center',
           justifyContent: 'center', margin: '0 auto 24px',
         }}>
-          <svg width="40" height="40" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+          <svg width="40" height="40" fill="none" stroke="#c9a400" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
@@ -96,7 +96,7 @@ export default function PaymentSuccess({ onNavigate }: PaymentSuccessProps) {
               <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px' }}>
                 <span style={{
                   flexShrink: 0, width: '20px', height: '20px', borderRadius: '50%',
-                  backgroundColor: '#1A9D9D', color: 'white', fontSize: '11px',
+                  backgroundColor: '#fcd03a', color: '#000000', fontSize: '11px',
                   fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center',
                 }}>
                   {i + 1}
@@ -112,10 +112,10 @@ export default function PaymentSuccess({ onNavigate }: PaymentSuccessProps) {
           onClick={() => onNavigate('my-bookings')}
           style={{
             width: '100%', padding: '16px',
-            background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-            color: 'white', border: 'none', borderRadius: '12px',
+            background: '#000000',
+            color: '#fcd03a', border: 'none', borderRadius: '12px',
             fontSize: '16px', fontWeight: '700', cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(26,157,157,0.25)',
+            boxShadow: '0 4px 14px rgba(252,208,58,0.25)',
             marginBottom: '12px',
           }}
         >

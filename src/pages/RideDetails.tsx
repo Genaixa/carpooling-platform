@@ -76,7 +76,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <p style={{ fontSize: '20px', color: '#4B5563', marginBottom: '25px' }}>Ride not found</p>
-            <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Back to Home</button>
+            <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Back to Home</button>
           </div>
         </div>
       </div>
@@ -91,18 +91,18 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Page Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px' }}>
+      <div style={{ background: '#fcd03a', padding: isMobile ? '24px 16px' : '40px 20px' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '0', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Ride Details</h1>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: '#000000', marginBottom: '0' }}>Ride Details</h1>
         </div>
       </div>
 
       <main style={{ maxWidth: '1000px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
-        <button onClick={() => onNavigate('home')} style={{ marginBottom: '30px', padding: '10px 20px', background: 'none', border: '2px solid #1A9D9D', color: '#1A9D9D', borderRadius: '10px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <button onClick={() => onNavigate('home')} style={{ marginBottom: '30px', padding: '10px 20px', background: 'none', border: '2px solid #fcd03a', color: '#fcd03a', borderRadius: '10px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px' }}>
           ← Back to Rides
         </button>
 
-        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #1A9D9D' }}>
+        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #fcd03a' }}>
           {/* Route Information */}
           <div style={{ marginBottom: '30px' }}>
             <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Route</h2>
@@ -210,12 +210,12 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                         <p style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>{passenger ? getPassengerAlias(passenger.id) : 'Passenger'}</p>
                         <p style={{ fontSize: '14px', color: '#4B5563', margin: 0 }}>{booking.seats_booked} seat(s) - £{booking.total_paid?.toFixed(2)}</p>
                       </div>
-                      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', backgroundColor: booking.status === 'confirmed' ? '#dcfce7' : '#fef3c7', color: booking.status === 'confirmed' ? '#166534' : '#92400e' }}>
+                      <span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '600', backgroundColor: booking.status === 'confirmed' ? '#fef9e0' : '#fef3c7', color: booking.status === 'confirmed' ? '#000000' : '#92400e' }}>
                         {booking.status === 'pending_driver' ? 'Pending' : 'Confirmed'}
                       </span>
                     </div>
                     {contactVisible && booking.status === 'confirmed' ? (
-                      <div style={{ marginTop: '8px', fontSize: '13px', color: '#1A9D9D' }}>
+                      <div style={{ marginTop: '8px', fontSize: '13px', color: '#fcd03a' }}>
                         {passenger?.phone && <span>Phone: {passenger.phone}</span>}
                         {passenger?.email && <span> | Email: {passenger.email}</span>}
                       </div>
@@ -256,8 +256,8 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                 </div>
 
                 {alreadyBooked ? (
-                  <div style={{ padding: '16px 20px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '12px' }}>
-                    <p style={{ margin: 0, color: '#166534', fontSize: '14px', fontWeight: '600' }}>You've already booked this ride.</p>
+                  <div style={{ padding: '16px 20px', backgroundColor: '#fef9e0', border: '1px solid #fcd03a', borderRadius: '12px' }}>
+                    <p style={{ margin: 0, color: '#000000', fontSize: '14px', fontWeight: '600' }}>You've already booked this ride.</p>
                   </div>
                 ) : (
                   <>
@@ -265,8 +265,8 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                     <div style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Booking for</label>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setBookingFor('myself')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'myself' ? '2px solid #1A9D9D' : '2px solid #E8EBED', backgroundColor: bookingFor === 'myself' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Myself</button>
-                        <button onClick={() => setBookingFor('someone-else')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'someone-else' ? '2px solid #1A9D9D' : '2px solid #E8EBED', backgroundColor: bookingFor === 'someone-else' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Someone else</button>
+                        <button onClick={() => setBookingFor('myself')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'myself' ? '2px solid #fcd03a' : '2px solid #E8EBED', backgroundColor: bookingFor === 'myself' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Myself</button>
+                        <button onClick={() => setBookingFor('someone-else')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'someone-else' ? '2px solid #fcd03a' : '2px solid #E8EBED', backgroundColor: bookingFor === 'someone-else' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Someone else</button>
                       </div>
                       {bookingFor === 'someone-else' && (
                         <div style={{ marginTop: '8px' }}>
@@ -287,7 +287,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                           <option key={n} value={n}>{n}</option>
                         ))}
                       </select>
-                      <span style={{ marginLeft: '12px', fontSize: '16px', fontWeight: '700', color: '#1A9D9D' }}>
+                      <span style={{ marginLeft: '12px', fontSize: '16px', fontWeight: '700', color: '#fcd03a' }}>
                         Total: £{totalAmount.toFixed(2)}
                       </span>
                     </div>
@@ -299,20 +299,20 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                           type="checkbox"
                           checked={termsAccepted}
                           onChange={(e) => setTermsAccepted(e.target.checked)}
-                          style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer', accentColor: '#1A9D9D' }}
+                          style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer', accentColor: '#fcd03a' }}
                         />
                         <span style={{ fontSize: '13px', color: '#374151', lineHeight: '1.5' }}>
                           I accept ChapaRide's{' '}
                           <span
                             onClick={(e) => { e.preventDefault(); onNavigate('terms'); }}
-                            style={{ color: '#1A9D9D', textDecoration: 'underline', cursor: 'pointer' }}
+                            style={{ color: '#fcd03a', textDecoration: 'underline', cursor: 'pointer' }}
                           >
                             Terms & Conditions
                           </span>
                           {' '}and{' '}
                           <span
                             onClick={(e) => { e.preventDefault(); onNavigate('privacy-policy'); }}
-                            style={{ color: '#1A9D9D', textDecoration: 'underline', cursor: 'pointer' }}
+                            style={{ color: '#fcd03a', textDecoration: 'underline', cursor: 'pointer' }}
                           >
                             Privacy Policy
                           </span>
@@ -331,10 +331,10 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                         disabled={!termsAccepted}
                         style={{
                           padding: '14px 32px', border: 'none', borderRadius: '12px',
-                          background: termsAccepted ? 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)' : '#D1D5DB',
-                          color: 'white', fontSize: '16px', fontWeight: '600',
+                          background: termsAccepted ? '#000000' : '#D1D5DB',
+                          color: termsAccepted ? '#fcd03a' : '#9CA3AF', fontSize: '16px', fontWeight: '600',
                           cursor: termsAccepted ? 'pointer' : 'not-allowed',
-                          boxShadow: termsAccepted ? '0 4px 12px rgba(26, 157, 157, 0.15)' : 'none',
+                          boxShadow: termsAccepted ? '0 4px 12px rgba(252,208,58,0.25)' : 'none',
                           transition: 'background 0.2s',
                         }}
                       >
@@ -352,7 +352,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
             <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
               <div style={{ padding: '20px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '12px', textAlign: 'center' }}>
                 <p style={{ margin: '0 0 12px', color: '#1e40af', fontSize: '16px', fontWeight: '600' }}>Log in to book this ride</p>
-                <button onClick={() => onNavigate('login')} style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Login</button>
+                <button onClick={() => onNavigate('login')} style={{ padding: '12px 28px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Login</button>
               </div>
             </div>
           )}
@@ -365,8 +365,8 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
           )}
 
           {isDriver && (
-            <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '12px' }}>
-              <p style={{ margin: 0, color: '#166534', fontSize: '16px', fontWeight: '600' }}>This is your ride</p>
+            <div style={{ marginTop: '20px', padding: '20px', backgroundColor: '#fef9e0', border: '1px solid #fcd03a', borderRadius: '12px' }}>
+              <p style={{ margin: 0, color: '#000000', fontSize: '16px', fontWeight: '600' }}>This is your ride</p>
             </div>
           )}
         </div>

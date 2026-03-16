@@ -74,7 +74,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
         <div style={{ padding: '80px 20px', textAlign: 'center' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <p style={{ color: '#ef4444', marginBottom: '25px', fontSize: '18px' }}>{error || 'Profile not found'}</p>
-            <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Back to Home</button>
+            <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Back to Home</button>
           </div>
         </div>
       </div>
@@ -142,7 +142,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
                     <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 2px' }}>{formatDate(ride.date_time)} at {formatTime(ride.date_time)}</p>
                     <p style={{ fontSize: '13px', color: '#4B5563', margin: 0 }}>£{ride.price_per_seat} per seat - {ride.seats_available} available</p>
                   </div>
-                  <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '10px 20px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>View</button>
+                  <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '10px 20px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>View</button>
                 </div>
               ))}
             </div>

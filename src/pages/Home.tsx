@@ -473,24 +473,19 @@ export default function Home({ onNavigate }: HomeProps) {
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero Section with Background */}
       <section style={{
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-        color: 'white',
+        background: '#fcd03a',
+        color: '#000000',
         padding: isMobile ? '32px 16px' : '64px 20px',
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Background Pattern/Overlay */}
-        <div style={{ position: 'absolute', inset: 0, opacity: 0.1 }}>
-          <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(circle at 2px 2px, rgba(255,255,255,0.15) 1px, transparent 0)', backgroundSize: '40px 40px' }}></div>
-        </div>
-
         <div style={{ maxWidth: '1400px', margin: '0 auto', position: 'relative', zIndex: 10 }}>
           {/* Hero Tagline */}
           <div style={{ textAlign: 'center', marginBottom: '40px' }}>
-            <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '-0.5px' }}>
+            <h2 style={{ fontSize: isMobile ? '24px' : '36px', fontWeight: 'bold', marginBottom: '12px', letterSpacing: '-0.5px', color: '#000000' }}>
               Chap A Ride - Share A Ride
             </h2>
-            <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(255, 255, 255, 0.9)', maxWidth: '600px', margin: '0 auto' }}>
+            <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(0,0,0,0.7)', maxWidth: '600px', margin: '0 auto' }}>
               Affordable Rides Across the UK
             </p>
           </div>
@@ -521,9 +516,9 @@ export default function Home({ onNavigate }: HomeProps) {
                         <button
                           onClick={swapLocations}
                           style={{
-                            backgroundColor: '#1A9D9D', borderRadius: '50%',
+                            backgroundColor: '#fcd03a', borderRadius: '50%',
                             width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            boxShadow: '0 4px 12px rgba(26, 157, 157, 0.3)', border: '3px solid white', cursor: 'pointer',
+                            boxShadow: '0 4px 12px rgba(252,208,58,0.4)', border: '3px solid white', cursor: 'pointer',
                             transform: 'rotate(90deg)',
                           }}
                           title="Swap locations"
@@ -538,9 +533,9 @@ export default function Home({ onNavigate }: HomeProps) {
                         <button
                           onClick={swapLocations}
                           style={{
-                            backgroundColor: '#1A9D9D', borderRadius: '50%',
+                            backgroundColor: '#fcd03a', borderRadius: '50%',
                             width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                            transition: 'all 0.3s', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.3)',
+                            transition: 'all 0.3s', boxShadow: '0 4px 12px rgba(252,208,58,0.4)',
                             border: '4px solid white', cursor: 'pointer',
                           }}
                           title="Swap locations"
@@ -583,7 +578,7 @@ export default function Home({ onNavigate }: HomeProps) {
                         color: '#111827',
                         transition: 'border-color 0.3s'
                       }}
-                      onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                      onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                       onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                     />
                   </div>
@@ -606,7 +601,7 @@ export default function Home({ onNavigate }: HomeProps) {
                         backgroundColor: 'white',
                         transition: 'border-color 0.3s'
                       }}
-                      onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                      onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                       onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                     >
                       <option value="">Any time</option>
@@ -643,7 +638,7 @@ export default function Home({ onNavigate }: HomeProps) {
                         backgroundRepeat: 'no-repeat',
                         backgroundPosition: 'right 16px center'
                       }}
-                      onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                      onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                       onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                     >
                       {[1, 2, 3, 4, 5, 6, 7, 8].map((num) => (
@@ -677,7 +672,7 @@ export default function Home({ onNavigate }: HomeProps) {
                           backgroundColor: 'white',
                           transition: 'border-color 0.3s'
                         }}
-                        onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                        onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                         onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                       >
                         <option value="myself">Myself</option>
@@ -704,7 +699,7 @@ export default function Home({ onNavigate }: HomeProps) {
                             backgroundColor: 'white',
                             transition: 'border-color 0.3s'
                           }}
-                          onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                          onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                           onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                         >
                           <option value="Male">Male</option>
@@ -725,24 +720,24 @@ export default function Home({ onNavigate }: HomeProps) {
                   onClick={handleHeroSearch}
                   style={{
                     width: '100%',
-                    background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                    color: 'white',
+                    background: '#000000',
+                    color: '#fcd03a',
                     fontWeight: 'bold',
                     padding: '16px 32px',
                     borderRadius: '30px',
                     fontSize: '18px',
                     border: 'none',
                     cursor: 'pointer',
-                    boxShadow: '0 8px 24px rgba(26, 157, 157, 0.3)',
+                    boxShadow: '0 8px 24px rgba(252,208,58,0.3)',
                     transition: 'transform 0.3s, box-shadow 0.3s'
                   }}
                   onMouseOver={(e) => {
                     e.currentTarget.style.transform = 'translateY(-2px)';
-                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(26, 157, 157, 0.4)';
+                    e.currentTarget.style.boxShadow = '0 12px 28px rgba(252,208,58,0.4)';
                   }}
                   onMouseOut={(e) => {
                     e.currentTarget.style.transform = 'translateY(0)';
-                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(26, 157, 157, 0.3)';
+                    e.currentTarget.style.boxShadow = '0 8px 24px rgba(252,208,58,0.3)';
                   }}
                 >
                   Find Your Journey
@@ -778,7 +773,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <div style={{
                 width: '48px',
                 height: '48px',
-                backgroundColor: '#1A9D9D',
+                backgroundColor: '#fcd03a',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -816,7 +811,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <div style={{
                 width: '48px',
                 height: '48px',
-                backgroundColor: '#1A9D9D',
+                backgroundColor: '#fcd03a',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -854,7 +849,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <div style={{
                 width: '48px',
                 height: '48px',
-                backgroundColor: '#1A9D9D',
+                backgroundColor: '#fcd03a',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -892,7 +887,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <div style={{
                 width: '48px',
                 height: '48px',
-                backgroundColor: '#1A9D9D',
+                backgroundColor: '#fcd03a',
                 borderRadius: '50%',
                 display: 'flex',
                 alignItems: 'center',
@@ -915,7 +910,7 @@ export default function Home({ onNavigate }: HomeProps) {
       {/* Become a Driver CTA */}
       {(!user || (user && profile && !profile.is_approved_driver)) && (
         <section style={{
-          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+          background: '#fcd03a',
           padding: isMobile ? '40px 16px' : '56px 20px',
         }}>
           <div style={{
@@ -929,14 +924,14 @@ export default function Home({ onNavigate }: HomeProps) {
             <div style={{
               width: isMobile ? '64px' : '80px',
               height: isMobile ? '64px' : '80px',
-              backgroundColor: 'rgba(255,255,255,0.2)',
+              backgroundColor: 'rgba(0,0,0,0.08)',
               borderRadius: '50%',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
               flexShrink: 0,
             }}>
-              <svg style={{ width: isMobile ? '32px' : '40px', height: isMobile ? '32px' : '40px', color: 'white' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg style={{ width: isMobile ? '32px' : '40px', height: isMobile ? '32px' : '40px', color: '#000000' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
               </svg>
             </div>
@@ -944,14 +939,14 @@ export default function Home({ onNavigate }: HomeProps) {
               <h2 style={{
                 fontSize: isMobile ? '24px' : '32px',
                 fontWeight: 'bold',
-                color: 'white',
+                color: '#000000',
                 marginBottom: '8px',
               }}>
                 Want to drive?
               </h2>
               <p style={{
                 fontSize: isMobile ? '15px' : '17px',
-                color: 'rgba(255,255,255,0.9)',
+                color: 'rgba(0,0,0,0.7)',
                 lineHeight: '1.6',
                 margin: 0,
               }}>
@@ -962,14 +957,14 @@ export default function Home({ onNavigate }: HomeProps) {
               onClick={() => onNavigate(user ? 'driver-apply' : 'register-driver')}
               style={{
                 padding: isMobile ? '14px 32px' : '16px 40px',
-                backgroundColor: 'white',
-                color: '#1A9D9D',
+                backgroundColor: '#000000',
+                color: '#fcd03a',
                 borderRadius: '50px',
                 fontSize: isMobile ? '16px' : '18px',
                 fontWeight: '700',
                 border: 'none',
                 cursor: 'pointer',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.15)',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.2)',
                 whiteSpace: 'nowrap',
                 flexShrink: 0,
               }}
@@ -1029,7 +1024,7 @@ export default function Home({ onNavigate }: HomeProps) {
                   boxShadow: '0 2px 8px rgba(0,0,0,0.06)',
                   transition: 'border-color 0.2s',
                 }}
-                onFocus={(e) => (e.target.style.borderColor = '#1A9D9D')}
+                onFocus={(e) => (e.target.style.borderColor = '#fcd03a')}
                 onBlur={(e) => (e.target.style.borderColor = '#E5E7EB')}
               >
                 <option value="All">All locations</option>
@@ -1080,8 +1075,8 @@ export default function Home({ onNavigate }: HomeProps) {
           {!user && (
             <div style={{
               marginTop: '16px',
-              background: 'linear-gradient(135deg, rgba(26,157,157,0.08) 0%, rgba(139,195,74,0.08) 100%)',
-              border: '1px solid rgba(26,157,157,0.2)',
+              background: '#fef9e0',
+              border: '1px solid rgba(252,208,58,0.4)',
               borderRadius: '16px',
               padding: '14px 20px',
               display: 'inline-block'
@@ -1122,8 +1117,8 @@ export default function Home({ onNavigate }: HomeProps) {
                 onClick={clearAllFilters}
                 style={{
                   fontSize: '15px',
-                  color: 'white',
-                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  color: '#fcd03a',
+                  background: '#000000',
                   border: 'none',
                   cursor: 'pointer',
                   fontWeight: '600',
@@ -1139,9 +1134,9 @@ export default function Home({ onNavigate }: HomeProps) {
                 onClick={() => onNavigate('ride-wishes')}
                 style={{
                   fontSize: '15px',
-                  color: '#1A9D9D',
+                  color: '#fcd03a',
                   background: 'white',
-                  border: '2px solid #1A9D9D',
+                  border: '2px solid #fcd03a',
                   cursor: 'pointer',
                   fontWeight: '600',
                   padding: '12px 28px',
@@ -1169,7 +1164,7 @@ export default function Home({ onNavigate }: HomeProps) {
               >
                 {/* Destination Header */}
                 <div style={{
-                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                  background: '#000000',
                   padding: isMobile ? '16px 20px' : '18px 28px',
                   display: 'flex',
                   alignItems: 'center',
@@ -1186,9 +1181,9 @@ export default function Home({ onNavigate }: HomeProps) {
                   </div>
                   <span style={{
                     fontSize: '13px',
-                    color: 'rgba(255,255,255,0.9)',
                     fontWeight: '600',
-                    backgroundColor: 'rgba(255,255,255,0.2)',
+                    backgroundColor: '#fcd03a',
+                    color: '#000000',
                     padding: '4px 12px',
                     borderRadius: '20px',
                   }}>
@@ -1275,7 +1270,7 @@ export default function Home({ onNavigate }: HomeProps) {
                               fontSize: '13px', color: '#374151', fontWeight: '500',
                               backgroundColor: '#F0FDFA', padding: '3px 10px', borderRadius: '6px',
                             }}>
-                              <svg style={{ width: '13px', height: '13px', color: '#1A9D9D' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <svg style={{ width: '13px', height: '13px', color: '#fcd03a' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                               </svg>
                               {ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''}
@@ -1296,7 +1291,7 @@ export default function Home({ onNavigate }: HomeProps) {
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
                               <button
                                 onClick={() => onNavigate('public-profile', undefined, ride.driver.id)}
-                                style={{ color: '#1A9D9D', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: 0 }}
+                                style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: 0 }}
                               >
                                 {getDriverAlias(ride.driver.id)}
                               </button>
@@ -1383,7 +1378,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
                           {/* Total if multi-seat */}
                           {getSelectedSeats(ride.id) > 1 && (
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#1A9D9D' }}>
+                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#fcd03a' }}>
                               = £{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}
                             </span>
                           )}
@@ -1396,9 +1391,9 @@ export default function Home({ onNavigate }: HomeProps) {
                               padding: '8px 22px', borderRadius: '50px', border: 'none',
                               fontWeight: '700', fontSize: '13px',
                               cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer',
-                              background: !ride.compatible ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                              color: 'white',
-                              boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(26,157,157,0.2)',
+                              background: !ride.compatible ? '#D1D5DB' : '#000000',
+                              color: !ride.compatible ? '#9CA3AF' : '#fcd03a',
+                              boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)',
                               transition: 'all 0.3s', whiteSpace: 'nowrap',
                             }}
                           >
@@ -1436,7 +1431,7 @@ export default function Home({ onNavigate }: HomeProps) {
               justifyContent: 'space-between',
               flexWrap: 'wrap',
               gap: '16px',
-              borderLeft: '5px solid #1A9D9D',
+              borderLeft: '5px solid #fcd03a',
             }}>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                 <div style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937' }}>Ride Alerts</div>
@@ -1447,8 +1442,8 @@ export default function Home({ onNavigate }: HomeProps) {
                 onClick={() => onNavigate('ride-wishes')}
                 style={{
                   padding: '12px 24px',
-                  background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                  color: 'white',
+                  background: '#000000',
+                  color: '#fcd03a',
                   border: 'none',
                   borderRadius: '50px',
                   fontSize: '14px',
@@ -1494,14 +1489,14 @@ export default function Home({ onNavigate }: HomeProps) {
           width: 16px;
           height: 16px;
           border-radius: 50%;
-          background: #1A9D9D;
+          background: #fcd03a;
           cursor: pointer;
         }
         input[type="range"]::-moz-range-thumb {
           width: 16px;
           height: 16px;
           border-radius: 50%;
-          background: #1A9D9D;
+          background: #fcd03a;
           cursor: pointer;
           border: none;
         }

@@ -26,11 +26,11 @@ export default function RidePosted({ onNavigate }: Props) {
         {/* Icon */}
         <div style={{
           width: '80px', height: '80px', borderRadius: '50%',
-          backgroundColor: '#dcfce7',
+          backgroundColor: '#fef9e0',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           margin: '0 auto 24px',
         }}>
-          <svg width="40" height="40" fill="none" stroke="#16a34a" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+          <svg width="40" height="40" fill="none" stroke="#c9a400" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
             <polyline points="20 6 9 17 4 12" />
           </svg>
         </div>
@@ -45,14 +45,14 @@ export default function RidePosted({ onNavigate }: Props) {
 
         {/* What happens next */}
         <div style={{
-          backgroundColor: '#f0fdf4',
-          border: '2px solid #bbf7d0',
+          backgroundColor: '#fef9e0',
+          border: '2px solid #fcd03a',
           borderRadius: '16px',
           padding: '20px 24px',
           marginBottom: '28px',
           textAlign: 'left',
         }}>
-          <p style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700', color: '#166534' }}>
+          <p style={{ margin: '0 0 14px 0', fontSize: '15px', fontWeight: '700', color: '#000000' }}>
             Sit back and wait for ride requests:
           </p>
           {[
@@ -63,12 +63,12 @@ export default function RidePosted({ onNavigate }: Props) {
             <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', marginBottom: i < 2 ? '10px' : 0 }}>
               <span style={{
                 flexShrink: 0, width: '22px', height: '22px', borderRadius: '50%',
-                backgroundColor: '#16a34a', color: 'white', fontSize: '12px',
+                backgroundColor: '#c9a400', color: 'white', fontSize: '12px',
                 fontWeight: '700', display: 'flex', alignItems: 'center', justifyContent: 'center',
               }}>
                 {i + 1}
               </span>
-              <span style={{ fontSize: '14px', color: '#166534', lineHeight: '1.5' }}>{step}</span>
+              <span style={{ fontSize: '14px', color: '#000000', lineHeight: '1.5' }}>{step}</span>
             </div>
           ))}
         </div>
@@ -78,10 +78,10 @@ export default function RidePosted({ onNavigate }: Props) {
           onClick={() => onNavigate('home')}
           style={{
             width: '100%', padding: '16px',
-            background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-            color: 'white', border: 'none', borderRadius: '12px',
+            background: '#000000',
+            color: '#fcd03a', border: 'none', borderRadius: '12px',
             fontSize: '16px', fontWeight: '700', cursor: 'pointer',
-            boxShadow: '0 4px 14px rgba(26,157,157,0.25)',
+            boxShadow: '0 4px 14px rgba(252,208,58,0.25)',
             marginBottom: '12px',
           }}
         >

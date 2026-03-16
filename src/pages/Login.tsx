@@ -59,8 +59,8 @@ export default function Login({ onNavigate }: LoginProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero Section with Form */}
-      <section style={{ 
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
+      <section style={{
+        background: '#fcd03a',
         padding: isMobile ? '32px 16px 60px' : '60px 20px 100px',
         position: 'relative',
         overflow: 'hidden'
@@ -82,11 +82,10 @@ export default function Login({ onNavigate }: LoginProps) {
             <h1 style={{
               fontSize: isMobile ? '28px' : '48px',
               fontWeight: 'bold',
-              color: 'white',
+              color: '#000000',
               marginBottom: '12px',
-              textShadow: '2px 2px 4px rgba(0,0,0,0.2)'
             }}>Welcome back</h1>
-            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
+            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(0,0,0,0.7)' }}>
               Sign in to your ChapaRide account
             </p>
           </div>
@@ -182,7 +181,7 @@ export default function Login({ onNavigate }: LoginProps) {
                   style={{
                     background: 'none',
                     border: 'none',
-                    color: '#1A9D9D',
+                    color: '#fcd03a',
                     fontSize: '14px',
                     fontWeight: '600',
                     cursor: resetLoading ? 'not-allowed' : 'pointer',
@@ -196,13 +195,13 @@ export default function Login({ onNavigate }: LoginProps) {
 
               {resetSent && (
                 <div style={{
-                  backgroundColor: '#dcfce7',
-                  border: '1px solid #86efac',
+                  backgroundColor: '#fef9e0',
+                  border: '1px solid #fcd03a',
                   borderRadius: '12px',
                   padding: '16px',
                   marginBottom: '20px',
                 }}>
-                  <p style={{ color: '#166534', margin: 0, fontSize: '14px' }}>
+                  <p style={{ color: '#000000', margin: 0, fontSize: '14px' }}>
                     Password reset email sent! Check your inbox and follow the link to reset your password.
                   </p>
                 </div>
@@ -216,12 +215,12 @@ export default function Login({ onNavigate }: LoginProps) {
                   padding: '18px',
                   fontSize: '18px',
                   fontWeight: '600',
-                  background: loading ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                  color: 'white',
+                  background: loading ? '#D1D5DB' : '#000000',
+                  color: loading ? '#9CA3AF' : '#fcd03a',
                   border: 'none',
                   borderRadius: '12px',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: loading ? 'none' : '0 8px 20px rgba(26, 157, 157, 0.15)',
+                  boxShadow: loading ? 'none' : '0 8px 20px rgba(252,208,58,0.25)',
                   transition: 'all 0.3s'
                 }}
               >
@@ -237,7 +236,7 @@ export default function Login({ onNavigate }: LoginProps) {
                   style={{ 
                     background: 'none', 
                     border: 'none', 
-                    color: '#1A9D9D', 
+                    color: '#fcd03a', 
                     fontSize: '16px', 
                     fontWeight: 'bold', 
                     cursor: 'pointer', 
@@ -266,8 +265,8 @@ export default function Login({ onNavigate }: LoginProps) {
 
         input:focus {
           outline: none;
-          border-color: #1A9D9D !important;
-          box-shadow: 0 0 0 4px rgba(26, 157, 157, 0.1);
+          border-color: #fcd03a !important;
+          box-shadow: 0 0 0 4px rgba(252,208,58,0.15);
         }
 
         button:hover:not(:disabled) {

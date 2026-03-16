@@ -192,7 +192,7 @@ function AppContent() {
           success: {
             duration: 3000,
             iconTheme: {
-              primary: '#10bd59',
+              primary: '#000000',
               secondary: '#fff',
             },
           },

@@ -202,7 +202,7 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
 
   const statusBadge = (status: 'active' | 'fulfilled' | 'expired') => {
     const styles: Record<string, { bg: string; color: string; border: string }> = {
-      active: { bg: '#ecfdf5', color: '#065f46', border: '#a7f3d0' },
+      active: { bg: '#fef9e0', color: '#000000', border: '#fcd03a' },
       fulfilled: { bg: '#eff6ff', color: '#1e40af', border: '#bfdbfe' },
       expired: { bg: '#f3f4f6', color: '#6b7280', border: '#d1d5db' },
     };
@@ -246,7 +246,7 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                   <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
                     {statusBadge(status)}
                     {matches.length > 0 && (
-                      <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#ecfdf5', color: '#065f46' }}>{matches.length} match{matches.length > 1 ? 'es' : ''}</span>
+                      <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>{matches.length} match{matches.length > 1 ? 'es' : ''}</span>
                     )}
                     <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                   </div>
@@ -260,16 +260,16 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                       Only drivers of the same gender (or with a matching occupant) will see this alert.
                     </div>
                     {matches.length > 0 && (
-                      <div style={{ marginBottom: '10px', padding: '10px', backgroundColor: '#ecfdf5', borderRadius: '10px', border: '1px solid #a7f3d0' }}>
-                        <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '700', color: '#065f46' }}>
+                      <div style={{ marginBottom: '10px', padding: '10px', backgroundColor: '#fef9e0', borderRadius: '10px', border: '1px solid #fcd03a' }}>
+                        <p style={{ margin: '0 0 6px', fontSize: '13px', fontWeight: '700', color: '#000000' }}>
                           {matches.length} matching ride{matches.length > 1 ? 's' : ''}:
                         </p>
                         {matches.map(ride => (
-                          <div key={ride.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', backgroundColor: 'white', borderRadius: '6px', marginBottom: '4px', border: '1px solid #d1fae5' }}>
+                          <div key={ride.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 8px', backgroundColor: 'white', borderRadius: '6px', marginBottom: '4px', border: '1px solid #fef9e0' }}>
                             <div style={{ fontSize: '12px', color: '#374151' }}>
                               <span style={{ fontWeight: '600' }}>{ride.driver_name}</span> at {ride.time} · {ride.seats} seat{ride.seats > 1 ? 's' : ''} · £{ride.price.toFixed(2)}
                             </div>
-                            <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '4px 10px', fontSize: '11px', fontWeight: '600', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Book</button>
+                            <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '4px 10px', fontSize: '11px', fontWeight: '600', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '5px', cursor: 'pointer', whiteSpace: 'nowrap' }}>Book</button>
                           </div>
                         ))}
                       </div>
@@ -307,7 +307,7 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
               const status = getWishStatus(wish);
               const isExpanded = expandedWishId === wish.id;
               const matches = wishMatches[wish.id] || [];
-              const borderColor = status === 'active' ? '#1A9D9D' : status === 'fulfilled' ? '#3b82f6' : '#d1d5db';
+              const borderColor = status === 'active' ? '#fcd03a' : status === 'fulfilled' ? '#3b82f6' : '#d1d5db';
 
               return (
                 <React.Fragment key={wish.id}>
@@ -329,7 +329,7 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                     </td>
                     <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
                       {matches.length > 0 ? (
-                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', backgroundColor: '#ecfdf5', color: '#065f46' }}>{matches.length}</span>
+                        <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '12px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>{matches.length}</span>
                       ) : (
                         <span style={{ color: '#D1D5DB' }}>—</span>
                       )}
@@ -356,25 +356,25 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                           Only drivers of the same gender (or with a matching occupant) will see this alert.
                         </div>
                         {matches.length > 0 && (
-                          <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #d1fae5' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #fef9e0' }}>
                             <thead>
-                              <tr style={{ backgroundColor: '#ecfdf5' }}>
-                                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#065f46' }}>Driver</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#065f46' }}>Time</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#065f46' }}>Seats</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: '#065f46' }}>Price</th>
-                                <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#065f46' }}></th>
+                              <tr style={{ backgroundColor: '#fef9e0' }}>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Driver</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'left', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Time</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Seats</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'right', fontSize: '12px', fontWeight: '600', color: '#000000' }}>Price</th>
+                                <th style={{ padding: '8px 12px', textAlign: 'center', fontSize: '12px', fontWeight: '600', color: '#000000' }}></th>
                               </tr>
                             </thead>
                             <tbody>
                               {matches.map(ride => (
                                 <tr key={ride.id}>
-                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#1F2937', fontWeight: '500', borderTop: '1px solid #d1fae5' }}>{ride.driver_name}</td>
-                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', borderTop: '1px solid #d1fae5' }}>{ride.time}</td>
-                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'center', borderTop: '1px solid #d1fae5' }}>{ride.seats}</td>
-                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'right', fontWeight: '600', borderTop: '1px solid #d1fae5' }}>£{ride.price.toFixed(2)}</td>
-                                  <td style={{ padding: '8px 12px', textAlign: 'center', borderTop: '1px solid #d1fae5' }}>
-                                    <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>View & Book</button>
+                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#1F2937', fontWeight: '500', borderTop: '1px solid #fef9e0' }}>{ride.driver_name}</td>
+                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', borderTop: '1px solid #fef9e0' }}>{ride.time}</td>
+                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'center', borderTop: '1px solid #fef9e0' }}>{ride.seats}</td>
+                                  <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'right', fontWeight: '600', borderTop: '1px solid #fef9e0' }}>£{ride.price.toFixed(2)}</td>
+                                  <td style={{ padding: '8px 12px', textAlign: 'center', borderTop: '1px solid #fef9e0' }}>
+                                    <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '5px 12px', fontSize: '12px', fontWeight: '600', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>View & Book</button>
                                   </td>
                                 </tr>
                               ))}
@@ -397,14 +397,14 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero */}
       <section style={{
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+        background: '#fcd03a',
         padding: isMobile ? '32px 16px' : '50px 20px',
       }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '12px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: '#000000', marginBottom: '12px' }}>
             Ride Alerts
           </h1>
-          <p style={{ fontSize: '18px', color: 'rgba(255,255,255,0.95)', maxWidth: '600px', margin: '0 auto' }}>
+          <p style={{ fontSize: '18px', color: 'rgba(0,0,0,0.7)', maxWidth: '600px', margin: '0 auto' }}>
             Can't find the ride you need? Set up an alert and we'll email you when a matching ride is posted.
           </p>
         </div>
@@ -563,10 +563,10 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
               disabled={submitting}
               style={{
                 padding: '14px 32px', fontSize: '16px', fontWeight: '700',
-                color: 'white',
-                background: submitting ? '#9CA3AF' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+                color: submitting ? '#6B7280' : '#fcd03a',
+                background: submitting ? '#9CA3AF' : '#000000',
                 border: 'none', borderRadius: '50px', cursor: submitting ? 'default' : 'pointer',
-                boxShadow: '0 4px 14px rgba(26,157,157,0.3)',
+                boxShadow: '0 4px 14px rgba(252,208,58,0.3)',
               }}
             >
               {submitting ? 'Creating...' : 'Create Alert'}

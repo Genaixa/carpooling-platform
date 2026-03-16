@@ -41,7 +41,7 @@ export default function Footer({ onNavigate }: FooterProps) {
   };
 
   return (
-    <footer style={{ backgroundColor: '#1F2937', color: '#D1D5DB' }}>
+    <footer style={{ backgroundColor: '#000000', color: '#D1D5DB' }}>
       {/* Main footer content */}
       <div
         style={{
@@ -60,9 +60,7 @@ export default function Footer({ onNavigate }: FooterProps) {
               fontSize: '22px',
               fontWeight: 800,
               marginBottom: '12px',
-              background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
+              color: '#fcd03a',
             }}
           >
             ChapaRide
@@ -79,7 +77,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('home')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               Find a Ride
@@ -87,7 +85,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('how-it-works')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               How it Works
@@ -95,7 +93,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('driver-apply')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               Become a Driver
@@ -103,7 +101,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('post-ride')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               Post a Ride
@@ -118,7 +116,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('contact')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               Contact Us
@@ -126,7 +124,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('terms')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               Terms &amp; Conditions
@@ -134,7 +132,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('privacy-policy')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               Privacy Policy
@@ -142,7 +140,7 @@ export default function Footer({ onNavigate }: FooterProps) {
             <button
               onClick={() => handleNavigate('faqs')}
               style={linkStyle}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
               onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
             >
               FAQs
@@ -155,7 +153,7 @@ export default function Footer({ onNavigate }: FooterProps) {
           <h4 style={columnHeadingStyle}>Contact</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A9D9D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fcd03a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
                 <polyline points="22,6 12,13 2,6" />
               </svg>
@@ -167,14 +165,14 @@ export default function Footer({ onNavigate }: FooterProps) {
                   textDecoration: 'none',
                   transition: 'color 0.2s',
                 }}
-                onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
+                onMouseEnter={(e) => (e.currentTarget.style.color = '#fcd03a')}
                 onMouseLeave={(e) => (e.currentTarget.style.color = '#D1D5DB')}
               >
                 info@chaparide.com
               </a>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1A9D9D" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fcd03a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" />
               </svg>
               <span style={plainTextStyle}>Mon–Fri, 9am–5pm GMT</span>
@@ -187,7 +185,7 @@ export default function Footer({ onNavigate }: FooterProps) {
       <div
         style={{
           borderTop: '1px solid rgba(255,255,255,0.1)',
-          backgroundColor: '#1a2332',
+          backgroundColor: '#000000',
         }}
       >
         <div
@@ -212,13 +210,13 @@ export default function Footer({ onNavigate }: FooterProps) {
               target="_blank"
               rel="noopener noreferrer"
               style={{
-                color: '#1A9D9D',
+                color: '#fcd03a',
                 textDecoration: 'none',
                 fontWeight: 600,
                 transition: 'color 0.2s',
               }}
-              onMouseEnter={(e) => (e.currentTarget.style.color = '#8BC34A')}
-              onMouseLeave={(e) => (e.currentTarget.style.color = '#1A9D9D')}
+              onMouseEnter={(e) => (e.currentTarget.style.color = '#c9a400')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = '#fcd03a')}
             >
               Genaixa Ltd
             </a>

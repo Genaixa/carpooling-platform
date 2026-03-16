@@ -233,7 +233,7 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
         <div style={{ padding: '80px 20px' }}>
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <p style={{ color: '#ef4444', marginBottom: '25px', fontSize: '18px' }}>{error}</p>
-            <button onClick={() => onNavigate('dashboard')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)' }}>
+            <button onClick={() => onNavigate('dashboard')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(252,208,58,0.25)' }}>
               Back to Dashboard
             </button>
           </div>
@@ -244,11 +244,11 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
 
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
-      <section style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
+      <section style={{ background: '#fcd03a', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '40px' }}>
-            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: 'white', marginBottom: '15px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Edit Ride</h1>
-            <p style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.95)' }}>Update your ride details</p>
+            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: '#000000', marginBottom: '15px' }}>Edit Ride</h1>
+            <p style={{ fontSize: '20px', color: 'rgba(0,0,0,0.7)' }}>Update your ride details</p>
           </div>
 
           <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: isMobile ? '24px' : '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', animation: 'floatUp 0.7s ease-out' }}>
@@ -326,7 +326,7 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Additional passengers already travelling with you</label>
                 <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '4px', marginTop: 0 }}>Help passengers know who they'll be travelling with</p>
-                <p style={{ fontSize: '13px', color: '#1A9D9D', marginBottom: '12px', marginTop: 0, fontWeight: '500' }}>You ({profile?.gender === 'Male' ? 'male' : 'female'}) are automatically counted</p>
+                <p style={{ fontSize: '13px', color: '#fcd03a', marginBottom: '12px', marginTop: 0, fontWeight: '500' }}>You ({profile?.gender === 'Male' ? 'male' : 'female'}) are automatically counted</p>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', color: '#4B5563', marginBottom: '6px' }}>Males</label>
@@ -382,12 +382,12 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
                 </div>
               )}
               {success && (
-                <div style={{ backgroundColor: '#dcfce7', border: '1px solid #86efac', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
-                  <p style={{ color: '#166534', margin: 0, fontSize: '16px' }}>{success}</p>
+                <div style={{ backgroundColor: '#fef9e0', border: '1px solid #fcd03a', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                  <p style={{ color: '#000000', margin: 0, fontSize: '16px' }}>{success}</p>
                 </div>
               )}
 
-              <button type="submit" disabled={submitting} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: '600', background: submitting ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: submitting ? 'none' : '0 8px 20px rgba(26, 157, 157, 0.15)', transition: 'all 0.3s', marginBottom: '15px' }}>
+              <button type="submit" disabled={submitting} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: '600', background: submitting ? '#D1D5DB' : '#000000', color: submitting ? '#9CA3AF' : '#fcd03a', border: 'none', borderRadius: '12px', cursor: submitting ? 'not-allowed' : 'pointer', boxShadow: submitting ? 'none' : '0 8px 20px rgba(252,208,58,0.25)', transition: 'all 0.3s', marginBottom: '15px' }}>
                 {submitting ? 'Updating...' : 'Update Ride'}
               </button>
               <button type="button" onClick={() => onNavigate('dashboard')} style={{ width: '100%', padding: '14px', fontSize: '16px', fontWeight: '600', backgroundColor: '#F5F5F5', color: '#4B5563', border: 'none', borderRadius: '12px', cursor: 'pointer', transition: 'all 0.3s' }}>
@@ -403,7 +403,7 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
           from { transform: translateY(40px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-        input:focus, select:focus { outline: none; border-color: #1A9D9D !important; box-shadow: 0 0 0 4px rgba(26, 157, 157, 0.1); }
+        input:focus, select:focus { outline: none; border-color: #fcd03a !important; box-shadow: 0 0 0 4px rgba(252,208,58,0.15); }
         button:hover:not(:disabled) { transform: translateY(-2px); }
       `}</style>
     </div>

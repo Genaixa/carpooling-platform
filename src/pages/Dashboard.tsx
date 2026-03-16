@@ -372,7 +372,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   const getStatusStyle = (status: string) => {
     switch (status) {
-      case 'upcoming': return { backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' };
+      case 'upcoming': return { backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' };
       case 'completed': return { backgroundColor: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' };
       case 'cancelled': return { backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' };
       default: return { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db' };
@@ -399,7 +399,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           <div style={{ maxWidth: '600px', margin: '0 auto', backgroundColor: 'white', borderRadius: '20px', padding: '40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', marginBottom: '16px' }}>Driver Approval Required</h2>
             <p style={{ color: '#4B5563', marginBottom: '25px' }}>You need to be an approved driver to access the dashboard.</p>
-            <button onClick={() => onNavigate('driver-apply')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Apply to Drive</button>
+            <button onClick={() => onNavigate('driver-apply')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer' }}>Apply to Drive</button>
           </div>
         </div>
       </div>
@@ -409,14 +409,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Page Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <div style={{ background: '#fcd03a', padding: isMobile ? '24px 16px' : '40px 20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {profile?.profile_photo_url && (
             <div style={{ marginBottom: '12px', position: 'relative', display: 'inline-block' }}>
               <img
                 src={profile.profile_photo_url}
                 alt={profile.name}
-                style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(255,255,255,0.8)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
+                style={{ width: '72px', height: '72px', borderRadius: '50%', objectFit: 'cover', border: '3px solid rgba(0,0,0,0.2)', boxShadow: '0 2px 8px rgba(0,0,0,0.2)' }}
               />
               <button
                 onClick={handleDeleteProfilePhoto}
@@ -430,8 +430,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               >×</button>
             </div>
           )}
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Dashboard</h1>
-          <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.95)', margin: 0 }}>Manage your rides and bookings</p>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: '#000000', marginBottom: '10px' }}>Dashboard</h1>
+          <p style={{ fontSize: '18px', color: 'rgba(0,0,0,0.7)', margin: 0 }}>Manage your rides and bookings</p>
         </div>
       </div>
 
@@ -642,7 +642,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               <button
                                 onClick={() => handleAcceptBooking(booking.id)}
                                 disabled={acceptingBookingId === booking.id || rejectingBookingId === booking.id}
-                                style={{ padding: '8px 16px', backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: acceptingBookingId === booking.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
+                                style={{ padding: '8px 16px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: acceptingBookingId === booking.id ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap' }}
                               >
                                 {acceptingBookingId === booking.id ? 'Accepting...' : 'Accept'}
                               </button>
@@ -707,7 +707,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       type="checkbox"
                       checked={notifyDriverAlerts}
                       onChange={(e) => handleToggleNotifyAlerts(e.target.checked)}
-                      style={{ width: '16px', height: '16px', accentColor: '#1A9D9D', cursor: 'pointer' }}
+                      style={{ width: '16px', height: '16px', accentColor: '#fcd03a', cursor: 'pointer' }}
                     />
                     Email me when passengers in my city create alerts
                   </label>
@@ -750,7 +750,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   }}>{wish.user.gender}</span>
                                 )}
                                 {matchInfo?.mine ? (
-                                  <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#dcfce7', color: '#166534' }}>Posted</span>
+                                  <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>Posted</span>
                                 ) : null}
                                 <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                               </div>
@@ -764,19 +764,19 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                     <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>{wish.user.travel_status === 'couple' ? 'Couple' : 'Solo'}</span>
                                     {wish.user.city && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe' }}>{wish.user.city}</span>}
                                     {wish.user.average_rating && wish.user.total_reviews > 0 && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a' }}>{wish.user.average_rating.toFixed(1)} ({wish.user.total_reviews})</span>}
-                                    {wish.user.is_verified && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>Verified</span>}
+                                    {wish.user.is_verified && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' }}>Verified</span>}
                                   </div>
                                 )}
                                 {matchInfo && (matchInfo.mine > 0 || matchInfo.others > 0) && (
                                   <div style={{ marginBottom: '10px' }}>
-                                    {matchInfo.mine > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#dcfce7', borderRadius: '6px', border: '1px solid #86efac', marginBottom: '4px' }}><p style={{ margin: 0, fontSize: '12px', color: '#166534', fontWeight: '600' }}>You've already posted a ride for this</p></div>}
+                                    {matchInfo.mine > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#fef9e0', borderRadius: '6px', border: '1px solid #fcd03a', marginBottom: '4px' }}><p style={{ margin: 0, fontSize: '12px', color: '#000000', fontWeight: '600' }}>You've already posted a ride for this</p></div>}
                                     {matchInfo.others > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#fff7ed', borderRadius: '6px', border: '1px solid #fed7aa' }}><p style={{ margin: 0, fontSize: '12px', color: '#9a3412', fontWeight: '600' }}>{matchInfo.others} other driver{matchInfo.others > 1 ? 's' : ''} already posted</p></div>}
                                   </div>
                                 )}
                                 {isCompatible ? (
                                   <button
                                     onClick={() => { sessionStorage.setItem('prefill-ride', JSON.stringify({ from: wish.departure_location, to: wish.arrival_location, date: wish.desired_date, time: wish.desired_time || '', passengers: wish.passengers_count })); onNavigate('post-ride'); }}
-                                    style={{ width: '100%', padding: '10px', background: matchInfo?.mine ? '#E8EBED' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: matchInfo?.mine ? '#4B5563' : 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                                    style={{ width: '100%', padding: '10px', background: matchInfo?.mine ? '#E8EBED' : '#000000', color: matchInfo?.mine ? '#4B5563' : '#fcd03a', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
                                   >{matchInfo?.mine ? 'Post Another Ride' : 'Post This Ride'}</button>
                                 ) : (
                                   <p style={{ margin: 0, fontSize: '12px', color: '#6B7280', fontWeight: '500', padding: '8px', backgroundColor: '#f3f4f6', borderRadius: '6px', textAlign: 'center' }}>
@@ -809,7 +809,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           const isCompatible = checkRideCompatibility(passengerGender, profile?.gender || null, null);
                           const matchInfo = wishMatchingRides[wish.id];
                           const isExpanded = expandedWishId === wish.id;
-                          const borderColor = isCompatible ? '#8BC34A' : '#d1d5db';
+                          const borderColor = isCompatible ? '#fcd03a' : '#d1d5db';
 
                           return (
                             <React.Fragment key={wish.id}>
@@ -854,7 +854,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                 </td>
                                 <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
                                   {matchInfo?.mine ? (
-                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#dcfce7', color: '#166534' }}>Posted</span>
+                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>Posted</span>
                                   ) : matchInfo?.others ? (
                                     <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fff7ed', color: '#9a3412' }}>{matchInfo.others} other{matchInfo.others > 1 ? 's' : ''}</span>
                                   ) : !isCompatible ? (
@@ -867,7 +867,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                   {isCompatible && (
                                     <button
                                       onClick={() => { sessionStorage.setItem('prefill-ride', JSON.stringify({ from: wish.departure_location, to: wish.arrival_location, date: wish.desired_date, time: wish.desired_time || '', passengers: wish.passengers_count })); onNavigate('post-ride'); }}
-                                      style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', background: matchInfo?.mine ? '#E8EBED' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: matchInfo?.mine ? '#4B5563' : 'white', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                                      style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', background: matchInfo?.mine ? '#E8EBED' : '#000000', color: matchInfo?.mine ? '#4B5563' : '#fcd03a', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
                                     >{matchInfo?.mine ? 'Post Another' : 'Post Ride'}</button>
                                   )}
                                 </td>
@@ -882,13 +882,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                         <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>{wish.user.travel_status === 'couple' ? 'Couple' : 'Solo'}</span>
                                         {wish.user.city && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe' }}>{wish.user.city}</span>}
                                         {wish.user.average_rating && wish.user.total_reviews > 0 && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a' }}>{wish.user.average_rating.toFixed(1)} ({wish.user.total_reviews} {wish.user.total_reviews === 1 ? 'review' : 'reviews'})</span>}
-                                        {wish.user.is_verified && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#ecfdf5', color: '#065f46', border: '1px solid #a7f3d0' }}>Verified</span>}
+                                        {wish.user.is_verified && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' }}>Verified</span>}
                                         <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Member since {new Date(wish.user.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>
                                       </div>
                                     )}
                                     {matchInfo && (matchInfo.mine > 0 || matchInfo.others > 0) && (
                                       <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                                        {matchInfo.mine > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#dcfce7', borderRadius: '8px', border: '1px solid #86efac' }}><p style={{ margin: 0, fontSize: '12px', color: '#166534', fontWeight: '600' }}>You've already posted a ride for this route and date</p></div>}
+                                        {matchInfo.mine > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid #fcd03a' }}><p style={{ margin: 0, fontSize: '12px', color: '#000000', fontWeight: '600' }}>You've already posted a ride for this route and date</p></div>}
                                         {matchInfo.others > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}><p style={{ margin: 0, fontSize: '12px', color: '#9a3412', fontWeight: '600' }}>{matchInfo.others} other driver{matchInfo.others > 1 ? 's have' : ' has'} already posted a ride for this</p></div>}
                                       </div>
                                     )}
@@ -923,7 +923,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   fontWeight: '600',
                   cursor: 'pointer',
                   backgroundColor: dashView === 'rides' ? 'white' : 'transparent',
-                  color: dashView === 'rides' ? '#1A9D9D' : '#6B7280',
+                  color: dashView === 'rides' ? '#fcd03a' : '#6B7280',
                   boxShadow: dashView === 'rides' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                   transition: 'all 0.2s ease',
                 }}
@@ -941,7 +941,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   fontWeight: '600',
                   cursor: 'pointer',
                   backgroundColor: dashView === 'financials' ? 'white' : 'transparent',
-                  color: dashView === 'financials' ? '#1A9D9D' : '#6B7280',
+                  color: dashView === 'financials' ? '#fcd03a' : '#6B7280',
                   boxShadow: dashView === 'financials' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
                   transition: 'all 0.2s ease',
                 }}
@@ -972,7 +972,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 {rides.length === 0 ? (
                   <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
                     <p style={{ color: '#4B5563', fontSize: '20px', marginBottom: '25px' }}>No rides posted yet</p>
-                    <button onClick={() => onNavigate('post-ride')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)' }}>Post Your First Ride</button>
+                    <button onClick={() => onNavigate('post-ride')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(252,208,58,0.25)' }}>Post Your First Ride</button>
                   </div>
                 ) : (
                   <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
@@ -1024,7 +1024,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                         <div key={b.id} style={{ fontSize: '12px', color: '#4B5563', marginBottom: '5px', paddingBottom: '5px', borderBottom: '1px solid #F3F4F6' }}>
                                           <span style={{ fontWeight: '600' }}>{(b.passenger as any)?.name}</span> — {b.seats_booked} seat(s), £{b.total_paid?.toFixed(2)}
                                           {contactVisible ? (
-                                            <span style={{ display: 'block', fontSize: '11px', color: '#1A9D9D' }}>
+                                            <span style={{ display: 'block', fontSize: '11px', color: '#fcd03a' }}>
                                               {(b.passenger as any)?.phone && `${(b.passenger as any).phone}`}
                                               {(b.passenger as any)?.email && ` | ${(b.passenger as any).email}`}
                                             </span>
@@ -1033,7 +1033,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                           )}
                                           {(isPastDeparture || ride.status === 'completed') && !['cancelled', 'refunded'].includes(b.status) && (
                                             reviewedBookingIds.has(b.id)
-                                              ? <span style={{ marginTop: '3px', display: 'inline-block', padding: '3px 8px', fontSize: '11px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '5px', fontWeight: '500' }}>Reviewed ✓</span>
+                                              ? <span style={{ marginTop: '3px', display: 'inline-block', padding: '3px 8px', fontSize: '11px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a', borderRadius: '5px', fontWeight: '500' }}>Reviewed ✓</span>
                                               : <button onClick={() => setReviewingBooking(b)} style={{ marginTop: '3px', padding: '3px 8px', fontSize: '11px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '5px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
                                           )}
                                         </div>
@@ -1048,7 +1048,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                     )}
                                     {ride.status === 'upcoming' && !isPastDeparture && (
                                       <>
-                                        <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ flex: 1, padding: '10px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                                        <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ flex: 1, padding: '10px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                                         <button onClick={() => setCancellingRideId(ride.id)} style={{ flex: 1, padding: '10px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                                       </>
                                     )}
@@ -1085,7 +1085,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               <React.Fragment key={ride.id}>
                                 <tr
                                   onClick={() => setExpandedRideId(isExpanded ? null : ride.id)}
-                                  style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${ride.status === 'cancelled' ? '#ef4444' : ride.status === 'completed' ? '#3b82f6' : '#1A9D9D'}` }}
+                                  style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${ride.status === 'cancelled' ? '#ef4444' : ride.status === 'completed' ? '#3b82f6' : '#fcd03a'}` }}
                                   onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
                                   onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
                                 >
@@ -1128,12 +1128,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                         bookingsForRide.some(b => !['cancelled', 'refunded'].includes(b.status))
                                           ? (bookingsForRide.some(b => !['cancelled', 'refunded'].includes(b.status) && !reviewedBookingIds.has(b.id))
                                               ? <button onClick={() => setExpandedRideId(isExpanded ? null : ride.id)} style={{ padding: '6px 12px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Review</button>
-                                              : <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '6px', display: 'inline-block' }}>Reviewed ✓</span>)
+                                              : <span style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a', borderRadius: '6px', display: 'inline-block' }}>Reviewed ✓</span>)
                                           : <span style={{ fontSize: '12px', color: '#D1D5DB', fontWeight: '500' }}>—</span>
                                       )}
                                       {ride.status === 'upcoming' && !isPastDeparture && (
                                         <>
-                                          <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
+                                          <button onClick={() => onNavigate('edit-ride', ride.id)} style={{ padding: '6px 12px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Edit</button>
                                           <button onClick={() => setCancellingRideId(ride.id)} style={{ padding: '6px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                                         </>
                                       )}
@@ -1173,7 +1173,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                                 <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'right', fontWeight: '600', borderTop: '1px solid #F3F4F6' }}>£{b.total_paid?.toFixed(2)}</td>
                                                 <td style={{ padding: '8px 12px', fontSize: '12px', borderTop: '1px solid #F3F4F6' }}>
                                                   {contactVisible ? (
-                                                    <span style={{ color: '#1A9D9D' }}>
+                                                    <span style={{ color: '#fcd03a' }}>
                                                       {(b.passenger as any)?.phone && `${(b.passenger as any).phone}`}
                                                       {(b.passenger as any)?.email && ` | ${(b.passenger as any).email}`}
                                                     </span>
@@ -1184,7 +1184,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                                 <td style={{ padding: '8px 12px', textAlign: 'center', borderTop: '1px solid #F3F4F6' }}>
                                                   {(isPastDeparture || ride.status === 'completed') && !['cancelled', 'refunded'].includes(b.status) && (
                                                     reviewedBookingIds.has(b.id)
-                                                      ? <span style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#f0fdf4', color: '#15803d', border: '1px solid #bbf7d0', borderRadius: '5px', fontWeight: '500', display: 'inline-block' }}>Reviewed ✓</span>
+                                                      ? <span style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a', borderRadius: '5px', fontWeight: '500', display: 'inline-block' }}>Reviewed ✓</span>
                                                       : <button onClick={() => setReviewingBooking(b)} style={{ padding: '3px 8px', fontSize: '11px', backgroundColor: '#EEF2FF', color: '#4338CA', border: '1px solid #C7D2FE', borderRadius: '5px', cursor: 'pointer', fontWeight: '500' }}>Review</button>
                                                   )}
                                                 </td>
@@ -1332,9 +1332,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
                   {/* Grand Total Summary Cards */}
                   <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)', gap: '16px', marginBottom: '28px' }}>
-                    <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #1A9D9D' }}>
+                    <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #fcd03a' }}>
                       <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '6px', fontWeight: '500' }}>Your Share</p>
-                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#1A9D9D', margin: 0 }}>£{totalEarnings.toFixed(2)}</p>
+                      <p style={{ fontSize: '28px', fontWeight: 'bold', color: '#fcd03a', margin: 0 }}>£{totalEarnings.toFixed(2)}</p>
                     </div>
                     <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderTop: '4px solid #f59e0b' }}>
                       <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '6px', fontWeight: '500' }}>Platform Commission</p>
@@ -1421,23 +1421,23 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               <td style={{ ...tdStyle, textAlign: 'center' }}>{row.seats}</td>
                               <td style={{ ...tdStyle, textAlign: 'right' }}>£{row.revenue.toFixed(2)}</td>
                               <td style={{ ...tdStyle, textAlign: 'right', color: '#f59e0b' }}>£{row.commission.toFixed(2)}</td>
-                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '600', color: '#1A9D9D' }}>£{row.earnings.toFixed(2)}</td>
+                              <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '600', color: '#fcd03a' }}>£{row.earnings.toFixed(2)}</td>
                             </tr>
                           ))}
                         </tbody>
                         <tfoot>
                           <tr style={{ backgroundColor: '#F0FDFA' }}>
-                            <td colSpan={4} style={{ ...tdStyle, fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>Grand Total</td>
-                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>
+                            <td colSpan={4} style={{ ...tdStyle, fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #fcd03a' }}>Grand Total</td>
+                            <td style={{ ...tdStyle, textAlign: 'center', fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #fcd03a' }}>
                               {filtered.reduce((sum, r) => sum + r.seats, 0)}
                             </td>
-                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#1F2937', borderBottom: 'none', borderTop: '2px solid #fcd03a' }}>
                               £{totalRevenue.toFixed(2)}
                             </td>
-                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#f59e0b', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#f59e0b', borderBottom: 'none', borderTop: '2px solid #fcd03a' }}>
                               £{totalCommission.toFixed(2)}
                             </td>
-                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#1A9D9D', borderBottom: 'none', borderTop: '2px solid #1A9D9D' }}>
+                            <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: '#fcd03a', borderBottom: 'none', borderTop: '2px solid #fcd03a' }}>
                               £{totalEarnings.toFixed(2)}
                             </td>
                           </tr>

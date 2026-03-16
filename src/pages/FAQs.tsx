@@ -154,8 +154,8 @@ export default function FAQs({ onNavigate }: FAQsProps) {
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero */}
       <section style={{
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-        color: 'white',
+        background: '#fcd03a',
+        color: '#000000',
         padding: isMobile ? '40px 16px' : '64px 20px',
         textAlign: 'center',
         position: 'relative',
@@ -168,7 +168,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
           <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', marginBottom: '12px' }}>
             Frequently Asked Questions
           </h1>
-          <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(255,255,255,0.9)', maxWidth: '600px', margin: '0 auto' }}>
+          <p style={{ fontSize: isMobile ? '15px' : '18px', color: 'rgba(0,0,0,0.7)', maxWidth: '600px', margin: '0 auto' }}>
             Find answers to common questions about using ChapaRide.
           </p>
         </div>
@@ -182,7 +182,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
             <h2 style={{
               fontSize: isMobile ? '20px' : '24px',
               fontWeight: 'bold',
-              color: '#1A9D9D',
+              color: '#fcd03a',
               marginBottom: '16px',
               display: 'flex',
               alignItems: 'center',
@@ -195,8 +195,8 @@ export default function FAQs({ onNavigate }: FAQsProps) {
                 width: '36px',
                 height: '36px',
                 borderRadius: '50%',
-                background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                color: 'white',
+                background: '#fef9e0',
+                color: '#000000',
                 flexShrink: 0,
               }}>
                 {category.icon}
@@ -216,9 +216,9 @@ export default function FAQs({ onNavigate }: FAQsProps) {
                     style={{
                       backgroundColor: 'white',
                       borderRadius: '12px',
-                      border: isExpanded ? '1px solid #1A9D9D' : '1px solid #E8EBED',
+                      border: isExpanded ? '1px solid #fcd03a' : '1px solid #E8EBED',
                       boxShadow: isExpanded
-                        ? '0 4px 16px rgba(26,157,157,0.12)'
+                        ? '0 4px 16px rgba(252,208,58,0.12)'
                         : '0 2px 8px rgba(0,0,0,0.04)',
                       transition: 'border-color 0.2s ease, box-shadow 0.2s ease',
                       overflow: 'hidden',
@@ -240,7 +240,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
                         textAlign: 'left',
                         fontSize: isMobile ? '15px' : '16px',
                         fontWeight: '600',
-                        color: isExpanded ? '#1A9D9D' : '#1F2937',
+                        color: isExpanded ? '#fcd03a' : '#1F2937',
                         lineHeight: '1.5',
                         transition: 'color 0.2s ease',
                       }}
@@ -248,7 +248,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
                       <span style={{ flex: 1 }}>{faq.question}</span>
                       <span style={{
                         fontSize: '14px',
-                        color: isExpanded ? '#1A9D9D' : '#9CA3AF',
+                        color: isExpanded ? '#fcd03a' : '#9CA3AF',
                         flexShrink: 0,
                         transition: 'transform 0.3s ease, color 0.2s ease',
                         transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -290,10 +290,10 @@ export default function FAQs({ onNavigate }: FAQsProps) {
 
         {/* Still have questions CTA */}
         <div style={{
-          background: 'linear-gradient(135deg, rgba(26,157,157,0.06) 0%, rgba(139,195,74,0.06) 100%)',
+          background: '#fef9e0',
           borderRadius: '20px',
           padding: isMobile ? '28px 20px' : '40px',
-          border: '1px solid rgba(26,157,157,0.15)',
+          border: '1px solid rgba(252,208,58,0.4)',
           textAlign: 'center',
           marginBottom: '40px',
         }}>
@@ -308,13 +308,13 @@ export default function FAQs({ onNavigate }: FAQsProps) {
             style={{
               display: 'inline-block',
               padding: '12px 28px',
-              background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-              color: 'white',
+              background: '#000000',
+              color: '#fcd03a',
               borderRadius: '50px',
               fontSize: '15px',
               fontWeight: '700',
               textDecoration: 'none',
-              boxShadow: '0 4px 16px rgba(26,157,157,0.3)',
+              boxShadow: '0 4px 16px rgba(252,208,58,0.3)',
             }}
           >
             Contact Us
@@ -328,11 +328,11 @@ export default function FAQs({ onNavigate }: FAQsProps) {
             style={{
               padding: '14px 32px',
               background: 'none',
-              color: '#1A9D9D',
+              color: '#fcd03a',
               borderRadius: '50px',
               fontSize: '16px',
               fontWeight: '700',
-              border: '2px solid #1A9D9D',
+              border: '2px solid #fcd03a',
               cursor: 'pointer',
             }}
           >

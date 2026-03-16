@@ -293,7 +293,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
 
   const getStatusStyle = (status: string, driverAction: string | null) => {
     if (status === 'pending_driver') return { backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047' };
-    if (status === 'confirmed') return { backgroundColor: '#dcfce7', color: '#166534', border: '1px solid #86efac' };
+    if (status === 'confirmed') return { backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' };
     if (status === 'completed') return { backgroundColor: '#dbeafe', color: '#1e40af', border: '1px solid #93c5fd' };
     if (status === 'cancelled' || status === 'refunded') return { backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5' };
     return { backgroundColor: '#f3f4f6', color: '#374151', border: '1px solid #d1d5db' };
@@ -306,9 +306,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Page Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '24px 16px' : '40px 20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
+      <div style={{ background: '#fcd03a', padding: isMobile ? '24px 16px' : '40px 20px', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}>
         <div style={{ maxWidth: '1200px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: 'white', marginBottom: '0', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>My Bookings</h1>
+          <h1 style={{ fontSize: isMobile ? '28px' : '42px', fontWeight: 'bold', color: '#000000', marginBottom: '0' }}>My Bookings</h1>
         </div>
       </div>
 
@@ -362,7 +362,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 backgroundColor: bookingsView === 'bookings' ? 'white' : 'transparent',
-                color: bookingsView === 'bookings' ? '#1A9D9D' : '#6B7280',
+                color: bookingsView === 'bookings' ? '#fcd03a' : '#6B7280',
                 boxShadow: bookingsView === 'bookings' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
               }}
             >
@@ -380,7 +380,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                 cursor: 'pointer',
                 transition: 'all 0.2s',
                 backgroundColor: bookingsView === 'financials' ? 'white' : 'transparent',
-                color: bookingsView === 'financials' ? '#1A9D9D' : '#6B7280',
+                color: bookingsView === 'financials' ? '#fcd03a' : '#6B7280',
                 boxShadow: bookingsView === 'financials' ? '0 2px 8px rgba(0,0,0,0.08)' : 'none',
               }}
             >
@@ -394,15 +394,15 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
         ) : bookings.length === 0 ? (
           <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
             <p style={{ color: '#4B5563', fontSize: '20px', marginBottom: '25px' }}>No bookings yet. Start exploring rides!</p>
-            <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)' }}>Browse Rides</button>
+            <button onClick={() => onNavigate('home')} style={{ padding: '14px 32px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '16px', fontWeight: '600', cursor: 'pointer', boxShadow: '0 4px 12px rgba(252,208,58,0.25)' }}>Browse Rides</button>
           </div>
         ) : bookingsView === 'financials' ? (
           /* ===== FINANCIAL REPORT VIEW ===== */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
             {/* Grand Total Summary */}
-            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #1A9D9D' }}>
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '24px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #fcd03a' }}>
               <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 4px', fontWeight: '500' }}>Total Spent</p>
-              <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#1A9D9D', margin: 0 }}>
+              <p style={{ fontSize: '32px', fontWeight: 'bold', color: '#fcd03a', margin: 0 }}>
                 £{grandTotal.toFixed(2)}
               </p>
               <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '4px 0 0' }}>
@@ -547,7 +547,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                             textAlign: field === 'seats' || field === 'amount' ? 'right' : 'left',
                             fontSize: '13px',
                             fontWeight: '600',
-                            color: sortField === field ? '#1A9D9D' : '#4B5563',
+                            color: sortField === field ? '#fcd03a' : '#4B5563',
                             cursor: 'pointer',
                             userSelect: 'none',
                             whiteSpace: 'nowrap',
@@ -575,7 +575,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                           <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1F2937' }}>
                             {driver ? (
                               <span
-                                style={{ cursor: 'pointer', color: '#1A9D9D', fontWeight: '500' }}
+                                style={{ cursor: 'pointer', color: '#fcd03a', fontWeight: '500' }}
                                 onClick={() => onNavigate('public-profile', undefined, driver.id)}
                               >
                                 {getDriverAlias(driver.id)}
@@ -604,7 +604,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                       <td colSpan={5} style={{ padding: '14px 16px', fontSize: '14px', fontWeight: 'bold', color: '#1F2937', textAlign: 'right' }}>
                         Grand Total ({financialBookings.length} booking{financialBookings.length !== 1 ? 's' : ''})
                       </td>
-                      <td style={{ padding: '14px 16px', fontSize: '16px', fontWeight: 'bold', color: '#1A9D9D', textAlign: 'right' }}>
+                      <td style={{ padding: '14px 16px', fontSize: '16px', fontWeight: 'bold', color: '#fcd03a', textAlign: 'right' }}>
                         £{grandTotal.toFixed(2)}
                       </td>
                       <td></td>
@@ -635,7 +635,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                         const contactVisible = isContactVisible(booking.ride.date_time);
                         const isExpanded = expandedPastId === booking.id;
                         return (
-                          <div key={booking.id} style={{ borderBottom: '1px solid #E8EBED', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#1A9D9D'}` }}>
+                          <div key={booking.id} style={{ borderBottom: '1px solid #E8EBED', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#fcd03a'}` }}>
                             <div onClick={() => setExpandedPastId(isExpanded ? null : booking.id)} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -654,7 +654,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   Ref: {getRideRef(booking.ride_id)}
                                 </div>
                                 <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '10px' }}>
-                                  <span style={{ fontWeight: '600', cursor: 'pointer', color: '#1A9D9D' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>{getDriverAlias(driver.id)}</span>
+                                  <span style={{ fontWeight: '600', cursor: 'pointer', color: '#fcd03a' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>{getDriverAlias(driver.id)}</span>
                                   <span style={{ color: '#9CA3AF' }}> ({driver.gender === 'Male' ? 'M' : 'F'})</span>
                                   {' · '}{booking.seats_booked} seat(s) · £{booking.total_paid?.toFixed(2)}
                                 </div>
@@ -678,17 +678,17 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   </div>
                                 )}
                                 {booking.status === 'confirmed' && contactVisible ? (
-                                  <div style={{ padding: '10px', backgroundColor: '#F0FAFA', borderRadius: '8px', border: '1px solid rgba(26,157,157,0.25)', marginBottom: '10px' }}>
-                                    <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
+                                  <div style={{ padding: '10px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid rgba(252,208,58,0.4)', marginBottom: '10px' }}>
+                                    <p style={{ fontSize: '11px', fontWeight: '700', color: '#fcd03a', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
                                     <p style={{ fontSize: '13px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px 0' }}>{driver.name}</p>
-                                    {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
+                                    {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#fcd03a', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
                                     {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '12px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
                                   </div>
                                 ) : booking.status === 'confirmed' ? (
                                   <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 10px 0' }}>Contact details available 24 hours before departure</p>
                                 ) : null}
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                  <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ padding: '8px 16px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>View Ride</button>
+                                  <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ padding: '8px 16px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>View Ride</button>
                                   {(booking.status === 'confirmed' || booking.status === 'pending_driver') && (
                                     <button onClick={() => setCancellingBooking(booking)} style={{ padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                                   )}
@@ -724,7 +724,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                             <React.Fragment key={booking.id}>
                               <tr
                                 onClick={() => setExpandedPastId(isExpanded ? null : booking.id)}
-                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#1A9D9D'}` }}
+                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#fcd03a'}` }}
                                 onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
                                 onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
                               >
@@ -737,7 +737,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
                                   {formatDate(booking.ride.date_time)}<br /><span style={{ color: '#9CA3AF', fontSize: '12px' }}>{formatTime(booking.ride.date_time)}</span>
                                 </td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#1A9D9D', fontWeight: '500', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#fcd03a', fontWeight: '500', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
                                   <span style={{ cursor: 'pointer' }} onClick={(e) => { e.stopPropagation(); onNavigate('public-profile', undefined, driver.id); }}>
                                     {getDriverAlias(driver.id)} <span style={{ color: '#9CA3AF', fontWeight: '400' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
                                   </span>
@@ -751,7 +751,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 </td>
                                 <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                   <div style={{ display: 'flex', gap: '6px', justifyContent: 'flex-end' }} onClick={(e) => e.stopPropagation()}>
-                                    <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ padding: '6px 12px', background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View</button>
+                                    <button onClick={() => onNavigate('ride-details', booking.ride_id)} style={{ padding: '6px 12px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>View</button>
                                     {(booking.status === 'confirmed' || booking.status === 'pending_driver') && (
                                       <button onClick={() => setCancellingBooking(booking)} style={{ padding: '6px 12px', backgroundColor: '#fee2e2', color: '#991b1b', border: '1px solid #fca5a5', borderRadius: '6px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>Cancel</button>
                                     )}
@@ -779,10 +779,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                       </div>
                                     )}
                                     {booking.status === 'confirmed' && contactVisible ? (
-                                      <div style={{ display: 'inline-block', padding: '12px 16px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)' }}>
-                                        <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
+                                      <div style={{ display: 'inline-block', padding: '12px 16px', backgroundColor: '#fef9e0', borderRadius: '10px', border: '1px solid rgba(252,208,58,0.4)' }}>
+                                        <p style={{ fontSize: '11px', fontWeight: '700', color: '#fcd03a', margin: '0 0 6px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver Contact Details</p>
                                         <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px 0' }}>{driver.name}</p>
-                                        {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '14px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
+                                        {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '14px', color: '#fcd03a', fontWeight: '600', textDecoration: 'none', marginBottom: '3px' }}>📞 {driver.phone}</a>}
                                         {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '13px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
                                       </div>
                                     ) : booking.status === 'confirmed' ? (
@@ -843,10 +843,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   {booking.seats_booked} seat(s) — £{booking.total_paid?.toFixed(2)}
                                 </div>
                                 {driver && (
-                                  <div style={{ padding: '10px', backgroundColor: '#F0FAFA', borderRadius: '8px', border: '1px solid rgba(26,157,157,0.25)', marginBottom: '8px' }}>
-                                    <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</p>
+                                  <div style={{ padding: '10px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid rgba(252,208,58,0.4)', marginBottom: '8px' }}>
+                                    <p style={{ fontSize: '11px', fontWeight: '700', color: '#fcd03a', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</p>
                                     <p style={{ fontSize: '13px', fontWeight: '600', color: '#1F2937', margin: '0 0 3px 0' }}>{driver.name}</p>
-                                    {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '2px' }}>📞 {driver.phone}</a>}
+                                    {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#fcd03a', fontWeight: '600', textDecoration: 'none', marginBottom: '2px' }}>📞 {driver.phone}</a>}
                                     {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '12px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
                                   </div>
                                 )}
@@ -927,10 +927,10 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                   <td colSpan={8} style={{ padding: '0 16px 12px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
                                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', paddingTop: '8px' }}>
                                       {driver && (
-                                        <div style={{ padding: '10px 14px', backgroundColor: '#F0FAFA', borderRadius: '10px', border: '1px solid rgba(26,157,157,0.25)' }}>
-                                          <p style={{ fontSize: '11px', fontWeight: '700', color: '#1A9D9D', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</p>
+                                        <div style={{ padding: '10px 14px', backgroundColor: '#fef9e0', borderRadius: '10px', border: '1px solid rgba(252,208,58,0.4)' }}>
+                                          <p style={{ fontSize: '11px', fontWeight: '700', color: '#fcd03a', margin: '0 0 4px 0', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Driver</p>
                                           <p style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', margin: '0 0 3px 0' }}>{driver.name}</p>
-                                          {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#1A9D9D', fontWeight: '600', textDecoration: 'none', marginBottom: '2px' }}>📞 {driver.phone}</a>}
+                                          {driver.phone && <a href={`tel:${driver.phone}`} style={{ display: 'block', fontSize: '13px', color: '#fcd03a', fontWeight: '600', textDecoration: 'none', marginBottom: '2px' }}>📞 {driver.phone}</a>}
                                           {driver.email && <a href={`mailto:${driver.email}`} style={{ display: 'block', fontSize: '12px', color: '#4198d0', textDecoration: 'none' }}>✉ {driver.email}</a>}
                                         </div>
                                       )}

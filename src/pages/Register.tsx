@@ -103,34 +103,22 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero Section with Form */}
-      <section style={{ 
-        background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', 
+      <section style={{
+        background: '#fcd03a',
         padding: isMobile ? '32px 16px 60px' : '60px 20px 100px',
         position: 'relative',
         overflow: 'hidden'
       }}>
-        {/* Background decorative elements */}
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 80% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
-          pointerEvents: 'none'
-        }}></div>
-
         <div style={{ maxWidth: '600px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
           {/* Hero Text */}
           <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '40px' }}>
             <h1 style={{
               fontSize: isMobile ? '28px' : '48px',
               fontWeight: 'bold',
-              color: 'white',
+              color: '#000000',
               marginBottom: '12px',
-              textShadow: '2px 2px 4px rgba(0,0,0,0.2)'
             }}>{intent === 'driver' ? 'Become a Driver' : 'Create your account'}</h1>
-            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(255, 255, 255, 0.95)' }}>
+            <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(0,0,0,0.7)' }}>
               {intent === 'driver'
                 ? 'Start saving money by sharing your journeys across the UK'
                 : 'Join thousands of travellers saving money on rides'}
@@ -142,12 +130,12 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
             <div style={{ marginBottom: '24px' }}>
               {/* Step labels */}
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px' }}>
-                <span style={{ fontSize: '13px', fontWeight: '700', color: 'white' }}>Step 1: Create Account</span>
-                <span style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(255,255,255,0.6)' }}>Step 2: Driver Application</span>
+                <span style={{ fontSize: '13px', fontWeight: '700', color: '#000000' }}>Step 1: Create Account</span>
+                <span style={{ fontSize: '13px', fontWeight: '600', color: 'rgba(0,0,0,0.5)' }}>Step 2: Driver Application</span>
               </div>
               {/* Progress bar */}
-              <div style={{ backgroundColor: 'rgba(255,255,255,0.3)', borderRadius: '99px', height: '8px' }}>
-                <div style={{ width: '50%', backgroundColor: 'white', borderRadius: '99px', height: '8px', transition: 'width 0.3s' }} />
+              <div style={{ backgroundColor: 'rgba(0,0,0,0.15)', borderRadius: '99px', height: '8px' }}>
+                <div style={{ width: '50%', backgroundColor: '#000000', borderRadius: '99px', height: '8px', transition: 'width 0.3s' }} />
               </div>
             </div>
           )}
@@ -423,8 +411,8 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
               {/* Passenger Responsibility & Children Policy */}
               {intent !== 'driver' && (
                 <div style={{
-                  backgroundColor: '#f0fdf4',
-                  border: '1px solid #bbf7d0',
+                  backgroundColor: '#fef9e0',
+                  border: '1px solid #fcd03a',
                   borderRadius: '12px',
                   padding: '16px',
                   marginBottom: '20px',
@@ -432,13 +420,13 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                   lineHeight: '1.6',
                   color: '#374151',
                 }}>
-                  <p style={{ fontWeight: '700', color: '#166534', margin: '0 0 8px 0', fontSize: '14px' }}>
+                  <p style={{ fontWeight: '700', color: '#000000', margin: '0 0 8px 0', fontSize: '14px' }}>
                     Passenger Responsibility
                   </p>
                   <p style={{ margin: '0 0 8px 0', lineHeight: '1.4' }}>
                     By joining a ride on ChapaRide, I agree to arrive at the pick-up point on time, pay my share of fuel and travel costs as agreed with the driver, behave respectfully and follow the driver's reasonable instructions, and understand that ChapaRide is only a platform and my safety is my responsibility.
                   </p>
-                  <p style={{ fontWeight: '700', color: '#166534', margin: '12px 0 8px 0', fontSize: '14px' }}>
+                  <p style={{ fontWeight: '700', color: '#000000', margin: '12px 0 8px 0', fontSize: '14px' }}>
                     Children Policy
                   </p>
                   <ul style={{ margin: '0', paddingLeft: '20px' }}>
@@ -467,7 +455,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                       height: '20px',
                       marginTop: '2px',
                       flexShrink: 0,
-                      accentColor: '#1A9D9D',
+                      accentColor: '#fcd03a',
                       cursor: 'pointer',
                     }}
                   />
@@ -495,7 +483,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                       height: '20px',
                       marginTop: '2px',
                       flexShrink: 0,
-                      accentColor: '#1A9D9D',
+                      accentColor: '#fcd03a',
                       cursor: 'pointer',
                     }}
                   />
@@ -504,7 +492,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); onNavigate('privacy-policy'); }}
-                      style={{ background: 'none', border: 'none', color: '#1A9D9D', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: '14px', fontFamily: 'inherit' }}
+                      style={{ background: 'none', border: 'none', color: '#fcd03a', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: '14px', fontFamily: 'inherit' }}
                     >
                       Privacy Policy
                     </button>
@@ -512,7 +500,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                     <button
                       type="button"
                       onClick={(e) => { e.preventDefault(); onNavigate('terms'); }}
-                      style={{ background: 'none', border: 'none', color: '#1A9D9D', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: '14px', fontFamily: 'inherit' }}
+                      style={{ background: 'none', border: 'none', color: '#fcd03a', fontWeight: '600', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: '14px', fontFamily: 'inherit' }}
                     >
                       Terms of Service
                     </button>.
@@ -529,12 +517,12 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                   padding: '18px',
                   fontSize: '18px',
                   fontWeight: '600',
-                  background: loading ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                  color: 'white',
+                  background: loading ? '#D1D5DB' : '#000000',
+                  color: loading ? '#9CA3AF' : '#fcd03a',
                   border: 'none',
                   borderRadius: '12px',
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  boxShadow: loading ? 'none' : '0 8px 20px rgba(26, 157, 157, 0.15)',
+                  boxShadow: loading ? 'none' : '0 8px 20px rgba(252,208,58,0.25)',
                   transition: 'all 0.3s'
                 }}
               >
@@ -554,7 +542,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                   style={{ 
                     background: 'none', 
                     border: 'none', 
-                    color: '#1A9D9D', 
+                    color: '#fcd03a', 
                     fontSize: '16px', 
                     fontWeight: 'bold', 
                     cursor: 'pointer', 
@@ -583,8 +571,8 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
 
         input:focus, select:focus {
           outline: none;
-          border-color: #1A9D9D !important;
-          box-shadow: 0 0 0 4px rgba(26, 157, 157, 0.1);
+          border-color: #fcd03a !important;
+          box-shadow: 0 0 0 4px rgba(252,208,58,0.15);
         }
 
         button:hover:not(:disabled) {

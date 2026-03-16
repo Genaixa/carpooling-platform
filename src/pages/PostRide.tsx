@@ -76,14 +76,14 @@ export default function PostRide({ onNavigate }: PostRideProps) {
               onClick={() => onNavigate('driver-apply')}
               style={{
                 padding: '14px 32px',
-                background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                color: 'white',
+                background: '#000000',
+                color: '#fcd03a',
                 border: 'none',
                 borderRadius: '12px',
                 fontSize: '16px',
                 fontWeight: '600',
                 cursor: 'pointer',
-                boxShadow: '0 4px 12px rgba(26, 157, 157, 0.15)',
+                boxShadow: '0 4px 12px rgba(252,208,58,0.25)',
               }}
             >
               Apply to Drive
@@ -237,11 +237,11 @@ export default function PostRide({ onNavigate }: PostRideProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero Section with Form */}
-      <section style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
+      <section style={{ background: '#fcd03a', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
         <div style={{ maxWidth: '900px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '40px' }}>
-            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: 'white', marginBottom: '15px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>Post a Ride</h1>
-            <p style={{ fontSize: '20px', color: 'rgba(255, 255, 255, 0.95)' }}>Share your ride and help others travel</p>
+            <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: '#000000', marginBottom: '15px' }}>Post a Ride</h1>
+            <p style={{ fontSize: '20px', color: 'rgba(0,0,0,0.7)' }}>Share your ride and help others travel</p>
           </div>
 
           <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: isMobile ? '24px' : '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', animation: 'floatUp 0.7s ease-out' }}>
@@ -308,7 +308,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
               <div style={{ marginBottom: '20px' }}>
                 <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Additional passengers already travelling with you</label>
                 <p style={{ fontSize: '13px', color: '#6B7280', marginBottom: '4px', marginTop: 0 }}>Help passengers know who they'll be travelling with</p>
-                <p style={{ fontSize: '13px', color: '#1A9D9D', marginBottom: '12px', marginTop: 0, fontWeight: '500' }}>You ({profile?.gender === 'Male' ? 'male' : 'female'}) are automatically counted</p>
+                <p style={{ fontSize: '13px', color: '#fcd03a', marginBottom: '12px', marginTop: 0, fontWeight: '500' }}>You ({profile?.gender === 'Male' ? 'male' : 'female'}) are automatically counted</p>
                 <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: '16px' }}>
                   <div>
                     <label style={{ display: 'block', fontSize: '13px', color: '#4B5563', marginBottom: '6px' }}>Males</label>
@@ -349,7 +349,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   <input name="pricePerSeat" type="number" min="0" step="0.01" value={formData.pricePerSeat} onChange={handleChange} required placeholder="0.00" style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.pricePerSeat ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }} />
                   {errors.pricePerSeat && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.pricePerSeat}</p>}
                   {parseFloat(formData.pricePerSeat) > 0 ? (
-                    <p style={{ fontSize: '13px', color: '#166534', marginTop: '6px', fontWeight: '600' }}>
+                    <p style={{ fontSize: '13px', color: '#000000', marginTop: '6px', fontWeight: '600' }}>
                       You receive £{(parseFloat(formData.pricePerSeat) * 0.75).toFixed(2)} per seat after ChapaRide's 25% fee.
                     </p>
                   ) : (
@@ -396,7 +396,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                       height: '20px',
                       marginTop: '2px',
                       flexShrink: 0,
-                      accentColor: '#1A9D9D',
+                      accentColor: '#fcd03a',
                       cursor: 'pointer',
                     }}
                   />
@@ -414,7 +414,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
               )}
 
               {/* Submit Button */}
-              <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: '600', background: loading ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', color: 'white', border: 'none', borderRadius: '12px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 8px 20px rgba(26, 157, 157, 0.15)', transition: 'all 0.3s', marginBottom: '15px' }}>
+              <button type="submit" disabled={loading} style={{ width: '100%', padding: '18px', fontSize: '18px', fontWeight: '600', background: loading ? '#D1D5DB' : '#000000', color: loading ? '#9CA3AF' : '#fcd03a', border: 'none', borderRadius: '12px', cursor: loading ? 'not-allowed' : 'pointer', boxShadow: loading ? 'none' : '0 8px 20px rgba(252,208,58,0.25)', transition: 'all 0.3s', marginBottom: '15px' }}>
                 {loading ? 'Posting Ride...' : 'Post Ride'}
               </button>
 
@@ -432,7 +432,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
           from { transform: translateY(40px); opacity: 0; }
           to { transform: translateY(0); opacity: 1; }
         }
-        input:focus, select:focus { outline: none; border-color: #1A9D9D !important; box-shadow: 0 0 0 4px rgba(26, 157, 157, 0.1); }
+        input:focus, select:focus { outline: none; border-color: #fcd03a !important; box-shadow: 0 0 0 4px rgba(252,208,58,0.15); }
         button:hover:not(:disabled) { transform: translateY(-2px); }
       `}</style>
     </div>

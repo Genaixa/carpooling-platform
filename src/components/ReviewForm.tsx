@@ -65,8 +65,8 @@ export default function ReviewForm({ onSubmit, onCancel }: ReviewFormProps) {
           style={{
             flex: 1,
             padding: '12px',
-            background: submitting || rating === 0 ? '#D1D5DB' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-            color: 'white',
+            background: submitting || rating === 0 ? '#D1D5DB' : '#000000',
+            color: submitting || rating === 0 ? '#9CA3AF' : '#fcd03a',
             border: 'none',
             borderRadius: '10px',
             fontSize: '14px',

@@ -29,7 +29,7 @@ function Section({ number, title, children, isMobile }: SectionProps) {
         style={{
           fontSize: isMobile ? 18 : 22,
           fontWeight: 700,
-          color: '#1A9D9D',
+          color: '#fcd03a',
           marginBottom: 16,
           lineHeight: 1.3,
         }}
@@ -57,7 +57,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
       {/* Hero Section */}
       <div
         style={{
-          background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
+          background: '#fcd03a',
           padding: isMobile ? '48px 20px 40px' : '72px 40px 56px',
           textAlign: 'center',
         }}
@@ -66,7 +66,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
           style={{
             fontSize: isMobile ? 28 : 40,
             fontWeight: 800,
-            color: '#fff',
+            color: '#000000',
             margin: 0,
             marginBottom: 12,
             letterSpacing: '-0.5px',
@@ -77,7 +77,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
         <p
           style={{
             fontSize: isMobile ? 14 : 17,
-            color: 'rgba(255,255,255,0.9)',
+            color: 'rgba(0,0,0,0.7)',
             margin: 0,
             fontWeight: 500,
           }}
@@ -103,7 +103,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
             marginBottom: 32,
             boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
             border: '1px solid #f0f0f0',
-            borderLeft: '4px solid #1A9D9D',
+            borderLeft: '4px solid #fcd03a',
           }}
         >
           <p
@@ -210,7 +210,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
                   e.preventDefault();
                   onNavigate('privacy-policy');
                 }}
-                style={{ color: '#1A9D9D', textDecoration: 'none', fontWeight: 600 }}
+                style={{ color: '#fcd03a', textDecoration: 'none', fontWeight: 600 }}
               >
                 Privacy Policy
               </a>
@@ -296,7 +296,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
               Email:{' '}
               <a
                 href="mailto:info@chaparide.com"
-                style={{ color: '#1A9D9D', textDecoration: 'none', fontWeight: 600 }}
+                style={{ color: '#fcd03a', textDecoration: 'none', fontWeight: 600 }}
               >
                 info@chaparide.com
               </a>
@@ -310,7 +310,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
                 e.preventDefault();
                 onNavigate('privacy-policy');
               }}
-              style={{ color: '#1A9D9D', textDecoration: 'none', fontWeight: 600 }}
+              style={{ color: '#fcd03a', textDecoration: 'none', fontWeight: 600 }}
             >
               Privacy Policy
             </a>{' '}
@@ -323,8 +323,8 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
           <button
             onClick={() => onNavigate('home')}
             style={{
-              background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-              color: '#fff',
+              background: '#000000',
+              color: '#fcd03a',
               border: 'none',
               borderRadius: 10,
               padding: '14px 40px',
@@ -332,7 +332,7 @@ export default function TermsAndConditions({ onNavigate }: TermsAndConditionsPro
               fontWeight: 700,
               cursor: 'pointer',
               transition: 'opacity 0.2s, transform 0.2s',
-              boxShadow: '0 4px 16px rgba(26,157,157,0.25)',
+              boxShadow: '0 4px 16px rgba(252,208,58,0.25)',
             }}
             onMouseOver={(e) => {
               (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';

@@ -63,18 +63,18 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
 
   const navLinkStyle = (active?: boolean) => ({
     background: 'none', border: 'none',
-    color: active ? '#1A9D9D' : '#4B5563',
+    color: active ? '#fcd03a' : '#ffffff',
     fontSize: '17px', cursor: 'pointer' as const,
     fontWeight: active ? '800' : '700' as any,
     transition: 'color 0.3s', padding: 0,
   });
 
   const mobileLinkStyle = {
-    textAlign: 'left' as const, color: '#4B5563',
+    textAlign: 'left' as const, color: '#ffffff',
     background: 'none', border: 'none', fontSize: '18px',
     cursor: 'pointer' as const, padding: '12px 0',
     fontWeight: '700' as any, width: '100%',
-    borderBottom: '1px solid #F3F4F6',
+    borderBottom: '1px solid rgba(255,255,255,0.15)',
   };
 
   const dropdownItemStyle = (danger?: boolean) => ({
@@ -87,8 +87,8 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
 
   return (
     <nav style={{
-      backgroundColor: 'white',
-      boxShadow: '0 2px 12px rgba(0,0,0,0.06)',
+      backgroundColor: '#000000',
+      boxShadow: '0 2px 12px rgba(0,0,0,0.4)',
       position: 'sticky' as const, top: 0, zIndex: 40,
     }}>
       <div style={{
@@ -101,11 +101,11 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
           style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
           onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }}
         >
-          <img src="/ChapaRideLogo.jpg" alt="ChapaRide"
+          <img src="/ChapaRideLogo160326.jpg" alt="ChapaRide"
             style={{ height: isMobile ? '60px' : '78px', width: 'auto', objectFit: 'contain' }} />
           <span style={{ fontSize: '22px', fontWeight: '800', marginLeft: '8px' }}>
-            <span style={{ color: '#1A9D9D' }}>Chapa</span>
-            <span style={{ color: '#8BC34A' }}>Ride</span>
+            <span style={{ color: '#fcd03a' }}>Chapa</span>
+            <span style={{ color: '#fcd03a' }}>Ride</span>
           </span>
         </div>
 
@@ -133,8 +133,8 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
               <button
                 onClick={() => onNavigate('admin-dashboard')}
                 style={{
-                  background: currentPage === 'admin-dashboard' ? '#1A9D9D' : 'linear-gradient(135deg, #1A9D9D, #8BC34A)',
-                  color: 'white', border: 'none', borderRadius: '20px',
+                  background: '#fcd03a',
+                  color: '#000000', border: 'none', borderRadius: '20px',
                   padding: '6px 16px', fontSize: '13px', fontWeight: '700',
                   cursor: 'pointer', letterSpacing: '0.3px',
                 }}
@@ -154,14 +154,14 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 onClick={() => setProfileDropdownOpen(o => !o)}
                 style={{
                   display: 'flex', alignItems: 'center', gap: '8px',
-                  background: profileDropdownOpen ? '#F3F4F6' : 'none',
-                  border: '1px solid', borderColor: profileDropdownOpen ? '#D1D5DB' : 'transparent',
+                  background: profileDropdownOpen ? '#333333' : 'none',
+                  border: '1px solid', borderColor: profileDropdownOpen ? '#555555' : 'transparent',
                   borderRadius: '50px', padding: '6px 12px 6px 6px',
                   cursor: 'pointer', transition: 'all 0.2s',
                 }}
               >
                 <Avatar photoUrl={profile?.profile_photo_url} name={profile?.name || ''} size="sm" />
-                <span style={{ fontSize: '16px', color: '#374151', fontWeight: '700' }}>My Account : {profile?.name}</span>
+                <span style={{ fontSize: '16px', color: '#ffffff', fontWeight: '700' }}>My Account : {profile?.name}</span>
                 {bookingNotifCount > 0 && (
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -255,13 +255,13 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
 
           {!isMobile && !user && (
             <>
-              <button onClick={() => onNavigate('login')} className="header-cta-btn" style={{ padding: '12px 28px', background: 'white', color: '#1A9D9D', border: '3px solid #1A9D9D', borderRadius: '50px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 2px 8px rgba(26,157,157,0.15)' }}>
+              <button onClick={() => onNavigate('login')} className="header-cta-btn" style={{ padding: '12px 28px', background: 'transparent', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 2px 8px rgba(252,208,58,0.15)' }}>
                 Login
               </button>
-              <button onClick={() => onNavigate('register')} className="header-cta-btn" style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #1A9D9D 0%, #15b3b3 50%, #8BC34A 100%)', color: 'white', borderRadius: '50px', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 14px rgba(26,157,157,0.35)' }}>
+              <button onClick={() => onNavigate('register')} className="header-cta-btn" style={{ padding: '12px 28px', background: '#fcd03a', color: '#000000', borderRadius: '50px', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 14px rgba(252,208,58,0.35)' }}>
                 Sign Up to Ride
               </button>
-              <button onClick={() => onNavigate('register-driver')} className="header-cta-btn" style={{ padding: '12px 28px', background: 'linear-gradient(135deg, #8BC34A 0%, #6fa832 100%)', color: 'white', borderRadius: '50px', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 14px rgba(139,195,74,0.35)' }}>
+              <button onClick={() => onNavigate('register-driver')} className="header-cta-btn" style={{ padding: '12px 28px', background: '#000000', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 14px rgba(252,208,58,0.25)' }}>
                 Sign Up to Drive
               </button>
             </>
@@ -271,7 +271,7 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
           {isMobile && (
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              style={{ padding: '8px', color: '#374151', background: 'none', border: 'none', cursor: 'pointer' }}
+              style={{ padding: '8px', color: '#ffffff', background: 'none', border: 'none', cursor: 'pointer' }}
             >
               <svg style={{ width: '28px', height: '28px' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {mobileMenuOpen
@@ -285,7 +285,7 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
 
       {/* Mobile Menu */}
       {isMobile && mobileMenuOpen && (
-        <div style={{ padding: '8px 16px 16px', borderTop: '1px solid #F3F4F6', backgroundColor: 'white', boxShadow: '0 8px 20px rgba(0,0,0,0.1)' }}>
+        <div style={{ padding: '8px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.15)', backgroundColor: '#000000', boxShadow: '0 8px 20px rgba(0,0,0,0.4)' }}>
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             {user && (
               <button
@@ -293,7 +293,7 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 style={{ ...mobileLinkStyle, display: 'flex', alignItems: 'center', gap: '10px' }}
               >
                 <Avatar photoUrl={profile?.profile_photo_url} name={profile?.name || ''} size="sm" />
-                <span style={{ fontWeight: '600', color: '#1F2937' }}>{profile?.name}</span>
+                <span style={{ fontWeight: '600', color: '#ffffff' }}>{profile?.name}</span>
               </button>
             )}
             {user && (
@@ -318,7 +318,7 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 <button onClick={() => { onNavigate('ride-wishes'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Ride Alerts</button>
                 <button onClick={() => { onNavigate('dashboard'); setMobileMenuOpen(false); }} style={mobileLinkStyle}>Dashboard</button>
                 {profile?.is_admin && (
-                  <button onClick={() => { onNavigate('admin-dashboard'); setMobileMenuOpen(false); }} style={{ ...mobileLinkStyle, color: '#1A9D9D', fontWeight: '700' }}>
+                  <button onClick={() => { onNavigate('admin-dashboard'); setMobileMenuOpen(false); }} style={{ ...mobileLinkStyle, color: '#fcd03a', fontWeight: '700' }}>
                     🛡 Admin
                   </button>
                 )}
@@ -329,9 +329,9 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
             )}
             {!user && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '16px' }}>
-                <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'white', color: '#1A9D9D', border: '3px solid #1A9D9D', borderRadius: '50px', fontSize: '18px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 8px rgba(26,157,157,0.15)' }}>Login</button>
-                <button onClick={() => { onNavigate('register'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #1A9D9D 0%, #15b3b3 50%, #8BC34A 100%)', color: 'white', borderRadius: '50px', fontSize: '18px', fontWeight: '700', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(26,157,157,0.35)' }}>Sign Up to Ride</button>
-                <button onClick={() => { onNavigate('register-driver'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'linear-gradient(135deg, #8BC34A 0%, #6fa832 100%)', color: 'white', borderRadius: '50px', fontSize: '18px', fontWeight: '700', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(139,195,74,0.35)' }}>Sign Up to Drive</button>
+                <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'transparent', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '18px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 8px rgba(252,208,58,0.15)' }}>Login</button>
+                <button onClick={() => { onNavigate('register'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: '#fcd03a', color: '#000000', borderRadius: '50px', fontSize: '18px', fontWeight: '700', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(252,208,58,0.35)' }}>Sign Up to Ride</button>
+                <button onClick={() => { onNavigate('register-driver'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: '#000000', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '18px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 14px rgba(252,208,58,0.25)' }}>Sign Up to Drive</button>
               </div>
             )}
           </div>

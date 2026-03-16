@@ -171,8 +171,8 @@ svg {
 /* National Express button styles */
 button.btn-green,
 a.btn-green {
-  background-color: #10bd59;
-  color: #fff;
+  background-color: #000000;
+  color: #fcd03a;
   border-radius: 30px;
   border: none;
   display: flex;
@@ -194,7 +194,7 @@ a.btn-green {
 
 button.btn-green:hover,
 a.btn-green:hover {
-  background-color: #0c8e43;
+  background-color: #c9a400;
   text-decoration: none;
 }
 

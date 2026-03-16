@@ -187,12 +187,12 @@ export default function Profile({ onNavigate }: ProfileProps) {
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Page Header */}
-      <div style={{ background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)', padding: '40px 20px' }}>
+      <div style={{ background: '#fcd03a', padding: '40px 20px' }}>
         <div style={{ maxWidth: '800px', margin: '0 auto', textAlign: 'center' }}>
-          <h1 style={{ fontSize: '42px', fontWeight: 'bold', color: 'white', marginBottom: '10px', textShadow: '2px 2px 4px rgba(0,0,0,0.2)' }}>
+          <h1 style={{ fontSize: '42px', fontWeight: 'bold', color: '#000000', marginBottom: '10px' }}>
             Your Profile
           </h1>
-          <p style={{ fontSize: '18px', color: 'rgba(255, 255, 255, 0.95)', margin: 0 }}>
+          <p style={{ fontSize: '18px', color: 'rgba(0,0,0,0.7)', margin: 0 }}>
             Manage your account information
           </p>
         </div>
@@ -232,8 +232,8 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     disabled={uploadingPhoto}
                     style={{
                       padding: '10px 24px',
-                      background: 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                      color: 'white', borderRadius: '50px', fontSize: '14px',
+                      background: '#000000',
+                      color: '#fcd03a', borderRadius: '50px', fontSize: '14px',
                       fontWeight: '600', border: 'none', cursor: 'pointer',
                       opacity: uploadingPhoto ? 0.7 : 1,
                     }}
@@ -302,7 +302,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     onChange={handleChange}
                     required
                     style={inputStyle()}
-                    onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                     onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                   />
                 </div>
@@ -315,7 +315,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     onChange={handleChange}
                     required
                     style={inputStyle()}
-                    onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                     onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                   />
                 </div>
@@ -331,7 +331,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   onChange={handleChange}
                   placeholder="123 High Street"
                   style={inputStyle()}
-                  onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                  onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                   onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                 />
               </div>
@@ -344,7 +344,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   onChange={handleChange}
                   placeholder="Flat 4, Building Name (optional)"
                   style={inputStyle()}
-                  onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                  onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                   onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                 />
               </div>
@@ -357,7 +357,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   onChange={handleChange}
                   placeholder="London"
                   style={inputStyle()}
-                  onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                  onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                   onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                 />
               </div>
@@ -371,7 +371,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     onChange={handleChange}
                     placeholder="SW1A 1AA"
                     style={inputStyle()}
-                    onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                     onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                   />
                 </div>
@@ -384,7 +384,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     onChange={handleChange}
                     placeholder="United Kingdom"
                     style={inputStyle()}
-                    onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                     onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                   />
                 </div>
@@ -405,7 +405,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'right 16px center',
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                  onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                   onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                 >
                   <option value="Male">Male</option>
@@ -427,7 +427,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
                     backgroundRepeat: 'no-repeat',
                     backgroundPosition: 'right 16px center',
                   }}
-                  onFocus={(e) => e.target.style.borderColor = '#1A9D9D'}
+                  onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
                   onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
                 >
                   <option value="">Select marital status</option>
@@ -449,9 +449,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
               {success && (
                 <div style={{
                   padding: '14px 20px', borderRadius: '12px',
-                  backgroundColor: '#dcfce7', border: '1px solid #86efac',
+                  backgroundColor: '#fef9e0', border: '1px solid #fcd03a',
                 }}>
-                  <p style={{ fontSize: '14px', color: '#166534', margin: 0, fontWeight: '500' }}>{success}</p>
+                  <p style={{ fontSize: '14px', color: '#000000', margin: 0, fontWeight: '500' }}>{success}</p>
                 </div>
               )}
 
@@ -462,11 +462,11 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   disabled={loading}
                   style={{
                     flex: 1, padding: '14px',
-                    background: loading ? '#9CA3AF' : 'linear-gradient(135deg, #1A9D9D 0%, #8BC34A 100%)',
-                    color: 'white', borderRadius: '50px', fontSize: '16px',
+                    background: loading ? '#9CA3AF' : '#000000',
+                    color: loading ? '#ffffff' : '#fcd03a', borderRadius: '50px', fontSize: '16px',
                     fontWeight: '700', border: 'none',
                     cursor: loading ? 'not-allowed' : 'pointer',
-                    boxShadow: loading ? 'none' : '0 4px 12px rgba(26,157,157,0.25)',
+                    boxShadow: loading ? 'none' : '0 4px 12px rgba(252,208,58,0.3)',
                     transition: 'all 0.3s',
                   }}
                 >
