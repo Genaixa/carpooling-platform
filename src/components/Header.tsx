@@ -103,10 +103,6 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
         >
           <img src="/ChapaRideLogo160326.jpg" alt="ChapaRide"
             style={{ height: isMobile ? '60px' : '78px', width: 'auto', objectFit: 'contain' }} />
-          <span style={{ fontSize: '22px', fontWeight: '800', marginLeft: '8px' }}>
-            <span style={{ color: '#fcd03a' }}>Chapa</span>
-            <span style={{ color: '#fcd03a' }}>Ride</span>
-          </span>
         </div>
 
         {/* Desktop Navigation */}
