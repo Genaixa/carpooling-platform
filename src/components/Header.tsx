@@ -94,15 +94,15 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
       <div style={{
         maxWidth: '1200px', margin: '0 auto', padding: '0 16px',
         display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-        height: isMobile ? '70px' : '88px',
+        height: isMobile ? '52px' : '60px',
       }}>
         {/* Logo */}
         <div
           style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', flexShrink: 0 }}
           onClick={() => { onNavigate('home'); setMobileMenuOpen(false); }}
         >
-          <img src="/ChapaRideLogo160326.jpg" alt="ChapaRide"
-            style={{ height: isMobile ? '60px' : '78px', width: 'auto', objectFit: 'contain' }} />
+          <img src="/ChapaRide4.png" alt="ChapaRide"
+            style={{ height: isMobile ? '24px' : '30px', width: 'auto', objectFit: 'contain' }} />
         </div>
 
         {/* Desktop Navigation */}
