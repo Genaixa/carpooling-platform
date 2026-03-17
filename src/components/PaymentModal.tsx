@@ -36,8 +36,11 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
   const cardRef = useRef<any>(null);
   const paymentsRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
+  const profileRef = useRef<{ name: string; email: string; phone?: string | null; city?: string | null } | null>(null);
 
   useEffect(() => {
+    supabase.from('profiles').select('name, email, phone, city').eq('id', userId).single()
+      .then(({ data }) => { if (data) profileRef.current = data; });
     initializeSquare();
     return () => {
       if (cardRef.current) {
@@ -117,12 +120,22 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
     try {
       // Pass verificationDetails to tokenize() so Square handles 3DS/SCA inline.
       // If the bank requires a challenge, the popup appears here before a token is issued.
+      const profile = profileRef.current;
+      const nameParts = profile?.name?.trim().split(' ') ?? [];
       const verificationDetails = {
         amount: amount.toFixed(2),
         currencyCode: 'GBP',
         intent: 'CHARGE',
         customerInitiated: true,
         sellerKeyedIn: false,
+        billingContact: {
+          givenName: nameParts[0] ?? '',
+          familyName: nameParts.slice(1).join(' ') || (nameParts[0] ?? ''),
+          email: profile?.email ?? '',
+          phone: profile?.phone ?? undefined,
+          city: profile?.city ?? undefined,
+          countryCode: 'GB',
+        },
       };
 
       const result = await cardRef.current.tokenize(verificationDetails);
