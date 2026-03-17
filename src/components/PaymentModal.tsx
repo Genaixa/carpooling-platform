@@ -115,35 +115,27 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
     setError(null);
 
     try {
-      const result = await cardRef.current.tokenize();
+      // Pass verificationDetails to tokenize() so Square handles 3DS/SCA inline.
+      // If the bank requires a challenge, the popup appears here before a token is issued.
+      const verificationDetails = {
+        amount: amount.toFixed(2),
+        currencyCode: 'GBP',
+        intent: 'CHARGE',
+        customerInitiated: true,
+        sellerKeyedIn: false,
+      };
+
+      const result = await cardRef.current.tokenize(verificationDetails);
       if (result.status !== 'OK') {
-        throw new Error(result.errors?.[0]?.message || 'Card tokenization failed');
+        const errMsg = result.errors?.[0]?.message || 'Card tokenization failed';
+        // Surface a clear message if the user cancelled the 3DS bank challenge
+        if (/cancel/i.test(errMsg)) {
+          throw new Error('Payment cancelled — please try again and complete the bank verification when prompted.');
+        }
+        throw new Error(errMsg);
       }
 
       const sourceId = result.token;
-
-      // Run 3D Secure verification (SCA / PSD2) — triggers bank challenge if required.
-      let verificationToken: string | undefined;
-      if (paymentsRef.current) {
-        try {
-          const verifyResult = await paymentsRef.current.verifyBuyer(sourceId, {
-            amount: amount.toFixed(2),
-            currencyCode: 'GBP',
-            intent: 'CHARGE',
-          });
-          verificationToken = verifyResult?.token;
-        } catch (verifyErr: any) {
-          const msg = verifyErr?.message || String(verifyErr) || '';
-          // If the user cancelled the bank challenge, stop and tell them
-          if (/cancel/i.test(msg)) {
-            throw new Error('Payment cancelled — please try again and complete the bank verification when prompted.');
-          }
-          // For all other verifyBuyer errors (config/popup/browser issues),
-          // proceed without the token. Square will decline if SCA is truly required,
-          // giving the user the error below.
-          console.warn('3DS verifyBuyer failed, proceeding without token:', msg);
-        }
-      }
 
       const thirdPartyPassenger = bookingForSomeoneElse ? {
         name: tpName,
@@ -161,7 +153,6 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
         },
         body: JSON.stringify({
           sourceId,
-          verificationToken,
           amount,
           rideId,
           userId,
