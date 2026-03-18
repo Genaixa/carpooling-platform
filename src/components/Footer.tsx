@@ -152,6 +152,7 @@ export default function Footer({ onNavigate }: FooterProps) {
         <div>
           <h4 style={columnHeadingStyle}>Contact</h4>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <p style={{ ...plainTextStyle, color: '#D1D5DB', fontWeight: 600, margin: 0 }}>Yossi Adam</p>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fcd03a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z" />
