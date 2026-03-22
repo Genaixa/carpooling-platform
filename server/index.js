@@ -60,10 +60,10 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
-    if (['image/jpeg', 'image/jpg', 'image/png'].includes(file.mimetype)) {
+    if (['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'].includes(file.mimetype)) {
       cb(null, true);
     } else {
-      cb(new Error('Only JPG and PNG images are allowed'));
+      cb(new Error('Only JPG, PNG, or PDF files are allowed'));
     }
   },
 });
@@ -213,18 +213,14 @@ app.post('/api/upload-licence-photo', upload.single('photo'), async (req, res) =
 
     if (uploadError) throw uploadError;
 
-    // Get signed URL (private bucket)
-    const { data: signedUrlData } = await supabase.storage.from('licence-photos').createSignedUrl(fileName, 60 * 60 * 24 * 365); // 1 year
-    if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL');
-
-    // Update profile
+    // Store only the filename (not a signed URL) — short-lived URLs are generated on demand
     await supabase.from('profiles').update({
-      licence_photo_url: signedUrlData.signedUrl,
+      licence_photo_url: fileName,
       licence_status: 'pending',
     }).eq('id', userId);
 
     console.log(`✓ Licence photo uploaded for: ${userId}`);
-    res.json({ success: true, url: signedUrlData.signedUrl });
+    res.json({ success: true });
   } catch (error) {
     console.error('Licence photo upload error:', error);
     res.status(500).json({ error: error.message || 'Upload failed' });
@@ -300,19 +296,57 @@ app.post('/api/upload-application-licence-photo', upload.single('photo'), async 
 
     if (uploadError) throw uploadError;
 
-    const { data: signedUrlData } = await supabase.storage.from('licence-photos').createSignedUrl(fileName, 60 * 60 * 24 * 365);
-    if (!signedUrlData?.signedUrl) throw new Error('Failed to get signed URL');
-
+    // Store only the filename (not a signed URL) — short-lived URLs are generated on demand
     await supabase.from('profiles').update({
-      licence_photo_url: signedUrlData.signedUrl,
+      licence_photo_url: fileName,
       licence_status: 'pending',
     }).eq('id', userId);
 
     console.log(`✓ Application licence photo uploaded for: ${userId}`);
-    res.json({ success: true, url: signedUrlData.signedUrl });
+    res.json({ success: true });
   } catch (error) {
     console.error('Application licence photo upload error:', error);
     res.status(500).json({ error: error.message || 'Upload failed' });
+  }
+});
+
+// ============================================================
+// GET LICENCE PHOTO URL (short-lived, owner or admin only)
+// ============================================================
+
+app.get('/api/licence-photo-url', async (req, res) => {
+  try {
+    const { targetUserId, requesterId } = req.query;
+    if (!targetUserId || !requesterId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, requesterId)) return;
+
+    // Allow if requester is the file owner OR an admin
+    const isOwner = requesterId === targetUserId;
+    if (!isOwner) {
+      const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', requesterId).single();
+      if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+    }
+
+    // Get the stored value (may be a plain filename or a legacy full signed URL)
+    const { data: profile } = await supabase.from('profiles').select('licence_photo_url').eq('id', targetUserId).single();
+    if (!profile?.licence_photo_url) return res.status(404).json({ error: 'No licence photo found' });
+
+    let fileName = profile.licence_photo_url;
+    if (fileName.startsWith('http')) {
+      // Legacy format: extract filename from the signed URL path
+      const match = fileName.match(/\/licence-photos\/([^?]+)/);
+      if (!match) return res.status(400).json({ error: 'Invalid stored URL format' });
+      fileName = match[1];
+    }
+
+    // Generate a short-lived signed URL (15 minutes)
+    const { data: signedUrlData } = await supabase.storage.from('licence-photos').createSignedUrl(fileName, 15 * 60);
+    if (!signedUrlData?.signedUrl) throw new Error('Failed to generate signed URL');
+
+    res.json({ url: signedUrlData.signedUrl });
+  } catch (error) {
+    console.error('Get licence photo URL error:', error);
+    res.status(500).json({ error: error.message || 'Failed to get URL' });
   }
 });
 
@@ -846,6 +880,22 @@ app.post('/api/driver/complete-ride', async (req, res) => {
 });
 
 // ============================================================
+// NEW USER NOTIFICATION
+// ============================================================
+
+app.post('/api/notify-new-user', async (req, res) => {
+  try {
+    const { user } = req.body;
+    if (!user) return res.status(400).json({ error: 'Missing user data' });
+    const { sendNewUserNotification } = await import('./emails.js');
+    await sendNewUserNotification(user);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('New user notification error:', err);
+    res.json({ success: false });
+  }
+});
+
 // DRIVER APPLICATION NOTIFICATION
 // ============================================================
 
@@ -1039,6 +1089,51 @@ app.post('/api/admin/revoke-driver', async (req, res) => {
   }
 });
 
+app.post('/api/admin/update-user', async (req, res) => {
+  try {
+    const { adminId, userId, updates } = req.body;
+    if (!adminId || !userId || !updates) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const allowed = ['name', 'email', 'phone', 'gender', 'age_group', 'marital_status', 'travel_status', 'partner_name', 'address_line1', 'address_line2', 'city', 'postcode'];
+    const sanitized = {};
+    for (const key of allowed) {
+      if (key in updates) sanitized[key] = updates[key] || null;
+    }
+
+    const { error } = await supabase.from('profiles').update(sanitized).eq('id', userId);
+    if (error) throw error;
+
+    console.log(`✓ Admin updated profile: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin update user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/ban-user', async (req, res) => {
+  try {
+    const { userId, adminId, reason, unban } = req.body;
+    if (!userId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    await supabase.from('profiles').update({ is_banned: !unban }).eq('id', userId);
+
+    console.log(`✓ User ${unban ? 'unbanned' : 'banned'}: ${userId}${reason ? ` — ${reason}` : ''}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Ban user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // ADMIN FINANCIAL ENDPOINTS
 // ============================================================
@@ -1056,7 +1151,7 @@ app.get('/api/admin/rides-overview', async (req, res) => {
     // Fetch all rides with driver profiles
     const { data: rides, error: ridesError } = await supabase
       .from('rides')
-      .select('*, driver:profiles!rides_driver_id_fkey(id, name, email)')
+      .select('*, driver:profiles!rides_driver_id_fkey(id, name, email, phone, gender, age_group, address_line1, address_line2, city, postcode)')
       .order('date_time', { ascending: false });
 
     if (ridesError) throw ridesError;
@@ -1067,7 +1162,7 @@ app.get('/api/admin/rides-overview', async (req, res) => {
     if (rideIds.length > 0) {
       const { data: bookings, error: bookingsError } = await supabase
         .from('bookings')
-        .select('*, passenger:profiles!bookings_passenger_id_fkey(id, name, email)')
+        .select('*, passenger:profiles!bookings_passenger_id_fkey(id, name, email, phone, gender, age_group, address_line1, address_line2, city, postcode)')
         .in('ride_id', rideIds);
 
       if (bookingsError) throw bookingsError;
@@ -1717,6 +1812,12 @@ async function sendContactDetailEmails() {
 setInterval(cleanupPastRides, 15 * 60 * 1000);
 setInterval(sendPostRideReminders, 15 * 60 * 1000);
 setInterval(sendContactDetailEmails, 15 * 60 * 1000);
+
+// Global error handler — catches multer errors (file size/type) and returns JSON
+app.use((err, req, res, next) => {
+  console.error('Express error:', err.message);
+  res.status(err.status || 400).json({ error: err.message || 'Server error' });
+});
 
 const PORT = 3001;
 app.listen(PORT, () => {

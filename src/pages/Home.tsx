@@ -1193,19 +1193,43 @@ export default function Home({ onNavigate }: HomeProps) {
 
                 {/* Rides within this destination */}
                 <div>
-                  {destRides.map((ride, rideIdx) => (
+                  {destRides.map((ride, rideIdx) => {
+                    const isGold = (ride.driver as any).driver_tier === 'gold';
+                    return (
                     <div
                       key={ride.id}
                       style={{
                         padding: isMobile ? '16px 20px' : '20px 28px',
                         borderBottom: rideIdx < destRides.length - 1 ? '1px solid #F3F4F6' : 'none',
+                        borderLeft: isGold ? '4px solid #fcd03a' : '4px solid transparent',
+                        backgroundColor: isGold ? '#fffef5' : 'transparent',
                         opacity: ride.compatible ? 1 : 0.5,
                         position: 'relative',
                         transition: 'background-color 0.2s',
                       }}
-                      onMouseOver={(e) => { if (ride.compatible) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+                      onMouseOver={(e) => { if (ride.compatible) e.currentTarget.style.backgroundColor = isGold ? '#fff9d6' : '#FAFBFC'; }}
+                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = isGold ? '#fffef5' : 'transparent'; }}
                     >
+                      {/* Gold corner ribbon */}
+                      {isGold && (
+                        <div style={{
+                          position: 'absolute', top: 0, right: 0,
+                          width: '72px', height: '72px',
+                          overflow: 'hidden', pointerEvents: 'none',
+                        }}>
+                          <div style={{
+                            position: 'absolute', top: '14px', right: '-18px',
+                            width: '80px', backgroundColor: '#fcd03a', color: '#000000',
+                            fontSize: '10px', fontWeight: '800', textAlign: 'center',
+                            padding: '3px 0', transform: 'rotate(45deg)',
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                            letterSpacing: '0.5px',
+                          }}>
+                            GOLD
+                          </div>
+                        </div>
+                      )}
+
                       {/* Incompatibility notice */}
                       {!ride.compatible && ride.incompatibilityReason && (
                         <div style={{
@@ -1230,192 +1254,115 @@ export default function Home({ onNavigate }: HomeProps) {
                       }}>
                         {/* Left: Route + schedule */}
                         <div style={{ flex: 1, minWidth: 0 }}>
-                          {/* From → To */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>
-                              {ride.departure_location}
-                            </span>
-                            <svg style={{ width: '16px', height: '16px', color: '#9CA3AF', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
-                            </svg>
-                            <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>
-                              {ride.arrival_location}
-                            </span>
-                          </div>
-
-                          {/* Meta pills */}
-                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              fontSize: '13px', color: '#374151', fontWeight: '500',
-                              backgroundColor: '#F3F4F6', padding: '3px 10px', borderRadius: '6px',
-                            }}>
-                              <svg style={{ width: '13px', height: '13px', color: '#6B7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                              </svg>
-                              {new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                            </span>
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              fontSize: '13px', color: '#374151', fontWeight: '600',
-                              backgroundColor: '#F3F4F6', padding: '3px 10px', borderRadius: '6px',
-                            }}>
-                              <svg style={{ width: '13px', height: '13px', color: '#6B7280' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                              </svg>
-                              {new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
-                            <span style={{
-                              display: 'inline-flex', alignItems: 'center', gap: '4px',
-                              fontSize: '13px', color: '#374151', fontWeight: '500',
-                              backgroundColor: '#F0FDFA', padding: '3px 10px', borderRadius: '6px',
-                            }}>
-                              <svg style={{ width: '13px', height: '13px', color: '#fcd03a' }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                              </svg>
-                              {ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''}
-                            </span>
-                            {ride.luggage_size && ride.luggage_size !== 'none' && (
-                              <span style={{
-                                display: 'inline-flex', alignItems: 'center', gap: '4px',
-                                fontSize: '13px', color: '#374151', fontWeight: '500',
-                                backgroundColor: '#F3F4F6', padding: '3px 10px', borderRadius: '6px',
-                              }}>
-                                {getLuggageLabel(ride.luggage_size)}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Driver row */}
-                          {ride.driver && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                              <button
-                                onClick={() => onNavigate('public-profile', undefined, ride.driver.id)}
-                                style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '600', padding: 0 }}
-                              >
-                                {getDriverAlias(ride.driver.id)}
-                              </button>
-                              {(ride.driver as any).driver_tier === 'gold' && (
-                                <span style={{
-                                  display: 'inline-flex', alignItems: 'center', padding: '2px 8px',
-                                  borderRadius: '12px', fontSize: '11px', fontWeight: '700',
-                                  backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
-                                }}>
-                                  Gold Driver
-                                </span>
+                          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '13px' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ padding: '3px 0', verticalAlign: 'middle' }}>
+                                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>{ride.departure_location}</span>
+                                  {' '}<span style={{ color: '#9CA3AF' }}>→</span>{' '}
+                                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>{ride.arrival_location}</span>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td style={{ padding: '3px 0', color: '#374151', verticalAlign: 'middle' }}>
+                                  <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                                  {' · '}
+                                  <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                                  {' · '}{ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''} available
+                                </td>
+                              </tr>
+                              {ride.driver && (() => {
+                                const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
+                                const males = (occupants?.males || 0) + (occupants?.couples || 0);
+                                const females = (occupants?.females || 0) + (occupants?.couples || 0);
+                                const totalPassengers = males + females;
+                                const passengerParts = [...(males > 0 ? [`Male: ${males}`] : []), ...(females > 0 ? [`Female: ${females}`] : [])];
+                                return (
+                                  <>
+                                    <tr>
+                                      <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
+                                        <button onClick={() => onNavigate('public-profile', undefined, ride.driver.id)} style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', padding: 0 }}>{getDriverAlias(ride.driver.id)}</button>
+                                        {isGold && <span style={{ marginLeft: '5px', fontSize: '11px', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde047', borderRadius: '8px', padding: '1px 6px' }}>⭐ Gold</span>}
+                                        {' · '}{ride.driver?.gender || 'Unknown'}
+                                        {(ride.driver as any).age_group && <>{' · '}Age {(ride.driver as any).age_group}</>}
+                                        {(ride.driver as any).city && <>{' · '}{(ride.driver as any).city}</>}
+                                        {(ride.driver as any).marital_status && <>{' · '}{(ride.driver as any).marital_status}</>}
+                                        {ride.driver.average_rating != null && ride.driver.average_rating > 0 && <>{' · '}★ {ride.driver.average_rating.toFixed(1)}</>}
+                                      </td>
+                                    </tr>
+                                    <tr>
+                                      <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
+                                        Passengers: {passengerParts.length > 0 ? passengerParts.join(', ') : 'None yet'} · Total in vehicle: {1 + totalPassengers}
+                                      </td>
+                                    </tr>
+                                  </>
+                                );
+                              })()}
+                              {(ride.luggage_size && ride.luggage_size !== 'none' || ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && (
+                                <tr>
+                                  <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
+                                    {ride.luggage_size && ride.luggage_size !== 'none' && <>{getLuggageLabel(ride.luggage_size)}</>}
+                                    {ride.luggage_size && ride.luggage_size !== 'none' && (ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && ' · '}
+                                    {(ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && <>{[ride.vehicle_color, ride.vehicle_make, ride.vehicle_model].filter(Boolean).join(' ')}</>}
+                                  </td>
+                                </tr>
                               )}
-                              {(ride.driver as any).age_group && (
-                                <>
-                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
-                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>Age {(ride.driver as any).age_group}</span>
-                                </>
-                              )}
-                              {(ride.driver as any).city && (
-                                <>
-                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
-                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>{(ride.driver as any).city}</span>
-                                </>
-                              )}
-                              {(ride.driver as any).marital_status && (
-                                <>
-                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
-                                  <span style={{ fontSize: '12px', color: '#6B7280' }}>{(ride.driver as any).marital_status}</span>
-                                </>
-                              )}
-                              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
-                              <span style={{ fontSize: '12px', color: '#6B7280' }}>
-                                {getCarLabel(ride.driver?.gender || null, ride.existing_occupants as { males: number; females: number; couples: number } | null)}
-                              </span>
-                              {ride.driver.average_rating != null && ride.driver.average_rating > 0 && (
-                                <>
-                                  <span style={{ fontSize: '11px', color: '#9CA3AF' }}>|</span>
-                                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
-                                    <StarRating rating={ride.driver.average_rating} size="sm" />
-                                    <span style={{ fontSize: '12px', color: '#6B7280' }}>{ride.driver.average_rating.toFixed(1)}</span>
-                                  </div>
-                                </>
-                              )}
-                            </div>
-                          )}
+                            </tbody>
+                          </table>
                         </div>
 
                         {/* Right: Price + actions */}
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: isMobile ? '10px' : '16px',
-                          flexShrink: 0,
-                          flexWrap: 'wrap',
-                          width: isMobile ? '100%' : 'auto',
-                          justifyContent: isMobile ? 'space-between' : 'flex-end',
-                        }}>
-                          {/* Price */}
-                          <div style={{ textAlign: isMobile ? 'left' : 'right' }}>
-                            <span style={{ fontSize: '22px', fontWeight: '800', color: '#1F2937' }}>
-                              £{ride.price_per_seat.toFixed(2)}
-                            </span>
-                            <span style={{ fontSize: '12px', color: '#6B7280', marginLeft: '4px' }}>/ seat</span>
-                          </div>
-
-                          {/* Seat selector */}
-                          {ride.seats_available > 1 && (
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                              <button
-                                onClick={() => { const c = getSelectedSeats(ride.id); if (c > 1) handleSeatChange(ride.id, c - 1); }}
-                                disabled={getSelectedSeats(ride.id) <= 1}
-                                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
-                              >-</button>
-                              <span style={{ width: '24px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1F2937' }}>
-                                {getSelectedSeats(ride.id)}
-                              </span>
-                              <button
-                                onClick={() => { const c = getSelectedSeats(ride.id); if (c < ride.seats_available) handleSeatChange(ride.id, c + 1); }}
-                                disabled={getSelectedSeats(ride.id) >= ride.seats_available}
-                                style={{ width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '16px', fontWeight: 'bold' }}
-                              >+</button>
-                            </div>
-                          )}
-
-                          {/* Total if multi-seat */}
-                          {getSelectedSeats(ride.id) > 1 && (
-                            <span style={{ fontSize: '13px', fontWeight: '700', color: '#fcd03a' }}>
-                              = £{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}
-                            </span>
-                          )}
-
-                          {/* Book */}
-                          <button
-                            onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
-                            disabled={bookingRide === ride.id || !ride.compatible}
-                            style={{
-                              padding: '8px 22px', borderRadius: '50px', border: 'none',
-                              fontWeight: '700', fontSize: '13px',
-                              cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer',
-                              background: !ride.compatible ? '#D1D5DB' : '#000000',
-                              color: !ride.compatible ? '#9CA3AF' : '#fcd03a',
-                              boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)',
-                              transition: 'all 0.3s', whiteSpace: 'nowrap',
-                            }}
-                          >
-                            {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
-                          </button>
-
-                          {/* Details */}
-                          <button
-                            onClick={() => onNavigate('ride-details', ride.id)}
-                            style={{
-                              fontSize: '13px', color: '#6B7280', background: 'none',
-                              border: '1px solid #E5E7EB', borderRadius: '50px',
-                              cursor: 'pointer', fontWeight: '600', padding: '8px 16px',
-                              whiteSpace: 'nowrap', transition: 'all 0.3s',
-                            }}
-                          >
-                            Details
-                          </button>
+                        <div style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto' }}>
+                          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                            <tbody>
+                              <tr>
+                                <td style={{ padding: '4px 8px 4px 0', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>Price</td>
+                                <td style={{ padding: '4px 0', whiteSpace: 'nowrap' }}>
+                                  <span style={{ fontSize: '18px', fontWeight: '800', color: '#1F2937' }}>£{ride.price_per_seat.toFixed(2)}</span>
+                                  <span style={{ fontSize: '12px', color: '#6B7280', marginLeft: '2px' }}>/seat</span>
+                                </td>
+                              </tr>
+                              {ride.seats_available > 1 && (
+                                <tr>
+                                  <td style={{ padding: '4px 8px 4px 0', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>Seats</td>
+                                  <td style={{ padding: '4px 0' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                      <button onClick={() => { const c = getSelectedSeats(ride.id); if (c > 1) handleSeatChange(ride.id, c - 1); }} disabled={getSelectedSeats(ride.id) <= 1} style={{ width: '24px', height: '24px', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', lineHeight: '24px', textAlign: 'center', padding: 0 }}>-</button>
+                                      <span style={{ width: '18px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1F2937' }}>{getSelectedSeats(ride.id)}</span>
+                                      <button onClick={() => { const c = getSelectedSeats(ride.id); if (c < ride.seats_available) handleSeatChange(ride.id, c + 1); }} disabled={getSelectedSeats(ride.id) >= ride.seats_available} style={{ width: '24px', height: '24px', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', lineHeight: '24px', textAlign: 'center', padding: 0 }}>+</button>
+                                      {getSelectedSeats(ride.id) > 1 && <span style={{ fontSize: '12px', fontWeight: '700', color: '#fcd03a', marginLeft: '4px' }}>£{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}</span>}
+                                    </div>
+                                  </td>
+                                </tr>
+                              )}
+                              <tr>
+                                <td colSpan={2} style={{ padding: '8px 0 4px' }}>
+                                  <button
+                                    onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
+                                    disabled={bookingRide === ride.id || !ride.compatible}
+                                    style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: 'none', fontWeight: '700', fontSize: '13px', cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer', background: !ride.compatible ? '#D1D5DB' : '#000000', color: !ride.compatible ? '#9CA3AF' : '#fcd03a', boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)', whiteSpace: 'nowrap', textAlign: 'center' }}
+                                  >
+                                    {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
+                                  </button>
+                                </td>
+                              </tr>
+                              <tr>
+                                <td colSpan={2} style={{ padding: '4px 0 0' }}>
+                                  <button
+                                    onClick={() => onNavigate('ride-details', ride.id)}
+                                    style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: '1px solid #E5E7EB', background: 'none', fontSize: '13px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' }}
+                                  >
+                                    Booking for Someone Else
+                                  </button>
+                                </td>
+                              </tr>
+                            </tbody>
+                          </table>
                         </div>
                       </div>
                     </div>
-                  ))}
+                  );
+                  })}
                 </div>
               </div>
             ))}
@@ -1471,6 +1418,7 @@ export default function Home({ onNavigate }: HomeProps) {
           bookingForGender={bookingForGender}
           onSuccess={handlePaymentSuccess}
           onCancel={handlePaymentCancel}
+          onNavigateToRide={() => onNavigate('ride-details', selectedRide.id)}
         />
       )}
 

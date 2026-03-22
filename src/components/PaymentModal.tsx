@@ -20,9 +20,10 @@ interface PaymentModalProps {
   bookingForGender?: 'Male' | 'Female';
   onSuccess: (paymentId: string) => void;
   onCancel: () => void;
+  onNavigateToRide?: () => void;
 }
 
-export default function PaymentModal({ amount, rideId, userId, seatsToBook, rideName, bookingForSomeoneElse, bookingForGender, onSuccess, onCancel }: PaymentModalProps) {
+export default function PaymentModal({ amount, rideId, userId, seatsToBook, rideName, bookingForSomeoneElse, bookingForGender, onSuccess, onCancel, onNavigateToRide }: PaymentModalProps) {
   const isMobile = useIsMobile();
   const [processing, setProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -197,10 +198,17 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
         boxShadow: '0 20px 60px rgba(0,0,0,0.3)',
         maxHeight: '90vh', overflowY: 'auto',
       }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
-          <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
-            Payment Details
-          </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+          <div>
+            <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: '0 0 2px' }}>
+              Payment Details
+            </h2>
+            {onNavigateToRide && (
+              <button onClick={() => { onCancel(); onNavigateToRide(); }} style={{ background: 'none', border: 'none', padding: 0, fontSize: '13px', color: '#6B7280', cursor: 'pointer', textDecoration: 'underline' }}>
+                Booking for someone else?
+              </button>
+            )}
+          </div>
           <button
             type="button"
             onClick={onCancel}

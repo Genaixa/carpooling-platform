@@ -2,6 +2,8 @@ import React, { createContext, useContext, useEffect, useState, useCallback } fr
 import { supabase, Profile } from '../lib/supabase';
 import type { User } from '@supabase/supabase-js';
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 interface AuthContextType {
   user: User | null;
   profile: Profile | null;
@@ -126,17 +128,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (profileError) throw profileError;
 
+      // Notify admin of new registration (fire-and-forget)
+      fetch(`${API_URL}/api/notify-new-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user: { name: profileData.name, email, phone: profileData.phone, gender: profileData.gender, age_group: profileData.age_group, city: profileData.city } }),
+      }).catch(() => {});
+
       await loadProfile(data.user.id);
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
 
     if (error) throw error;
+
+    if (data.user) {
+      const { data: profile } = await supabase.from('profiles').select('is_banned').eq('id', data.user.id).single();
+      if (profile?.is_banned) {
+        await supabase.auth.signOut();
+        throw new Error('There seems to be an issue with your account. Please contact support.');
+      }
+    }
   };
 
   const signOut = async () => {

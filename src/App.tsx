@@ -14,6 +14,7 @@ import EditProfile from './pages/EditProfile';
 import PublicProfile from './pages/PublicProfile';
 import PaymentSuccess from './pages/PaymentSuccess';
 import DriverApplication from './pages/DriverApplication';
+import RegisterDriver from './pages/RegisterDriver';
 import AdminDashboard from './pages/AdminDashboard';
 import HowItWorks from './pages/HowItWorks';
 import TermsAndConditions from './pages/TermsAndConditions';
@@ -34,7 +35,6 @@ function AppContent() {
   const [editRideId, setEditRideId] = useState<string | null>(null);
   const [rideDetailsId, setRideDetailsId] = useState<string | null>(null);
   const [publicProfileUserId, setPublicProfileUserId] = useState<string | null>(null);
-  const [signupIntent, setSignupIntent] = useState<'passenger' | 'driver'>('passenger');
 
   // Build a hash string from page + optional IDs
   const buildHash = (page: Page, rideId?: string, userId?: string): string => {
@@ -51,7 +51,7 @@ function AppContent() {
     if (clean.startsWith('edit-ride/')) return { page: 'edit-ride', rideId: clean.split('/')[1] };
     if (clean.startsWith('ride-details/')) return { page: 'ride-details', rideId: clean.split('/')[1] };
     if (clean.startsWith('public-profile/')) return { page: 'public-profile', userId: clean.split('/')[1] };
-    if (clean === 'register-driver') return { page: 'register' as Page };
+    if (clean === 'register-driver') return { page: 'register-driver' };
     if (clean.startsWith('payment-success')) return { page: 'payment-success' as Page };
     if (clean.startsWith('booking-accepted-confirm')) return { page: 'booking-accepted-confirm' as Page };
     if (clean.startsWith('booking-rejected-confirm')) return { page: 'booking-rejected-confirm' as Page };
@@ -84,19 +84,9 @@ function AppContent() {
   };
 
   const handleNavigate = (page: Page, rideId?: string, userId?: string) => {
-    if (page === 'register-driver') {
-      setSignupIntent('driver');
-      const hash = buildHash(page, rideId, userId);
-      window.history.pushState({ page, rideId, userId }, '', hash);
-      applyRoute('register' as Page);
-    } else {
-      if (page === 'register') {
-        setSignupIntent('passenger');
-      }
-      const hash = buildHash(page, rideId, userId);
-      window.history.pushState({ page, rideId, userId }, '', hash);
-      applyRoute(page, rideId, userId);
-    }
+    const hash = buildHash(page, rideId, userId);
+    window.history.pushState({ page, rideId, userId }, '', hash);
+    applyRoute(page, rideId, userId);
     window.scrollTo(0, 0);
   };
 
@@ -104,14 +94,8 @@ function AppContent() {
   useEffect(() => {
     const handlePopState = () => {
       const { page, rideId, userId } = parseHash(window.location.hash);
-      if (page === 'register' && window.location.hash === '#register-driver') {
-        setSignupIntent('driver');
-      } else if (page === 'register') {
-        setSignupIntent('passenger');
-      }
       applyRoute(page, rideId, userId);
     };
-
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
   }, []);
@@ -119,9 +103,6 @@ function AppContent() {
   // Parse initial hash on load
   useEffect(() => {
     const { page, rideId, userId } = parseHash(window.location.hash);
-    if (page === 'register' && window.location.hash === '#register-driver') {
-      setSignupIntent('driver');
-    }
     applyRoute(page, rideId, userId);
   }, []);
 
@@ -133,7 +114,7 @@ function AppContent() {
       case 'login':
         return <Login onNavigate={handleNavigate} />;
       case 'register':
-        return <Register onNavigate={handleNavigate} intent={signupIntent} />;
+        return <Register onNavigate={handleNavigate} />;
       case 'profile':
         return <Profile onNavigate={handleNavigate} />;
       case 'post-ride':
@@ -152,6 +133,8 @@ function AppContent() {
         return publicProfileUserId ? <PublicProfile onNavigate={handleNavigate} userId={publicProfileUserId} /> : <Home onNavigate={handleNavigate} />;
       case 'payment-success':
         return <PaymentSuccess onNavigate={handleNavigate} />;
+      case 'register-driver':
+        return <RegisterDriver onNavigate={handleNavigate} />;
       case 'driver-apply':
         return <DriverApplication onNavigate={handleNavigate} />;
       case 'admin-dashboard':

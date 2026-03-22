@@ -18,6 +18,7 @@ export interface Profile {
   is_verified: boolean;
   is_admin: boolean;
   is_approved_driver: boolean;
+  is_banned: boolean;
   address_line1: string | null;
   address_line2: string | null;
   city: string | null;
@@ -186,13 +187,16 @@ export function getCarLabel(
   driverGender: string | null,
   existingOccupants: { males: number; females: number; couples: number } | null
 ): string {
-  const parts: string[] = [];
-  if (driverGender) parts.push(`Driver (${driverGender})`);
+  const driverPart = driverGender ? `Driver: ${driverGender}` : 'Driver: Unknown';
   const males = (existingOccupants?.males || 0) + (existingOccupants?.couples || 0);
   const females = (existingOccupants?.females || 0) + (existingOccupants?.couples || 0);
-  if (males > 0) parts.push(`${males} ${males === 1 ? 'man' : 'men'}`);
-  if (females > 0) parts.push(`${females} ${females === 1 ? 'woman' : 'women'}`);
-  return parts.length > 0 ? parts.join(', ') : 'No occupants listed';
+  const passengerParts: string[] = [];
+  if (males > 0) passengerParts.push(`Male: ${males}`);
+  if (females > 0) passengerParts.push(`Female: ${females}`);
+  const passengerPart = passengerParts.length > 0
+    ? `Passengers: ${passengerParts.join(', ')}`
+    : 'Passengers: None yet';
+  return `${driverPart} · ${passengerPart}`;
 }
 
 /**
@@ -319,20 +323,24 @@ export function getUserRef(userId: string): string {
 
 // Generate a consistent anonymous driver number from a UUID
 export function getDriverAlias(driverId: string): string {
-  let hash = 0;
+  let h1 = 0, h2 = 0;
   for (let i = 0; i < driverId.length; i++) {
-    hash = ((hash << 5) - hash + driverId.charCodeAt(i)) | 0;
+    const c = driverId.charCodeAt(i);
+    h1 = ((h1 << 5) - h1 + c) | 0;
+    h2 = ((h2 << 3) + h2 + c + i) | 0;
   }
-  const num = Math.abs(hash) % 10000;
-  return `Driver #${num.toString().padStart(4, '0')}`;
+  const num = Math.abs((h1 ^ (h2 * 1000003)) | 0) % 1000000;
+  return `Driver #${num.toString().padStart(6, '0')}`;
 }
 
 // Generate a consistent anonymous passenger number from a UUID
 export function getPassengerAlias(passengerId: string): string {
-  let hash = 0;
+  let h1 = 0, h2 = 0;
   for (let i = 0; i < passengerId.length; i++) {
-    hash = ((hash << 5) - hash + passengerId.charCodeAt(i)) | 0;
+    const c = passengerId.charCodeAt(i);
+    h1 = ((h1 << 5) - h1 + c) | 0;
+    h2 = ((h2 << 3) + h2 + c + i) | 0;
   }
-  const num = Math.abs(hash) % 10000;
-  return `Passenger #${num.toString().padStart(4, '0')}`;
+  const num = Math.abs((h1 ^ (h2 * 1000003)) | 0) % 1000000;
+  return `Passenger #${num.toString().padStart(6, '0')}`;
 }

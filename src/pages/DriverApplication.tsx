@@ -122,12 +122,12 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
   const handleLicenceFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
-      toast.error('Please select a JPG or PNG image');
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'].includes(file.type)) {
+      toast.error('Please select a JPG, PNG, or PDF file');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
-      toast.error('Image must be under 5MB');
+      toast.error('File must be under 5MB');
       return;
     }
     setLicencePhotoFile(file);
@@ -440,14 +440,24 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
                 {licencePhotoUrl ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flexWrap: 'wrap' }}>
-                    <img
-                      src={licencePhotoUrl}
-                      alt="Driving licence"
-                      style={{ height: '80px', borderRadius: '8px', border: '2px solid #fcd03a', objectFit: 'cover' }}
-                    />
+                    {licencePhotoUrl.toLowerCase().includes('.pdf') ? (
+                      <a href={licencePhotoUrl} target="_blank" rel="noopener noreferrer" style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
+                        border: '2px solid #fcd03a', borderRadius: '8px', textDecoration: 'none',
+                        color: '#000000', fontSize: '14px', fontWeight: '600',
+                      }}>
+                        📄 View PDF
+                      </a>
+                    ) : (
+                      <img
+                        src={licencePhotoUrl}
+                        alt="Driving licence"
+                        style={{ height: '80px', borderRadius: '8px', border: '2px solid #fcd03a', objectFit: 'cover' }}
+                      />
+                    )}
                     <div>
                       <p style={{ fontSize: '13px', fontWeight: '600', color: '#000000', margin: '0 0 8px 0' }}>
-                        ✓ Licence photo uploaded
+                        ✓ Licence document uploaded
                       </p>
                       <button
                         type="button"
@@ -458,7 +468,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                           fontSize: '13px', fontWeight: '600', cursor: 'pointer',
                         }}
                       >
-                        Remove Photo
+                        Remove File
                       </button>
                     </div>
                   </div>
@@ -466,7 +476,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
                   <div>
                     <input
                       type="file"
-                      accept="image/jpeg,image/jpg,image/png"
+                      accept="image/jpeg,image/jpg,image/png,application/pdf"
                       onChange={handleLicenceFileChange}
                       disabled={uploadingLicencePhoto}
                       style={{ fontSize: '14px', color: '#4B5563', display: 'block', marginBottom: '12px' }}
@@ -511,7 +521,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
               <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px' }}>Your payout for completed rides will be sent to this account.</p>
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Account Name *</label>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Account Holder Name *</label>
                   <input name="bank_account_name" type="text" value={formData.bank_account_name} onChange={handleChange} placeholder="Name on bank account" style={inputStyle('bank_account_name')} />
                   {errors.bank_account_name && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.bank_account_name}</p>}
                 </div>

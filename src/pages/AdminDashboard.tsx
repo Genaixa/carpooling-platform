@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, DriverApplication, Profile, DriverPayout, getRideRef, getUserRef, getDriverAlias } from '../lib/supabase';
+import { supabase, DriverApplication, Profile, DriverPayout, getRideRef, getUserRef, getDriverAlias, getPassengerAlias } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
 
@@ -23,7 +24,7 @@ interface RideOverview {
   seats_available: number;
   price_per_seat: number;
   status: string;
-  driver: { id: string; name: string; email: string } | null;
+  driver: { id: string; name: string; email: string; phone: string | null; gender: string | null; age_group: string | null; address_line1: string | null; address_line2: string | null; city: string | null; postcode: string | null } | null;
   bookings: Array<{
     id: string;
     passenger_id: string;
@@ -32,7 +33,7 @@ interface RideOverview {
     commission_amount: number;
     driver_payout_amount: number;
     status: string;
-    passenger: { id: string; name: string; email: string } | null;
+    passenger: { id: string; name: string; email: string; phone: string | null; gender: string | null; age_group: string | null; address_line1: string | null; address_line2: string | null; city: string | null; postcode: string | null } | null;
   }>;
   totalRevenue: number;
   totalCommission: number;
@@ -63,6 +64,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
   const [revokeReason, setRevokeReason] = useState<Record<string, string>>({});
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
+  const [banReason, setBanReason] = useState<Record<string, string>>({});
+  const [confirmBan, setConfirmBan] = useState<string | null>(null);
 
   // Finances state
   const [financeSubTab, setFinanceSubTab] = useState<'rides' | 'payouts'>('rides');
@@ -81,6 +84,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [usersFilter, setUsersFilter] = useState<'all' | 'drivers' | 'passengers'>('all');
   const [usersSearch, setUsersSearch] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
+  const [expandedUser, setExpandedUser] = useState<string | null>(null);
+  const [editingUser, setEditingUser] = useState<string | null>(null);
+  const [editUserData, setEditUserData] = useState<Record<string, any>>({});
+  const [editUserLoading, setEditUserLoading] = useState(false);
 
   // Search & Lookup state
   const [lookupQuery, setLookupQuery] = useState('');
@@ -95,8 +102,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [resendTypes, setResendTypes] = useState<Record<string, string>>({});
 
   // Licence reviews state
-  const [pendingLicences, setPendingLicences] = useState<Profile[]>([]);
-  const [licencePhotoModal, setLicencePhotoModal] = useState<string | null>(null);
+  const [allLicences, setAllLicences] = useState<Profile[]>([]);
+  const [licenceFilter, setLicenceFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('pending');
+
   const [profilePhotoModal, setProfilePhotoModal] = useState<string | null>(null);
   const [togglingAdmin, setTogglingAdmin] = useState<string | null>(null);
 
@@ -122,16 +130,31 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const { data, error } = await supabase
         .from('profiles')
         .select('*')
-        .eq('licence_status', 'pending')
+        .not('licence_photo_url', 'is', null)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
-      setPendingLicences(data || []);
+      setAllLicences(data || []);
     } catch (err: any) {
-      console.error('Error loading pending licences:', err);
-      toast.error('Failed to load pending licences');
+      console.error('Error loading licences:', err);
+      toast.error('Failed to load licences');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const viewLicencePhoto = async (targetUserId: string) => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/licence-photo-url?targetUserId=${targetUserId}&requesterId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      });
+      if (!res.ok) throw new Error('Failed to get URL');
+      const { url } = await res.json();
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      alert('Could not open licence photo. Please try again.');
     }
   };
 
@@ -181,7 +204,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const [profilesResult, bookingsResult, ridesResult] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, name, email, phone, is_approved_driver, is_admin, average_rating, total_reviews, created_at, gender, city, profile_photo_url')
+          .select('id, name, email, phone, is_approved_driver, is_admin, is_banned, average_rating, total_reviews, created_at, gender, city, profile_photo_url, driver_tier, age_group, marital_status, travel_status, partner_name, address_line1, address_line2, postcode')
           .order('created_at', { ascending: false }),
         // Fetch all non-cancelled booking passenger IDs to count per user
         supabase
@@ -227,8 +250,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     setLookupDetail(null);
     try {
       const isRef = /^[0-9a-f]{8}$/i.test(query);
-      // Match "#8876" or "8876" (1–4 digits) — driver alias lookup
-      const aliasMatch = query.match(/^#?(\d{1,4})$/);
+      // Match "Driver #123456", "Passenger #123456", "#123456", or "123456" (1–6 digits) — alias lookup
+      const aliasMatch = query.match(/^(?:(?:driver|passenger)\s*#?)?#?(\d{1,6})$/i);
       if (isRef) {
         // UUID range search: any UUID starting with the 8-char prefix falls between
         // prefix-0000-0000-0000-000000000000 and prefix-ffff-ffff-ffff-ffffffffffff.
@@ -238,25 +261,29 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         const hi = `${prefix}-ffff-ffff-ffff-ffffffffffff`;
         const [ridesResult, usersResult] = await Promise.all([
           supabase.from('rides').select('id, departure_location, arrival_location, date_time, status, driver_id').gte('id', lo).lte('id', hi).limit(10),
-          supabase.from('profiles').select('id, name, email, is_approved_driver, average_rating, total_reviews, profile_photo_url').gte('id', lo).lte('id', hi).limit(10),
+          supabase.from('profiles').select('id, name, email, phone, is_approved_driver, average_rating, total_reviews, profile_photo_url').gte('id', lo).lte('id', hi).limit(10),
         ]);
         setLookupRides(ridesResult.data || []);
         setLookupUsers(usersResult.data || []);
       } else if (aliasMatch) {
-        // Driver alias search: fetch all profiles and compute alias client-side
-        const aliasNum = parseInt(aliasMatch[1], 10).toString().padStart(4, '0');
-        const targetAlias = `Driver #${aliasNum}`;
+        // Alias search: fetch all profiles and compute alias client-side
+        const aliasNum = parseInt(aliasMatch[1], 10).toString().padStart(6, '0');
+        const isPassengerSearch = /^passenger/i.test(query);
         const { data: allProfiles } = await supabase
           .from('profiles')
-          .select('id, name, email, is_approved_driver, average_rating, total_reviews, profile_photo_url')
+          .select('id, name, email, phone, is_approved_driver, average_rating, total_reviews, profile_photo_url')
           .limit(2000);
-        const matched = (allProfiles || []).filter(p => getDriverAlias(p.id) === targetAlias);
+        const matched = (allProfiles || []).filter(p => {
+          if (isPassengerSearch) return getPassengerAlias(p.id) === `Passenger #${aliasNum}`;
+          // "#number" or "Driver #number" — check both aliases
+          return getDriverAlias(p.id) === `Driver #${aliasNum}` || getPassengerAlias(p.id) === `Passenger #${aliasNum}`;
+        });
         setLookupUsers(matched);
         setLookupRides([]);
       } else {
         const { data } = await supabase
           .from('profiles')
-          .select('id, name, email, is_approved_driver, average_rating, total_reviews, profile_photo_url')
+          .select('id, name, email, phone, is_approved_driver, average_rating, total_reviews, profile_photo_url')
           .or(`name.ilike.%${query}%,email.ilike.%${query}%`)
           .limit(20);
         setLookupUsers(data || []);
@@ -466,7 +493,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
     // Calculate balances
     for (const d of Object.values(driverMap)) {
-      d.balanceOwed = Math.max(0, d.totalEarned - d.totalPaidOut);
+      d.balanceOwed = Math.max(0, Math.round((d.totalEarned - d.totalPaidOut) * 100) / 100);
     }
 
     // Sort by balance owed descending
@@ -529,6 +556,52 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error(err.message || 'Failed to revoke driver');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const handleBanUser = async (userId: string, unban = false) => {
+    if (!user) return;
+    setActionLoading(`ban-${userId}`);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${API_URL}/api/admin/ban-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ userId, adminId: user.id, reason: banReason[userId] || '', unban }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      toast.success(unban ? 'User unbanned' : 'User banned');
+      setConfirmBan(null);
+      setBanReason(prev => { const n = { ...prev }; delete n[userId]; return n; });
+      loadUsersData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update ban status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleAdminUpdateUser = async (userId: string) => {
+    if (!user) return;
+    setEditUserLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/update-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id, userId, updates: editUserData }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Profile updated');
+      setEditingUser(null);
+      setEditUserData({});
+      loadUsersData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update profile');
+    } finally {
+      setEditUserLoading(false);
     }
   };
 
@@ -606,6 +679,41 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     ? payouts.reduce((sum, p) => sum + (parseFloat(p.amount as any) || 0), 0)
     : payouts.filter(p => filteredDriverIds.has(p.driver_id)).reduce((sum, p) => sum + (parseFloat(p.amount as any) || 0), 0);
 
+  const handleExportPayouts = () => {
+    // Sheet 1: To Pay — drivers with a balance owed
+    const toPayRows = driverSummaries
+      .filter(ds => ds.balanceOwed > 0)
+      .map(ds => ({
+        'Driver Name': ds.driverName,
+        'Email': ds.driverEmail,
+        'Bank Account Holder Name': ds.bankAccountName || '',
+        'Account Number': ds.bankAccountNumber || '',
+        'Sort Code': ds.bankSortCode || '',
+        'Total Earned (£)': ds.totalEarned.toFixed(2),
+        'Total Paid Out (£)': ds.totalPaidOut.toFixed(2),
+        'Balance Owed (£)': ds.balanceOwed.toFixed(2),
+      }));
+
+    // Sheet 2: Paid — full payout history
+    const paidRows = payouts.map(p => {
+      const ds = driverSummaries.find(d => d.driverId === p.driver_id);
+      return {
+        'Date': new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }),
+        'Driver Name': ds?.driverName || p.driver_id,
+        'Email': ds?.driverEmail || '',
+        'Amount Paid (£)': (parseFloat(p.amount as any) || 0).toFixed(2),
+        'Notes': p.notes || '',
+      };
+    });
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(toPayRows.length ? toPayRows : [{ 'Info': 'No outstanding balances' }]), 'To Pay');
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(paidRows.length ? paidRows : [{ 'Info': 'No payout history' }]), 'Paid');
+
+    const date = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `ChapaRide-Payouts-${date}.xlsx`);
+  };
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       <div style={{ background: '#fcd03a', padding: isMobile ? '24px 16px' : '40px 20px' }}>
@@ -620,7 +728,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: '2px' }}>
           {([
             { key: 'applications' as const, label: 'Applications' },
-            { key: 'licence-reviews' as const, label: `Licences (${pendingLicences.length || '...'})` },
+            { key: 'licence-reviews' as const, label: `Licences (${allLicences.length || '...'})` },
             { key: 'finances' as const, label: 'Rides & Finances' },
             { key: 'lookup' as const, label: '🔍 Search' },
             { key: 'users' as const, label: 'All Users' },
@@ -753,12 +861,22 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         <div style={{ marginTop: '12px', borderTop: '1px solid #E5E7EB', paddingTop: '12px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '13px' }}>
                           <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
                           <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS</span><p style={{ margin: '2px 0 0 0', color: app.dbs_check_acknowledged ? '#000000' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Acknowledged' : 'No'}</p></div>
+                          {(app.user as any)?.phone && <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Mobile</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{(app.user as any).phone}</p></div>}
                           <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
+                          <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Address</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}</p></div>
                           {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
-                            <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                            <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Bank Account Holder Name</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
                             <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Account No.</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
                             <div><span style={{ fontSize: '10px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
                           </>)}
+                          {app.user?.licence_photo_url && (
+                            <div style={{ gridColumn: 'span 2', marginTop: '4px' }}>
+                              <span style={{ fontSize: '10px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Licence Document</span>
+                              <div style={{ marginTop: '6px' }}>
+                                <button onClick={() => viewLicencePhoto(app.user!.id)} style={{ padding: '6px 14px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>View Licence</button>
+                              </div>
+                            </div>
+                          )}
                           {app.status === 'rejected' && app.admin_notes && (
                             <div style={{ gridColumn: 'span 2', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
                               <span style={{ fontSize: '12px', fontWeight: '700', color: '#991b1b' }}>Rejection reason: </span>
@@ -879,13 +997,22 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px 24px', paddingTop: '12px' }}>
                                     <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Marital Status</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{(app.user as any)?.marital_status || '—'}</p></div>
                                     <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>DBS Acknowledged</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: app.dbs_check_acknowledged ? '#000000' : '#991b1b' }}>{app.dbs_check_acknowledged ? 'Yes' : 'No'}</p></div>
+                                    {(app.user as any)?.phone && <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Mobile</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{(app.user as any).phone}</p></div>}
                                     <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Emergency Contact</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.emergency_contact_name} · {app.emergency_contact_phone}</p></div>
                                     <div style={{ gridColumn: 'span 2' }}><span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Address</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{[(app.user as any)?.address_line1, (app.user as any)?.address_line2, (app.user as any)?.city, (app.user as any)?.postcode].filter(Boolean).join(', ') || '—'}</p></div>
                                     {(app.bank_account_name || app.bank_account_number || app.bank_sort_code) && (<>
-                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Bank Account Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
+                                      <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Bank Account Holder Name</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_name || '—'}</p></div>
                                       <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Account Number</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_account_number || '—'}</p></div>
                                       <div><span style={{ fontSize: '11px', fontWeight: '700', color: '#000000', textTransform: 'uppercase' }}>Sort Code</span><p style={{ margin: '2px 0 0 0', fontSize: '13px', color: '#1F2937' }}>{app.bank_sort_code || '—'}</p></div>
                                     </>)}
+                                    {app.user?.licence_photo_url && (
+                                      <div style={{ gridColumn: 'span 2' }}>
+                                        <span style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase' }}>Licence Document</span>
+                                        <div style={{ marginTop: '6px' }}>
+                                          <button onClick={() => viewLicencePhoto(app.user!.id)} style={{ padding: '6px 14px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}>View Licence</button>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
                                   {app.status === 'rejected' && app.admin_notes && (
                                     <div style={{ marginTop: '12px', backgroundColor: '#FEE2E2', borderRadius: '8px', padding: '10px 14px', border: '1px solid #FCA5A5' }}>
@@ -925,83 +1052,111 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         {/* ==================== LICENCE REVIEWS TAB ==================== */}
         {tab === 'licence-reviews' && (
           <>
-            {/* Licence Photo modal */}
-            {licencePhotoModal && (
-              <div style={{ position: 'fixed', inset: 0, backgroundColor: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }} onClick={() => setLicencePhotoModal(null)}>
-                <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '20px', maxWidth: '90vw', maxHeight: '90vh' }} onClick={(e) => e.stopPropagation()}>
-                  <img src={licencePhotoModal} alt="Licence Photo" style={{ maxWidth: '100%', maxHeight: '80vh', borderRadius: '12px' }} />
-                  <div style={{ textAlign: 'center', marginTop: '12px' }}>
-                    <button onClick={() => setLicencePhotoModal(null)} style={{ padding: '10px 24px', backgroundColor: '#f3f4f6', color: '#374151', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Close</button>
-                  </div>
-                </div>
-              </div>
-            )}
+            {/* Filter buttons */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
+              {(['all', 'pending', 'approved', 'rejected'] as const).map(f => {
+                const count = f === 'all' ? allLicences.length : allLicences.filter(l => l.licence_status === f).length;
+                return (
+                  <button
+                    key={f}
+                    onClick={() => setLicenceFilter(f)}
+                    style={{
+                      padding: '8px 20px', fontWeight: '600', fontSize: '14px', borderRadius: '50px',
+                      border: 'none', cursor: 'pointer', textTransform: 'capitalize',
+                      backgroundColor: licenceFilter === f ? '#1F2937' : '#F3F4F6',
+                      color: licenceFilter === f ? 'white' : '#374151',
+                    }}
+                  >
+                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)} ({count})
+                  </button>
+                );
+              })}
+            </div>
 
             {loading ? (
               <div style={{ textAlign: 'center', padding: '80px' }}><Loading /></div>
-            ) : pendingLicences.length === 0 ? (
-              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
-                <p style={{ color: '#4B5563', fontSize: '20px' }}>No pending licence reviews</p>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {pendingLicences.map(driver => (
-                  <div key={driver.id} style={{
-                    backgroundColor: 'white', borderRadius: '20px', padding: '24px 30px',
-                    boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #f59e0b',
-                  }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
-                        <Avatar photoUrl={driver.profile_photo_url} name={driver.name} size="sm" />
-                        <div>
-                          <h3 style={{ fontSize: '17px', fontWeight: '600', color: '#1F2937', margin: 0 }}>{driver.name}</h3>
-                          <p style={{ fontSize: '13px', color: '#6B7280', margin: '2px 0 0 0' }}>
-                            {driver.email} | {driver.gender}
-                          </p>
+            ) : (() => {
+              const filtered = licenceFilter === 'all' ? allLicences : allLicences.filter(l => l.licence_status === licenceFilter);
+              const borderColor = { pending: '#f59e0b', approved: '#10b981', rejected: '#ef4444' };
+              if (filtered.length === 0) return (
+                <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '80px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+                  <p style={{ color: '#4B5563', fontSize: '20px' }}>No licences found</p>
+                </div>
+              );
+              return (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                  {filtered.map(driver => (
+                    <div key={driver.id} style={{
+                      backgroundColor: 'white', borderRadius: '20px', padding: '24px 30px',
+                      boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+                      borderLeft: `5px solid ${borderColor[driver.licence_status as keyof typeof borderColor] || '#d1d5db'}`,
+                    }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '14px' }}>
+                          <Avatar photoUrl={driver.profile_photo_url} name={driver.name} size="sm" />
+                          <div>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <h3 style={{ fontSize: '17px', fontWeight: '600', color: '#1F2937', margin: 0 }}>{driver.name}</h3>
+                              <span style={{
+                                fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', textTransform: 'capitalize',
+                                backgroundColor: driver.licence_status === 'approved' ? '#d1fae5' : driver.licence_status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                                color: driver.licence_status === 'approved' ? '#065f46' : driver.licence_status === 'rejected' ? '#991b1b' : '#92400e',
+                              }}>
+                                {driver.licence_status || 'unknown'}
+                              </span>
+                            </div>
+                            <p style={{ fontSize: '13px', color: '#6B7280', margin: '2px 0 0 0' }}>
+                              {driver.email} | {driver.gender}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          {driver.licence_photo_url && (
+                            <button
+                              onClick={() => viewLicencePhoto(driver.id)}
+                              style={{
+                                padding: '8px 16px', backgroundColor: '#eff6ff', color: '#1e40af',
+                                border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '13px',
+                                fontWeight: '600', cursor: 'pointer',
+                              }}
+                            >
+                              View Licence
+                            </button>
+                          )}
+                          {driver.licence_status !== 'approved' && (
+                            <button
+                              onClick={() => handleApproveLicence(driver.id)}
+                              disabled={actionLoading === driver.id}
+                              style={{
+                                padding: '8px 16px', backgroundColor: '#fef9e0', color: '#000000',
+                                border: '1px solid #fcd03a', borderRadius: '8px', fontSize: '13px',
+                                fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              {actionLoading === driver.id ? 'Processing...' : 'Approve (Gold)'}
+                            </button>
+                          )}
+                          {driver.licence_status !== 'rejected' && (
+                            <button
+                              onClick={() => handleRejectLicence(driver.id)}
+                              disabled={actionLoading === driver.id}
+                              style={{
+                                padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b',
+                                border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px',
+                                fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
+                              }}
+                            >
+                              Reject
+                            </button>
+                          )}
                         </div>
                       </div>
-
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        {driver.licence_photo_url && (
-                          <button
-                            onClick={() => setLicencePhotoModal(driver.licence_photo_url)}
-                            style={{
-                              padding: '8px 16px', backgroundColor: '#eff6ff', color: '#1e40af',
-                              border: '1px solid #bfdbfe', borderRadius: '8px', fontSize: '13px',
-                              fontWeight: '600', cursor: 'pointer',
-                            }}
-                          >
-                            View Photo
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleApproveLicence(driver.id)}
-                          disabled={actionLoading === driver.id}
-                          style={{
-                            padding: '8px 16px', backgroundColor: '#fef9e0', color: '#000000',
-                            border: '1px solid #fcd03a', borderRadius: '8px', fontSize: '13px',
-                            fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          {actionLoading === driver.id ? 'Processing...' : 'Approve (Gold)'}
-                        </button>
-                        <button
-                          onClick={() => handleRejectLicence(driver.id)}
-                          disabled={actionLoading === driver.id}
-                          style={{
-                            padding: '8px 16px', backgroundColor: '#fee2e2', color: '#991b1b',
-                            border: '1px solid #fca5a5', borderRadius: '8px', fontSize: '13px',
-                            fontWeight: '600', cursor: actionLoading === driver.id ? 'not-allowed' : 'pointer',
-                          }}
-                        >
-                          Reject
-                        </button>
-                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              );
+            })()}
           </>
         )}
 
@@ -1131,6 +1286,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                   </div>
                                   <div style={{ display: 'flex', gap: isMobile ? '12px' : '20px', alignItems: 'center', flexWrap: 'wrap' }}>
                                     <div style={{ textAlign: 'center' }}>
+                                      <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Price/Seat</p>
+                                      <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1F2937', margin: 0 }}>£{(parseFloat(ride.price_per_seat as any) || 0).toFixed(2)}</p>
+                                    </div>
+                                    <div style={{ textAlign: 'center' }}>
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Passengers</p>
                                       <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1F2937', margin: 0 }}>{ride.passengerCount}</p>
                                     </div>
@@ -1185,56 +1344,90 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 </div>
                               </div>
 
-                              {/* Expanded: show bookings/passengers */}
-                              {isExpanded && ride.bookings.length > 0 && (
+                              {/* Expanded: driver details + bookings */}
+                              {isExpanded && (
                                 <div style={{ borderTop: '1px solid #E8EBED', padding: '16px 24px', backgroundColor: '#FAFBFC' }}>
-                                  <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
-                                    Bookings ({ride.bookings.length})
-                                  </p>
-                                  <div style={{ overflowX: 'auto' }}>
-                                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
-                                      <thead>
-                                        <tr style={{ backgroundColor: '#F3F4F6' }}>
-                                          <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Passenger</th>
-                                          <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Seats</th>
-                                          <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Status</th>
-                                          <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Paid</th>
-                                          <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Commission</th>
-                                          <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Driver</th>
-                                        </tr>
-                                      </thead>
-                                      <tbody>
-                                        {ride.bookings.map(booking => {
-                                          const bsc = statusColors[booking.status] || statusColors.pending;
-                                          return (
-                                            <tr key={booking.id} style={{ borderBottom: '1px solid #E8EBED' }}>
-                                              <td style={{ padding: '10px 12px', color: '#1F2937' }}>
-                                                {booking.passenger?.name || 'Unknown'}
-                                                <span style={{ display: 'block', fontSize: '11px', color: '#9CA3AF' }}>{booking.passenger?.email}</span>
-                                              </td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{booking.seats_booked}</td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'center' }}>
-                                                <span style={{
-                                                  padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600',
-                                                  backgroundColor: bsc.bg, color: bsc.color, textTransform: 'capitalize',
-                                                }}>
-                                                  {booking.status.replace('_', ' ')}
-                                                </span>
-                                              </td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1F2937', fontWeight: '600' }}>£{(parseFloat(booking.total_paid as any) || 0).toFixed(2)}</td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#fcd03a', fontWeight: '600' }}>£{(parseFloat(booking.commission_amount as any) || 0).toFixed(2)}</td>
-                                              <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(parseFloat(booking.driver_payout_amount as any) || 0).toFixed(2)}</td>
+                                  {/* Driver details */}
+                                  {ride.driver && (
+                                    <div style={{ marginBottom: '16px', padding: '12px 16px', backgroundColor: '#EFF6FF', borderRadius: '10px', border: '1px solid #BFDBFE' }}>
+                                      <p style={{ fontSize: '12px', fontWeight: '700', color: '#1e40af', textTransform: 'uppercase', marginBottom: '8px' }}>Driver</p>
+                                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '6px 20px', fontSize: '13px', color: '#1F2937' }}>
+                                        <span><strong>Name:</strong> {ride.driver.name}</span>
+                                        <span><strong>Email:</strong> {ride.driver.email}</span>
+                                        <span><strong>Phone:</strong> {ride.driver.phone || '—'}</span>
+                                        <span><strong>Gender:</strong> {ride.driver.gender || '—'}</span>
+                                        <span><strong>Age:</strong> {ride.driver.age_group || '—'}</span>
+                                        {(ride.driver.address_line1 || ride.driver.city || ride.driver.postcode) && (
+                                          <span style={{ gridColumn: 'span 2' }}>
+                                            <strong>Address:</strong> {[ride.driver.address_line1, ride.driver.address_line2, ride.driver.city, ride.driver.postcode].filter(Boolean).join(', ')}
+                                          </span>
+                                        )}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Bookings / passengers */}
+                                  {ride.bookings.length > 0 ? (
+                                    <>
+                                      <p style={{ fontSize: '13px', fontWeight: '700', color: '#374151', marginBottom: '12px' }}>
+                                        Bookings ({ride.bookings.length})
+                                      </p>
+                                      <div style={{ overflowX: 'auto' }}>
+                                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                                          <thead>
+                                            <tr style={{ backgroundColor: '#F3F4F6' }}>
+                                              <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Passenger</th>
+                                              <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Contact</th>
+                                              <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Details</th>
+                                              <th style={{ textAlign: 'left', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Address</th>
+                                              <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Seats</th>
+                                              <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Status</th>
+                                              <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Paid</th>
+                                              <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Commission</th>
+                                              <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Driver</th>
                                             </tr>
-                                          );
-                                        })}
-                                      </tbody>
-                                    </table>
-                                  </div>
-                                </div>
-                              )}
-                              {isExpanded && ride.bookings.length === 0 && (
-                                <div style={{ borderTop: '1px solid #E8EBED', padding: '20px 24px', backgroundColor: '#FAFBFC', textAlign: 'center' }}>
-                                  <p style={{ color: '#9CA3AF', fontSize: '14px', margin: 0 }}>No bookings for this ride</p>
+                                          </thead>
+                                          <tbody>
+                                            {ride.bookings.map(booking => {
+                                              const bsc = statusColors[booking.status] || statusColors.pending;
+                                              const p = booking.passenger;
+                                              const address = p ? [p.address_line1, p.address_line2, p.city, p.postcode].filter(Boolean).join(', ') : '';
+                                              return (
+                                                <tr key={booking.id} style={{ borderBottom: '1px solid #E8EBED' }}>
+                                                  <td style={{ padding: '10px 12px', color: '#1F2937' }}>
+                                                    <span style={{ fontWeight: '600' }}>{p?.name || 'Unknown'}</span>
+                                                  </td>
+                                                  <td style={{ padding: '10px 12px', color: '#374151' }}>
+                                                    <span style={{ display: 'block' }}>{p?.email || '—'}</span>
+                                                    <span style={{ display: 'block', color: '#6B7280' }}>{p?.phone || '—'}</span>
+                                                  </td>
+                                                  <td style={{ padding: '10px 12px', color: '#374151' }}>
+                                                    <span style={{ display: 'block' }}>{p?.gender || '—'}</span>
+                                                    <span style={{ display: 'block', color: '#6B7280' }}>{p?.age_group || '—'}</span>
+                                                  </td>
+                                                  <td style={{ padding: '10px 12px', color: '#6B7280', maxWidth: '180px' }}>{address || '—'}</td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{booking.seats_booked}</td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                    <span style={{
+                                                      padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600',
+                                                      backgroundColor: bsc.bg, color: bsc.color, textTransform: 'capitalize',
+                                                    }}>
+                                                      {booking.status.replace('_', ' ')}
+                                                    </span>
+                                                  </td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1F2937', fontWeight: '600' }}>£{(parseFloat(booking.total_paid as any) || 0).toFixed(2)}</td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#fcd03a', fontWeight: '600' }}>£{(parseFloat(booking.commission_amount as any) || 0).toFixed(2)}</td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(parseFloat(booking.driver_payout_amount as any) || 0).toFixed(2)}</td>
+                                                </tr>
+                                              );
+                                            })}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <p style={{ color: '#9CA3AF', fontSize: '14px', margin: 0, textAlign: 'center' }}>No bookings for this ride</p>
+                                  )}
                                 </div>
                               )}
                             </div>
@@ -1248,88 +1441,136 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 {/* ========= PAYOUTS SUB-TAB ========= */}
                 {financeSubTab === 'payouts' && (
                   <>
+                    <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '16px' }}>
+                      <button
+                        onClick={handleExportPayouts}
+                        style={{
+                          padding: '10px 20px', backgroundColor: '#fcd03a', color: '#000000',
+                          border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+                          cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
+                        }}
+                      >
+                        ⬇ Export to Excel
+                      </button>
+                    </div>
+
                     {driverSummaries.length === 0 ? (
                       <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '60px 40px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
                         <p style={{ color: '#4B5563', fontSize: '18px' }}>No driver earnings to display</p>
                       </div>
-                    ) : (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                        {driverSummaries.map(ds => (
-                          <div key={ds.driverId} style={{
-                            backgroundColor: 'white', borderRadius: '16px', padding: '24px',
-                            boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
-                            borderLeft: ds.balanceOwed > 0 ? '4px solid #f59e0b' : '4px solid #fcd03a',
-                          }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', flexWrap: 'wrap', gap: '16px' }}>
-                              <div>
-                                <h4 style={{ fontSize: '17px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px 0' }}>{ds.driverName}</h4>
-                                <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>{ds.driverEmail}</p>
-                                {/* Bank details */}
-                                {(ds.bankAccountName || ds.bankAccountNumber) && (
-                                  <div style={{ marginTop: '8px', padding: '8px 12px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid #fcd03a' }}>
-                                    <span style={{ fontSize: '11px', fontWeight: '700', color: '#000000' }}>Bank: </span>
-                                    <span style={{ fontSize: '12px', color: '#1F2937' }}>
-                                      {ds.bankAccountName || '—'} | Acc: {ds.bankAccountNumber || '—'} | SC: {ds.bankSortCode || '—'}
-                                    </span>
-                                  </div>
-                                )}
-                              </div>
-
-                              <div style={{ display: 'flex', gap: '24px', alignItems: 'center', flexWrap: 'wrap' }}>
-                                <div style={{ textAlign: 'center' }}>
-                                  <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Total Earned</p>
-                                  <p style={{ fontSize: '20px', fontWeight: '700', color: '#1e40af', margin: 0 }}>£{ds.totalEarned.toFixed(2)}</p>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                  <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Paid Out</p>
-                                  <p style={{ fontSize: '20px', fontWeight: '700', color: '#000000', margin: 0 }}>£{ds.totalPaidOut.toFixed(2)}</p>
-                                </div>
-                                <div style={{ textAlign: 'center' }}>
-                                  <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Balance Owed</p>
-                                  <p style={{ fontSize: '20px', fontWeight: '700', color: ds.balanceOwed > 0 ? '#dc2626' : '#000000', margin: 0 }}>
-                                    £{ds.balanceOwed.toFixed(2)}
-                                  </p>
-                                </div>
-                                {ds.balanceOwed > 0 && (
-                                  <button
-                                    onClick={() => {
-                                      setPayoutModal({ driverId: ds.driverId, driverName: ds.driverName, balance: ds.balanceOwed });
-                                      setPayoutAmount(ds.balanceOwed.toFixed(2));
-                                      setPayoutNotes('');
-                                    }}
-                                    style={{
-                                      padding: '10px 20px', backgroundColor: '#fcd03a', color: '#000000',
-                                      border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
-                                      cursor: 'pointer', whiteSpace: 'nowrap',
-                                    }}
-                                  >
-                                    Mark as Paid
-                                  </button>
-                                )}
-                              </div>
+                    ) : (() => {
+                      const toPay = driverSummaries.filter(ds => ds.balanceOwed > 0);
+                      const paid = driverSummaries.filter(ds => ds.balanceOwed === 0);
+                      const thStyle: React.CSSProperties = { padding: '10px 14px', textAlign: 'left', fontWeight: '700', fontSize: '12px', color: '#374151', backgroundColor: '#F9FAFB', whiteSpace: 'nowrap' };
+                      const tdStyle: React.CSSProperties = { padding: '11px 14px', fontSize: '13px', color: '#1F2937', verticalAlign: 'top' };
+                      const renderTable = (rows: typeof driverSummaries, showAction: boolean) => (
+                        <div style={{ overflowX: 'auto' }}>
+                          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                            <thead>
+                              <tr style={{ borderBottom: '2px solid #E5E7EB' }}>
+                                <th style={thStyle}>Driver</th>
+                                <th style={thStyle}>Bank Details</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Total Earned</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Paid Out</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Balance Owed</th>
+                                <th style={thStyle}>Payout History</th>
+                                {showAction && <th style={thStyle}>Action</th>}
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {rows.map((ds, i) => {
+                                const driverPayouts = payouts.filter(p => p.driver_id === ds.driverId);
+                                return (
+                                  <tr key={ds.driverId} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: i % 2 === 0 ? 'white' : '#FAFAFA' }}>
+                                    <td style={tdStyle}>
+                                      <span style={{ fontWeight: '600' }}>{ds.driverName}</span>
+                                      <span style={{ display: 'block', fontSize: '12px', color: '#6B7280' }}>{ds.driverEmail}</span>
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {(ds.bankAccountName || ds.bankAccountNumber) ? (
+                                        <span style={{ fontSize: '12px', color: '#374151' }}>
+                                          <span style={{ display: 'block' }}>{ds.bankAccountName || '—'}</span>
+                                          <span style={{ display: 'block', color: '#6B7280' }}>Acc: {ds.bankAccountNumber || '—'}</span>
+                                          <span style={{ display: 'block', color: '#6B7280' }}>SC: {ds.bankSortCode || '—'}</span>
+                                        </span>
+                                      ) : <span style={{ color: '#9CA3AF' }}>—</span>}
+                                    </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '600', color: '#1e40af' }}>£{ds.totalEarned.toFixed(2)}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '600' }}>£{ds.totalPaidOut.toFixed(2)}</td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', fontWeight: '700', color: ds.balanceOwed > 0 ? '#dc2626' : '#16a34a' }}>
+                                      £{ds.balanceOwed.toFixed(2)}
+                                    </td>
+                                    <td style={tdStyle}>
+                                      {driverPayouts.length === 0 ? (
+                                        <span style={{ color: '#9CA3AF' }}>—</span>
+                                      ) : (
+                                        <div style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                                          {driverPayouts.map(p => (
+                                            <span key={p.id} style={{ fontSize: '12px', color: '#374151' }}>
+                                              {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                              {' · '}
+                                              <strong>£{(parseFloat(p.amount as any) || 0).toFixed(2)}</strong>
+                                              {p.notes && <span style={{ color: '#9CA3AF' }}> — {p.notes}</span>}
+                                            </span>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </td>
+                                    {showAction && (
+                                      <td style={tdStyle}>
+                                        <button
+                                          onClick={() => {
+                                            setPayoutModal({ driverId: ds.driverId, driverName: ds.driverName, balance: ds.balanceOwed });
+                                            setPayoutAmount(ds.balanceOwed.toFixed(2));
+                                            setPayoutNotes('');
+                                          }}
+                                          style={{
+                                            padding: '7px 14px', backgroundColor: '#fcd03a', color: '#000000',
+                                            border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600',
+                                            cursor: 'pointer', whiteSpace: 'nowrap',
+                                          }}
+                                        >
+                                          Mark as Paid
+                                        </button>
+                                      </td>
+                                    )}
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                      return (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
+                          {/* Table 1: To Pay */}
+                          <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                            <div style={{ padding: '16px 20px', borderBottom: '2px solid #fcd03a', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>To Pay</h3>
+                              <span style={{ backgroundColor: toPay.length > 0 ? '#FEF3C7' : '#F3F4F6', color: toPay.length > 0 ? '#92400e' : '#6B7280', padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                                {toPay.length} driver{toPay.length !== 1 ? 's' : ''}
+                              </span>
                             </div>
-
-                            {/* Payout history for this driver */}
-                            {payouts.filter(p => p.driver_id === ds.driverId).length > 0 && (
-                              <div style={{ marginTop: '16px', borderTop: '1px solid #E8EBED', paddingTop: '12px' }}>
-                                <p style={{ fontSize: '12px', fontWeight: '700', color: '#6B7280', marginBottom: '8px' }}>Payout History</p>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                                  {payouts.filter(p => p.driver_id === ds.driverId).map(p => (
-                                    <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 10px', backgroundColor: '#F9FAFB', borderRadius: '8px', fontSize: '13px' }}>
-                                      <span style={{ color: '#374151' }}>
-                                        {new Date(p.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
-                                        {p.notes && <span style={{ color: '#9CA3AF', marginLeft: '8px' }}>— {p.notes}</span>}
-                                      </span>
-                                      <span style={{ fontWeight: '600', color: '#000000' }}>£{(parseFloat(p.amount as any) || 0).toFixed(2)}</span>
-                                    </div>
-                                  ))}
-                                </div>
-                              </div>
-                            )}
+                            {toPay.length === 0 ? (
+                              <p style={{ padding: '24px 20px', color: '#9CA3AF', margin: 0 }}>All drivers have been paid.</p>
+                            ) : renderTable(toPay, true)}
                           </div>
-                        ))}
-                      </div>
-                    )}
+
+                          {/* Table 2: Paid */}
+                          <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                            <div style={{ padding: '16px 20px', borderBottom: '2px solid #D1FAE5', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                              <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#1F2937', margin: 0 }}>Paid</h3>
+                              <span style={{ backgroundColor: '#D1FAE5', color: '#065F46', padding: '2px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>
+                                {paid.length} driver{paid.length !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            {paid.length === 0 ? (
+                              <p style={{ padding: '24px 20px', color: '#9CA3AF', margin: 0 }}>No fully paid drivers yet.</p>
+                            ) : renderTable(paid, false)}
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </>
@@ -1412,7 +1653,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                               Ref: {getUserRef(u.id)}
                             </span>
                             <span style={{ fontSize: '12px', color: '#6B7280', backgroundColor: '#F3F4F6', padding: '3px 8px', borderRadius: '6px' }}>
-                              {getDriverAlias(u.id)}
+                              {u.is_approved_driver ? getDriverAlias(u.id) : getPassengerAlias(u.id)}
                             </span>
                             {u.is_approved_driver && (
                               <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
@@ -1499,8 +1740,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           <div>
                             <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>{selectedLookupItem.data.name}</h3>
                             <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>{selectedLookupItem.data.email}</p>
+                            {selectedLookupItem.data.phone && <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>{selectedLookupItem.data.phone}</p>}
                             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 2px 0', fontFamily: 'monospace' }}>Ref: {getUserRef(selectedLookupItem.data.id)}</p>
-                            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: 0 }}>Alias: {getDriverAlias(selectedLookupItem.data.id)}</p>
+                            <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 4px 0' }}>Alias: {selectedLookupItem.data.is_approved_driver ? getDriverAlias(selectedLookupItem.data.id) : getPassengerAlias(selectedLookupItem.data.id)}</p>
+                            <a href={`#public-profile/${selectedLookupItem.data.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline' }}>View reviews ↗</a>
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
@@ -1710,7 +1953,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           <p style={{ margin: '0 0 2px 0', fontWeight: '600', color: '#1F2937' }}>{lookupDetail.driver.name}</p>
                           <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#6B7280' }}>{lookupDetail.driver.email}</p>
                           {lookupDetail.driver.phone && <p style={{ margin: '0 0 2px 0', fontSize: '13px', color: '#6B7280' }}>{lookupDetail.driver.phone}</p>}
-                          <p style={{ margin: 0, fontSize: '11px', color: '#9CA3AF', fontFamily: 'monospace' }}>Ref: {getUserRef(lookupDetail.driver.id)}</p>
+                          <p style={{ margin: '0 0 4px 0', fontSize: '11px', color: '#9CA3AF', fontFamily: 'monospace' }}>Ref: {getUserRef(lookupDetail.driver.id)}</p>
+                          <a href={`#public-profile/${lookupDetail.driver.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline' }}>View reviews ↗</a>
                         </div>
                       )}
 
@@ -1766,9 +2010,16 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       <td style={{ padding: '10px 12px', color: '#1F2937' }}>
                                         <span style={{ fontWeight: '600' }}>{b.passenger?.name || '—'}</span>
                                         <span style={{ display: 'block', fontSize: '12px', color: '#6B7280' }}>{b.passenger?.email}</span>
-                                        <span style={{ fontSize: '10px', color: '#9CA3AF', fontFamily: 'monospace' }}>
+                                        {b.passenger?.phone && <span style={{ display: 'block', fontSize: '12px', color: '#6B7280' }}>{b.passenger.phone}</span>}
+                                        {(b.passenger?.gender || b.passenger?.age_group) && (
+                                          <span style={{ display: 'block', fontSize: '12px', color: '#6B7280' }}>
+                                            {[b.passenger.gender, b.passenger.age_group ? `Age ${b.passenger.age_group}` : null].filter(Boolean).join(' · ')}
+                                          </span>
+                                        )}
+                                        <span style={{ display: 'block', fontSize: '10px', color: '#9CA3AF', fontFamily: 'monospace' }}>
                                           Ref: {b.passenger ? getUserRef(b.passenger.id) : '—'}
                                         </span>
+                                        {b.passenger && <a href={`#public-profile/${b.passenger.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '11px', color: '#2563EB', textDecoration: 'underline' }}>View reviews ↗</a>}
                                       </td>
                                       <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{b.seats_booked}</td>
                                       <td style={{ padding: '10px 12px', textAlign: 'right', fontWeight: '600', color: '#1F2937' }}>£{(parseFloat(b.total_paid) || 0).toFixed(2)}</td>
@@ -1926,7 +2177,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       </thead>
                       <tbody>
                         {filtered.map(u => (
-                          <tr key={u.id} style={{ borderBottom: '1px solid #F3F4F6' }}
+                          <React.Fragment key={u.id}>
+                          <tr style={{ borderBottom: '1px solid #F3F4F6' }}
                             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F9FAFB')}
                             onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
                           >
@@ -1945,9 +2197,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937' }}>
-                              {u.name || '—'}
-                              {u.is_admin && <span style={{ marginLeft: '6px', fontSize: '10px', backgroundColor: '#FEF3C7', color: '#92400E', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>Admin</span>}
+                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937', cursor: 'pointer' }} onClick={() => setExpandedUser(expandedUser === u.id ? null : u.id)}>
+                              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                {u.name || '—'}
+                                <span style={{ fontSize: '10px', color: '#9CA3AF', transform: expandedUser === u.id ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.2s' }}>▼</span>
+                              </span>
+                              {u.is_admin && <span style={{ fontSize: '10px', backgroundColor: '#FEF3C7', color: '#92400E', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>Admin</span>}
+                              {u.is_banned && <span style={{ fontSize: '10px', backgroundColor: '#FEE2E2', color: '#7F1D1D', padding: '1px 6px', borderRadius: '10px', fontWeight: '700' }}>Banned</span>}
                             </td>
                             <td style={{ padding: '10px 14px', color: '#6B7280' }}>
                               <a href={`mailto:${u.email}`} style={{ color: '#fcd03a', textDecoration: 'none' }}>{u.email}</a>
@@ -1955,12 +2211,17 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             <td style={{ padding: '10px 14px', color: '#6B7280' }}>{u.phone || '—'}</td>
                             <td style={{ padding: '10px 14px' }}>
                               <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#374151', display: 'block' }}>{getUserRef(u.id)}</span>
-                              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{getDriverAlias(u.id)}</span>
+                              <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{u.is_approved_driver ? getDriverAlias(u.id) : getPassengerAlias(u.id)}</span>
                             </td>
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
-                              {u.is_approved_driver
-                                ? <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
-                                : <span style={{ backgroundColor: '#EFF6FF', color: '#1E40AF', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Passenger</span>}
+                              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '4px' }}>
+                                {u.is_approved_driver
+                                  ? <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Driver</span>
+                                  : <span style={{ backgroundColor: '#EFF6FF', color: '#1E40AF', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Passenger</span>}
+                                {u.driver_tier === 'gold' && (
+                                  <span style={{ backgroundColor: '#FEF3C7', color: '#92400E', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>⭐ Gold</span>
+                                )}
+                              </div>
                             </td>
                             <td style={{ padding: '10px 14px', textAlign: 'center' }}>
                               {u.rides_count > 0 && (
@@ -2042,9 +2303,139 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                     </button>
                                   )
                                 )}
+                                {/* Ban / Unban */}
+                                {u.id !== user?.id && (
+                                  u.is_banned ? (
+                                    <button
+                                      onClick={() => handleBanUser(u.id, true)}
+                                      disabled={actionLoading === `ban-${u.id}`}
+                                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', backgroundColor: '#DCFCE7', color: '#166534' }}
+                                    >
+                                      {actionLoading === `ban-${u.id}` ? '...' : '✓ Unban'}
+                                    </button>
+                                  ) : confirmBan === u.id ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <input
+                                        type="text"
+                                        placeholder="Reason (optional)"
+                                        value={banReason[u.id] || ''}
+                                        onChange={e => setBanReason(prev => ({ ...prev, [u.id]: e.target.value }))}
+                                        style={{ fontSize: '11px', padding: '4px 6px', border: '1px solid #FCA5A5', borderRadius: '6px' }}
+                                      />
+                                      <div style={{ display: 'flex', gap: '4px' }}>
+                                        <button
+                                          onClick={() => handleBanUser(u.id)}
+                                          disabled={actionLoading === `ban-${u.id}`}
+                                          style={{ flex: 1, fontSize: '11px', padding: '4px', borderRadius: '6px', border: 'none', backgroundColor: '#7F1D1D', color: 'white', cursor: 'pointer', fontWeight: '600' }}
+                                        >
+                                          {actionLoading === `ban-${u.id}` ? '...' : 'Confirm Ban'}
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmBan(null)}
+                                          style={{ flex: 1, fontSize: '11px', padding: '4px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: 'white', cursor: 'pointer' }}
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmBan(u.id)}
+                                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#7F1D1D' }}
+                                    >
+                                      🚫 Ban User
+                                    </button>
+                                  )
+                                )}
                               </div>
                             </td>
                           </tr>
+                          {expandedUser === u.id && (
+                            <tr>
+                              <td colSpan={10} style={{ padding: '0 14px 14px 14px', backgroundColor: '#F9FAFB' }}>
+                                <div style={{ backgroundColor: 'white', borderRadius: '10px', padding: '14px 18px', border: '1px solid #E5E7EB' }}>
+                                  {/* Read-only view — always visible */}
+                                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '8px 24px', fontSize: '13px', color: '#1F2937', marginBottom: '12px' }}>
+                                    <span><strong>Name:</strong> {u.name || '—'}</span>
+                                    <span><strong>Email:</strong> {u.email || '—'}</span>
+                                    <span><strong>Phone:</strong> {u.phone || '—'}</span>
+                                    {u.gender && <span><strong>Gender:</strong> {u.gender}</span>}
+                                    {u.age_group && <span><strong>Age Group:</strong> {u.age_group}</span>}
+                                    {u.marital_status && <span><strong>Marital Status:</strong> {u.marital_status}</span>}
+                                    {u.travel_status && <span><strong>Travels:</strong> {u.travel_status === 'couple' ? 'As a couple' : 'Solo'}</span>}
+                                    {u.partner_name && <span><strong>Partner:</strong> {u.partner_name}</span>}
+                                    {(u.address_line1 || u.city || u.postcode) && (
+                                      <span style={{ gridColumn: 'span 2' }}>
+                                        <strong>Address:</strong> {[u.address_line1, u.address_line2, u.city, u.postcode].filter(Boolean).join(', ')}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {/* Edit form — shown below read-only view when editing */}
+                                  {editingUser === u.id ? (
+                                    <>
+                                      <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '14px', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '10px', marginBottom: '14px' }}>
+                                        {[
+                                          { key: 'name', label: 'Name' },
+                                          { key: 'email', label: 'Email' },
+                                          { key: 'phone', label: 'Phone' },
+                                          { key: 'address_line1', label: 'Address Line 1' },
+                                          { key: 'address_line2', label: 'Address Line 2' },
+                                          { key: 'city', label: 'City' },
+                                          { key: 'postcode', label: 'Postcode' },
+                                          { key: 'partner_name', label: 'Partner Name' },
+                                        ].map(({ key, label }) => (
+                                          <div key={key}>
+                                            <label style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>{label}</label>
+                                            <input type="text" value={editUserData[key] ?? ''} onChange={e => setEditUserData(prev => ({ ...prev, [key]: e.target.value }))} style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '6px', boxSizing: 'border-box' }} />
+                                          </div>
+                                        ))}
+                                        <div>
+                                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Gender</label>
+                                          <select value={editUserData.gender ?? ''} onChange={e => setEditUserData(prev => ({ ...prev, gender: e.target.value }))} style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '6px' }}>
+                                            <option value="">—</option><option value="Male">Male</option><option value="Female">Female</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Age Group</label>
+                                          <select value={editUserData.age_group ?? ''} onChange={e => setEditUserData(prev => ({ ...prev, age_group: e.target.value }))} style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '6px' }}>
+                                            <option value="">—</option>{['18-25','26-35','36-45','46-55','56+'].map(a => <option key={a} value={a}>{a}</option>)}
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Marital Status</label>
+                                          <select value={editUserData.marital_status ?? ''} onChange={e => setEditUserData(prev => ({ ...prev, marital_status: e.target.value }))} style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '6px' }}>
+                                            <option value="">—</option><option value="Single">Single</option><option value="Married">Married</option>
+                                          </select>
+                                        </div>
+                                        <div>
+                                          <label style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>Travels As</label>
+                                          <select value={editUserData.travel_status ?? ''} onChange={e => setEditUserData(prev => ({ ...prev, travel_status: e.target.value }))} style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '6px' }}>
+                                            <option value="solo">Solo</option><option value="couple">Couple</option>
+                                          </select>
+                                        </div>
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '8px' }}>
+                                        <button onClick={() => handleAdminUpdateUser(u.id)} disabled={editUserLoading} style={{ padding: '7px 18px', fontSize: '13px', fontWeight: '600', backgroundColor: '#fcd03a', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                          {editUserLoading ? 'Saving...' : 'Save Changes'}
+                                        </button>
+                                        <button onClick={() => { setEditingUser(null); setEditUserData({}); }} style={{ padding: '7px 18px', fontSize: '13px', fontWeight: '600', backgroundColor: '#F3F4F6', color: '#374151', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </>
+                                  ) : (
+                                    <button
+                                      onClick={() => { setEditingUser(u.id); setEditUserData({ name: u.name || '', email: u.email || '', phone: u.phone || '', gender: u.gender || '', age_group: u.age_group || '', marital_status: u.marital_status || '', travel_status: u.travel_status || 'solo', partner_name: u.partner_name || '', address_line1: u.address_line1 || '', address_line2: u.address_line2 || '', city: u.city || '', postcode: u.postcode || '' }); }}
+                                      style={{ fontSize: '12px', padding: '5px 14px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: '#F9FAFB', color: '#374151', cursor: 'pointer', fontWeight: '600' }}
+                                    >
+                                      ✏ Edit Profile
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          )}
+                          </React.Fragment>
                         ))}
                       </tbody>
                     </table>

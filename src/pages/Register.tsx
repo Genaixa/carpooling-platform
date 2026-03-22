@@ -47,6 +47,22 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
       setError('Passwords do not match');
       return;
     }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(formData.email)) {
+      setError('Please enter a valid email address');
+      return;
+    }
+
+    if (/\d{5,}/.test(formData.email) || /^[\d\s\+\-\(\)]+$/.test(formData.email)) {
+      setError('Please enter an email address, not a phone number, in the Email field');
+      return;
+    }
+
+    if (formData.phone.includes('@')) {
+      setError('Please enter a phone number, not an email address, in the Phone Number field');
+      return;
+    }
   
     if (formData.password.length < 6) {
       setError('Password must be at least 6 characters');

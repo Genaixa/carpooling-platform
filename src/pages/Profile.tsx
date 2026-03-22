@@ -10,6 +10,8 @@ interface ProfileProps {
   onNavigate: NavigateFn;
 }
 
+const API_URL = import.meta.env.VITE_API_URL || '';
+
 export default function Profile({ onNavigate }: ProfileProps) {
   const { profile, updateProfile, user } = useAuth();
   const [formData, setFormData] = useState({
@@ -29,6 +31,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [licenceUploading, setLicenceUploading] = useState(false);
 
   useEffect(() => {
     if (profile) {
@@ -155,6 +158,72 @@ export default function Profile({ onNavigate }: ProfileProps) {
     }
   };
 
+  const handleLicenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (!user || !e.target.files?.length) return;
+    const file = e.target.files[0];
+    if (!['image/jpeg', 'image/jpg', 'image/png', 'application/pdf'].includes(file.type)) {
+      toast.error('Only JPG, PNG, or PDF files are allowed');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File must be under 5MB');
+      return;
+    }
+    setLicenceUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('userId', user.id);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/upload-licence-photo`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Licence photo uploaded! It will be reviewed by an admin.');
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to upload licence photo');
+    } finally {
+      setLicenceUploading(false);
+    }
+  };
+
+  const viewLicencePhoto = async () => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/licence-photo-url?targetUserId=${user.id}&requesterId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      });
+      if (!res.ok) throw new Error('Failed to get URL');
+      const { url } = await res.json();
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch {
+      toast.error('Could not open licence photo. Please try again.');
+    }
+  };
+
+  const handleDeleteLicencePhoto = async () => {
+    if (!user || !confirm('Are you sure you want to delete your licence photo? This will remove your Gold Driver status.')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/delete-licence-photo`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ userId: user.id }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Licence photo deleted');
+      window.location.reload();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete licence photo');
+    }
+  };
+
   const inputStyle = (hasError?: boolean) => ({
     width: '100%',
     padding: '14px 16px',
@@ -199,74 +268,206 @@ export default function Profile({ onNavigate }: ProfileProps) {
       </div>
 
       <main style={{ maxWidth: '800px', margin: '0 auto', padding: '40px 20px' }}>
-        {/* Profile Photo Card */}
-        <div style={{
-          backgroundColor: 'white', borderRadius: '20px', padding: '32px',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px',
-        }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1F2937', marginBottom: '24px' }}>
-            Profile Photo
-          </h3>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
-            <Avatar
-              photoUrl={photoPreview || profile.profile_photo_url}
-              name={profile.name}
-              size="lg"
-            />
-            <div style={{ flex: 1, minWidth: '200px' }}>
-              <label style={labelStyle}>Upload Photo (JPG/PNG, max 5MB)</label>
-              <input
-                type="file"
-                accept="image/jpeg,image/jpg,image/png"
-                onChange={handleFileChange}
-                disabled={uploadingPhoto}
-                style={{
-                  fontSize: '14px', color: '#4B5563', marginBottom: '12px',
-                  display: 'block', width: '100%',
-                }}
+        {/* Profile Photo + Licence row */}
+        <div style={{ display: 'flex', gap: '24px', marginBottom: '24px', flexWrap: 'wrap' }}>
+          {/* Profile Photo Card */}
+          <div style={{
+            flex: 1, minWidth: '280px', backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)',
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1F2937', marginBottom: '24px' }}>
+              Profile Photo
+            </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '24px', flexWrap: 'wrap' }}>
+              <Avatar
+                photoUrl={photoPreview || profile.profile_photo_url}
+                name={profile.name}
+                size="lg"
               />
-              <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
-                {selectedFile && (
-                  <button
-                    onClick={handlePhotoUpload}
-                    disabled={uploadingPhoto}
-                    style={{
-                      padding: '10px 24px',
-                      background: '#000000',
-                      color: '#fcd03a', borderRadius: '50px', fontSize: '14px',
-                      fontWeight: '600', border: 'none', cursor: 'pointer',
-                      opacity: uploadingPhoto ? 0.7 : 1,
-                    }}
-                  >
-                    {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
-                  </button>
-                )}
-                {(photoPreview || profile.profile_photo_url) && !selectedFile && (
-                  <button
-                    onClick={async () => {
-                      await updateProfile({ profile_photo_url: null });
-                      setPhotoPreview(null);
-                      toast.success('Profile photo removed');
-                    }}
-                    style={{
-                      padding: '10px 24px', backgroundColor: '#FEE2E2', color: '#991B1B',
-                      borderRadius: '50px', fontSize: '14px', fontWeight: '600',
-                      border: '1px solid #FCA5A5', cursor: 'pointer',
-                    }}
-                  >
-                    Remove Photo
-                  </button>
-                )}
+              <div style={{ flex: 1, minWidth: '160px' }}>
+                <label style={labelStyle}>Upload Photo (JPG/PNG, max 5MB)</label>
+                <input
+                  type="file"
+                  accept="image/jpeg,image/jpg,image/png"
+                  onChange={handleFileChange}
+                  disabled={uploadingPhoto}
+                  style={{
+                    fontSize: '14px', color: '#4B5563', marginBottom: '12px',
+                    display: 'block', width: '100%',
+                  }}
+                />
+                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                  {selectedFile && (
+                    <button
+                      onClick={handlePhotoUpload}
+                      disabled={uploadingPhoto}
+                      style={{
+                        padding: '10px 24px', background: '#000000',
+                        color: '#fcd03a', borderRadius: '50px', fontSize: '14px',
+                        fontWeight: '600', border: 'none', cursor: 'pointer',
+                        opacity: uploadingPhoto ? 0.7 : 1,
+                      }}
+                    >
+                      {uploadingPhoto ? 'Uploading...' : 'Upload Photo'}
+                    </button>
+                  )}
+                  {(photoPreview || profile.profile_photo_url) && !selectedFile && (
+                    <button
+                      onClick={async () => {
+                        await updateProfile({ profile_photo_url: null });
+                        setPhotoPreview(null);
+                        toast.success('Profile photo removed');
+                      }}
+                      style={{
+                        padding: '10px 24px', backgroundColor: '#FEE2E2', color: '#991B1B',
+                        borderRadius: '50px', fontSize: '14px', fontWeight: '600',
+                        border: '1px solid #FCA5A5', cursor: 'pointer',
+                      }}
+                    >
+                      Remove Photo
+                    </button>
+                  )}
+                </div>
+                <p style={{
+                  marginTop: '12px', fontSize: '12px', color: '#6B7280',
+                  display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: '1.5',
+                }}>
+                  <span style={{ fontSize: '14px', flexShrink: 0 }}>🔒</span>
+                  <span>Your profile picture is <strong>not visible to other users</strong>. It is an optional personalisation feature.</span>
+                </p>
               </div>
-              <p style={{
-                marginTop: '12px', fontSize: '12px', color: '#6B7280',
-                display: 'flex', alignItems: 'flex-start', gap: '6px', lineHeight: '1.5',
-              }}>
-                <span style={{ fontSize: '14px', flexShrink: 0 }}>🔒</span>
-                <span>Your profile picture is <strong>not visible to other users</strong>. It is used for identity verification by our admin team only.</span>
-              </p>
             </div>
           </div>
+
+          {/* Licence Card — only for approved drivers */}
+          {profile.is_approved_driver && (
+            <div style={{
+              flex: 1, minWidth: '280px', backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+              boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #fde047',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
+                <span style={{
+                  display: 'inline-flex', alignItems: 'center', padding: '4px 12px',
+                  borderRadius: '20px', fontSize: '13px', fontWeight: '700',
+                  backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
+                }}>Gold Driver</span>
+                <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1F2937', margin: 0 }}>
+                  {profile.driver_tier === 'gold' ? 'Verified' : 'Upgrade to Gold'}
+                </h3>
+              </div>
+
+              {profile.driver_tier !== 'gold' && (
+                <p style={{ color: '#4B5563', fontSize: '14px', marginBottom: '16px' }}>
+                  Upload a photo of your driving licence to become a Gold Driver and get a special badge on your rides.
+                </p>
+              )}
+
+              {/* No upload yet */}
+              {!profile.licence_status && (
+                <div>
+                  <label style={{
+                    display: 'inline-block', padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                    color: 'white', borderRadius: '12px', fontSize: '14px', fontWeight: '600',
+                    cursor: licenceUploading ? 'not-allowed' : 'pointer',
+                    opacity: licenceUploading ? 0.6 : 1,
+                  }}>
+                    {licenceUploading ? 'Uploading...' : 'Upload Licence Photo'}
+                    <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleLicenceUpload} disabled={licenceUploading} style={{ display: 'none' }} />
+                  </label>
+                  <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '8px' }}>JPG, PNG, or PDF, max 5MB</p>
+                </div>
+              )}
+
+              {/* Pending */}
+              {profile.licence_status === 'pending' && (
+                <div>
+                  {profile.licence_photo_url && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button onClick={viewLicencePhoto} style={{
+                          display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
+                          border: '2px solid #fde047', borderRadius: '10px', cursor: 'pointer',
+                          color: '#92400e', fontSize: '14px', fontWeight: '600', backgroundColor: '#fef9e0',
+                        }}>
+                          View Uploaded Licence
+                        </button>
+                        <button onClick={handleDeleteLicencePhoto} title="Delete licence photo" style={{
+                          position: 'absolute', top: '-8px', right: '-8px', width: '26px', height: '26px',
+                          borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', border: '2px solid white',
+                          cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          padding: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                        }}>×</button>
+                      </div>
+                    </div>
+                  )}
+                  <div style={{ padding: '12px 16px', backgroundColor: '#fef3c7', borderRadius: '10px', border: '1px solid #fde047' }}>
+                    <p style={{ fontSize: '14px', color: '#92400e', fontWeight: '600', margin: 0 }}>
+                      Under review — we'll update your status soon.
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {/* Rejected */}
+              {profile.licence_status === 'rejected' && (
+                <div>
+                  {profile.licence_photo_url && (
+                    <div style={{ marginBottom: '12px' }}>
+                      <button onClick={viewLicencePhoto} style={{
+                        display: 'inline-flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
+                        border: '2px solid #fca5a5', borderRadius: '10px', cursor: 'pointer',
+                        color: '#991b1b', fontSize: '14px', fontWeight: '600', backgroundColor: '#fee2e2', opacity: 0.8,
+                      }}>
+                        View Previous Upload
+                      </button>
+                    </div>
+                  )}
+                  <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', borderRadius: '10px', border: '1px solid #fca5a5', marginBottom: '12px' }}>
+                    <p style={{ fontSize: '14px', color: '#991b1b', fontWeight: '600', margin: 0 }}>
+                      Not approved — please re-upload.
+                    </p>
+                  </div>
+                  <label style={{
+                    display: 'inline-block', padding: '12px 24px',
+                    background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
+                    color: 'white', borderRadius: '12px', fontSize: '14px', fontWeight: '600',
+                    cursor: licenceUploading ? 'not-allowed' : 'pointer',
+                    opacity: licenceUploading ? 0.6 : 1,
+                  }}>
+                    {licenceUploading ? 'Uploading...' : 'Re-upload Licence Photo'}
+                    <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleLicenceUpload} disabled={licenceUploading} style={{ display: 'none' }} />
+                  </label>
+                </div>
+              )}
+
+              {/* Gold — verified */}
+              {profile.driver_tier === 'gold' && (
+                <div>
+                  <p style={{ fontSize: '14px', color: '#92400e', fontWeight: '500', marginBottom: '12px' }}>
+                    Your licence has been verified. You're a Gold Driver!
+                  </p>
+                  {profile.licence_photo_url && (
+                    <div style={{ position: 'relative', display: 'inline-block' }}>
+                      <button onClick={viewLicencePhoto} style={{
+                        display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px',
+                        border: '2px solid #fde047', borderRadius: '10px', cursor: 'pointer',
+                        color: '#92400e', fontSize: '14px', fontWeight: '600', backgroundColor: '#fef9e0',
+                      }}>
+                        View Verified Licence
+                      </button>
+                      <button onClick={handleDeleteLicencePhoto} title="Delete licence photo (will remove Gold status)" style={{
+                        position: 'absolute', top: '-8px', right: '-8px', width: '26px', height: '26px',
+                        borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', border: '2px solid white',
+                        cursor: 'pointer', fontSize: '14px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                        padding: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+                      }}>×</button>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Profile Form Card */}

@@ -39,7 +39,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [passengerWishes, setPassengerWishes] = useState<RideWish[]>([]);
   const [wishMatchingRides, setWishMatchingRides] = useState<Record<string, { mine: number; others: number }>>({});
   const [notifyDriverAlerts, setNotifyDriverAlerts] = useState(true);
-  const [licenceUploading, setLicenceUploading] = useState(false);
   const [expandedRideId, setExpandedRideId] = useState<string | null>(null);
   const [expandedWishId, setExpandedWishId] = useState<string | null>(null);
   const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set());
@@ -305,43 +304,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
-  const handleLicenceUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!user || !e.target.files?.length) return;
-    const file = e.target.files[0];
-    if (!['image/jpeg', 'image/jpg', 'image/png'].includes(file.type)) {
-      toast.error('Only JPG and PNG images are allowed');
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error('File must be under 5MB');
-      return;
-    }
-    setLicenceUploading(true);
-    try {
-      const formData = new FormData();
-      formData.append('photo', file);
-      formData.append('userId', user.id);
-      const res = await fetch(`${API_URL}/api/upload-licence-photo`, {
-        method: 'POST',
-        body: formData,
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast.success('Licence photo uploaded! It will be reviewed by an admin.');
-      window.location.reload();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to upload licence photo');
-    } finally {
-      setLicenceUploading(false);
-    }
-  };
-
   const handleDeleteProfilePhoto = async () => {
     if (!user || !confirm('Are you sure you want to delete your profile photo?')) return;
     try {
+      const { data: { session } } = await supabase.auth.getSession();
       const res = await fetch(`${API_URL}/api/delete-profile-photo`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
         body: JSON.stringify({ userId: user.id }),
       });
       const data = await res.json();
@@ -350,23 +319,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       window.location.reload();
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete photo');
-    }
-  };
-
-  const handleDeleteLicencePhoto = async () => {
-    if (!user || !confirm('Are you sure you want to delete your licence photo? This will remove your Gold Driver status.')) return;
-    try {
-      const res = await fetch(`${API_URL}/api/delete-licence-photo`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: user.id }),
-      });
-      const data = await res.json();
-      if (data.error) throw new Error(data.error);
-      toast.success('Licence photo deleted');
-      window.location.reload();
-    } catch (err: any) {
-      toast.error(err.message || 'Failed to delete licence photo');
     }
   };
 
@@ -436,149 +388,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       </div>
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
-        {/* Gold Driver Upgrade Section */}
-        {profile?.is_approved_driver && profile.driver_tier !== 'gold' && (
-          <div style={{
-            marginBottom: '24px', backgroundColor: 'white', borderRadius: '20px', padding: '24px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #fde047',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '4px 12px',
-                borderRadius: '20px', fontSize: '13px', fontWeight: '700',
-                backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
-              }}>
-                Gold Driver
-              </span>
-              <h3 style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: 0 }}>Upgrade to Gold</h3>
-            </div>
-            <p style={{ color: '#4B5563', fontSize: '14px', marginBottom: '16px' }}>
-              Upload a photo of your driving licence to become a Gold Driver. Gold Drivers get a special badge that makes them more appealing to passengers.
-            </p>
-
-            {!profile.licence_status && (
-              <div>
-                <label style={{
-                  display: 'inline-block', padding: '12px 24px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                  color: 'white', borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-                  cursor: licenceUploading ? 'not-allowed' : 'pointer',
-                  opacity: licenceUploading ? 0.6 : 1,
-                }}>
-                  {licenceUploading ? 'Uploading...' : 'Upload Licence Photo'}
-                  <input type="file" accept="image/jpeg,image/png" onChange={handleLicenceUpload} disabled={licenceUploading} style={{ display: 'none' }} />
-                </label>
-                <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '8px' }}>JPG or PNG, max 5MB</p>
-              </div>
-            )}
-
-            {profile.licence_status === 'pending' && (
-              <div>
-                {profile.licence_photo_url && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#4B5563', marginBottom: '8px' }}>Uploaded licence photo:</p>
-                    <div style={{ position: 'relative', display: 'inline-block' }}>
-                      <img
-                        src={profile.licence_photo_url}
-                        alt="Licence photo"
-                        style={{ maxWidth: '240px', maxHeight: '160px', borderRadius: '10px', border: '2px solid #fde047', objectFit: 'cover' }}
-                      />
-                      <button
-                        onClick={handleDeleteLicencePhoto}
-                        title="Delete licence photo"
-                        style={{
-                          position: 'absolute', top: '-8px', right: '-8px', width: '26px', height: '26px',
-                          borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', border: '2px solid white',
-                          cursor: 'pointer', fontSize: '14px', lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          padding: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                        }}
-                      >×</button>
-                    </div>
-                  </div>
-                )}
-                <div style={{ padding: '12px 16px', backgroundColor: '#fef3c7', borderRadius: '10px', border: '1px solid #fde047' }}>
-                  <p style={{ fontSize: '14px', color: '#92400e', fontWeight: '600', margin: 0 }}>
-                    Your licence photo is under review. We'll update your status soon.
-                  </p>
-                </div>
-              </div>
-            )}
-
-            {profile.licence_status === 'rejected' && (
-              <div>
-                {profile.licence_photo_url && (
-                  <div style={{ marginBottom: '12px' }}>
-                    <p style={{ fontSize: '13px', fontWeight: '600', color: '#4B5563', marginBottom: '8px' }}>Previous upload (not approved):</p>
-                    <img
-                      src={profile.licence_photo_url}
-                      alt="Rejected licence photo"
-                      style={{ maxWidth: '240px', maxHeight: '160px', borderRadius: '10px', border: '2px solid #fca5a5', objectFit: 'cover', opacity: 0.7 }}
-                    />
-                  </div>
-                )}
-                <div style={{ padding: '12px 16px', backgroundColor: '#fee2e2', borderRadius: '10px', border: '1px solid #fca5a5', marginBottom: '12px' }}>
-                  <p style={{ fontSize: '14px', color: '#991b1b', fontWeight: '600', margin: 0 }}>
-                    Your licence photo was not approved. You can upload a new one.
-                  </p>
-                </div>
-                <label style={{
-                  display: 'inline-block', padding: '12px 24px',
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)',
-                  color: 'white', borderRadius: '12px', fontSize: '14px', fontWeight: '600',
-                  cursor: licenceUploading ? 'not-allowed' : 'pointer',
-                  opacity: licenceUploading ? 0.6 : 1,
-                }}>
-                  {licenceUploading ? 'Uploading...' : 'Re-upload Licence Photo'}
-                  <input type="file" accept="image/jpeg,image/png" onChange={handleLicenceUpload} disabled={licenceUploading} style={{ display: 'none' }} />
-                </label>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Gold Driver Badge (for gold drivers) */}
-        {profile?.driver_tier === 'gold' && (
-          <div style={{
-            marginBottom: '24px', backgroundColor: '#fffbeb', borderRadius: '20px', padding: '20px 24px',
-            boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #fde047',
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-              <span style={{
-                display: 'inline-flex', alignItems: 'center', gap: '4px', padding: '6px 14px',
-                borderRadius: '20px', fontSize: '14px', fontWeight: '700',
-                backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
-              }}>
-                Gold Driver
-              </span>
-              <p style={{ fontSize: '14px', color: '#92400e', margin: 0, fontWeight: '500' }}>
-                Your licence has been verified. You're a Gold Driver!
-              </p>
-            </div>
-            {profile.licence_photo_url && (
-              <div style={{ marginTop: '12px' }}>
-                <p style={{ fontSize: '13px', fontWeight: '600', color: '#92400e', marginBottom: '8px' }}>Verified licence:</p>
-                <div style={{ position: 'relative', display: 'inline-block' }}>
-                  <img
-                    src={profile.licence_photo_url}
-                    alt="Verified licence"
-                    style={{ maxWidth: '240px', maxHeight: '160px', borderRadius: '10px', border: '2px solid #fde047', objectFit: 'cover' }}
-                  />
-                  <button
-                    onClick={handleDeleteLicencePhoto}
-                    title="Delete licence photo (will remove Gold status)"
-                    style={{
-                      position: 'absolute', top: '-8px', right: '-8px', width: '26px', height: '26px',
-                      borderRadius: '50%', backgroundColor: '#ef4444', color: 'white', border: '2px solid white',
-                      cursor: 'pointer', fontSize: '14px', lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      padding: 0, boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-                    }}
-                  >×</button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
         {error && (
           <div style={{ marginBottom: '20px', borderRadius: '12px', backgroundColor: '#fee2e2', padding: '16px', border: '1px solid #fca5a5' }}>
             <p style={{ fontSize: '14px', color: '#991b1b', margin: 0 }}>{error}</p>

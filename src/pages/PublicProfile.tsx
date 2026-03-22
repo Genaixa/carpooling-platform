@@ -124,7 +124,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
           {/* Rating */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
             <StarRating rating={profile.average_rating || 0} size="md" />
-            <span style={{ fontSize: '14px', color: '#4B5563' }}>({profile.average_rating?.toFixed(1) || '0.0'}) - {profile.total_reviews} review{profile.total_reviews !== 1 ? 's' : ''}</span>
+            <span style={{ fontSize: '14px', color: '#4B5563' }}>({profile.average_rating?.toFixed(1) || '0.0'}) - <button onClick={() => document.getElementById('reviews')?.scrollIntoView({ behavior: 'smooth' })} style={{ color: '#4B5563', textDecoration: 'underline', cursor: 'pointer', background: 'none', border: 'none', padding: 0, fontSize: '14px' }}>{profile.total_reviews} review{profile.total_reviews !== 1 ? 's' : ''}</button></span>
           </div>
         </div>
 
@@ -150,7 +150,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
         )}
 
         {/* Reviews */}
-        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
+        <div id="reviews" style={{ backgroundColor: 'white', borderRadius: '20px', padding: '30px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)' }}>
           <h3 style={{ fontSize: '20px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Reviews & Ratings</h3>
           {reviews.length === 0 ? (
             <p style={{ color: '#4B5563' }}>No reviews yet</p>

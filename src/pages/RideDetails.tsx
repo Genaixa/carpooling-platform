@@ -23,7 +23,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
   const [loading, setLoading] = useState(true);
   const [selectedSeats, setSelectedSeats] = useState(1);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
-  const [bookingFor, setBookingFor] = useState<'myself' | 'someone-else'>('myself');
+  const [bookingFor, setBookingFor] = useState<'myself' | 'someone-else'>('someone-else');
   const [bookingForGender, setBookingForGender] = useState<'Male' | 'Female'>('Male');
   const [termsAccepted, setTermsAccepted] = useState(false);
 
@@ -103,96 +103,55 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
         </button>
 
         <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', borderLeft: '5px solid #fcd03a' }}>
-          {/* Route Information */}
-          <div style={{ marginBottom: '30px' }}>
-            <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Route</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
-              <div>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>From</p>
-                <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.departure_location}</p>
+          {/* Combined Info */}
+          <div style={{ marginBottom: '24px', fontSize: '14px', border: '1px solid #F3F4F6', borderRadius: '10px', overflow: 'hidden' }}>
+            {/* Driver row */}
+            {driver && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', borderBottom: '1px solid #F3F4F6', flexWrap: 'wrap' }}>
+                <span style={{ fontWeight: '700', fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '6px' }}>Driver</span>
+                <span
+                  style={{ cursor: 'pointer', fontWeight: '600', color: '#1F2937', textDecoration: 'underline', textDecorationColor: '#D1D5DB' }}
+                  onClick={() => onNavigate('public-profile', undefined, driver.id)}
+                >{getDriverAlias(driver.id)}</span>
+                <span style={{ color: '#6B7280' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
+                {(driver as any).driver_tier === 'gold' && (
+                  <span style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047' }}>Gold Driver</span>
+                )}
+                {(driver as any).city && <><span style={{ color: '#D1D5DB' }}>·</span><span style={{ color: '#4B5563' }}>{(driver as any).city}</span></>}
+                {(driver as any).marital_status && <><span style={{ color: '#D1D5DB' }}>·</span><span style={{ color: '#4B5563' }}>{(driver as any).marital_status}</span></>}
+                {driver.average_rating && (
+                  <><span style={{ color: '#D1D5DB' }}>·</span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '3px' }}>
+                    <StarRating rating={driver.average_rating} size="sm" />
+                    <span style={{ color: '#4B5563' }}>({driver.average_rating.toFixed(1)})</span>
+                  </div></>
+                )}
               </div>
-              <div>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>To</p>
-                <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.arrival_location}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Date</p>
-                <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{formatDate(ride.date_time)}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Time</p>
-                <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{formatTime(ride.date_time)}</p>
-              </div>
-              {ride.departure_spot && (
-                <div>
-                  <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Pickup Location</p>
-                  <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.departure_spot}</p>
-                </div>
-              )}
-              {ride.arrival_spot && (
-                <div>
-                  <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Drop-off Location</p>
-                  <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.arrival_spot}</p>
-                </div>
-              )}
-            </div>
-          </div>
+            )}
 
-          {/* Driver Information */}
-          {driver && (
-            <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
-              <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Driver</h2>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', cursor: 'pointer' }} onClick={() => onNavigate('public-profile', undefined, driver.id)}>
-                <div>
-                  <p style={{ fontSize: '18px', fontWeight: '600', color: '#1F2937', margin: '0 0 4px' }}>
-                    {getDriverAlias(driver.id)} <span style={{ color: '#6B7280', fontWeight: '500' }}>({driver.gender === 'Male' ? 'M' : 'F'})</span>
-                    {(driver as any).driver_tier === 'gold' && (
-                      <span style={{
-                        display: 'inline-flex', alignItems: 'center', padding: '2px 8px', marginLeft: '8px',
-                        borderRadius: '12px', fontSize: '12px', fontWeight: '700',
-                        backgroundColor: '#fef3c7', color: '#92400e', border: '1px solid #fde047',
-                        verticalAlign: 'middle',
-                      }}>
-                        Gold Driver
-                      </span>
-                    )}
-                  </p>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px', flexWrap: 'wrap' }}>
-                    {(driver as any).city && (
-                      <span style={{ fontSize: '13px', color: '#6B7280' }}>{(driver as any).city}</span>
-                    )}
-                    {(driver as any).marital_status && (
-                      <span style={{ fontSize: '13px', color: '#6B7280' }}>{(driver as any).marital_status}</span>
-                    )}
-                    {driver.average_rating && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <StarRating rating={driver.average_rating} size="sm" />
-                        <span style={{ fontSize: '13px', color: '#4B5563' }}>({driver.average_rating.toFixed(1)})</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+            {/* Route row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', borderBottom: '1px solid #F3F4F6', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: '700', fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '6px' }}>Route</span>
+              <span style={{ fontWeight: '600', color: '#1F2937' }}>{ride.departure_location}</span>
+              <span style={{ color: '#9CA3AF' }}>→</span>
+              <span style={{ fontWeight: '600', color: '#1F2937' }}>{ride.arrival_location}</span>
+              <span style={{ color: '#D1D5DB' }}>·</span>
+              <span style={{ color: '#4B5563' }}>{formatDate(ride.date_time)}</span>
+              <span style={{ color: '#D1D5DB' }}>·</span>
+              <span style={{ color: '#4B5563' }}>{formatTime(ride.date_time)}</span>
+              {ride.departure_spot && <><span style={{ color: '#D1D5DB' }}>·</span><span style={{ color: '#4B5563' }}>Pickup: {ride.departure_spot}</span></>}
+              {ride.arrival_spot && <><span style={{ color: '#D1D5DB' }}>·</span><span style={{ color: '#4B5563' }}>Drop-off: {ride.arrival_spot}</span></>}
             </div>
-          )}
 
-          {/* Booking Information */}
-          <div style={{ marginBottom: '30px', borderTop: '1px solid #E8EBED', paddingTop: '30px' }}>
-            <h2 style={{ fontSize: '28px', fontWeight: '600', color: '#1F2937', marginBottom: '20px' }}>Booking Information</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '15px' }}>
-              <div>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Available Seats</p>
-                <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{ride.seats_available} of {ride.seats_total}</p>
-              </div>
-              <div>
-                <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Price per Seat</p>
-                <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>£{ride.price_per_seat}</p>
-              </div>
+            {/* Booking row */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '10px 14px', flexWrap: 'wrap' }}>
+              <span style={{ fontWeight: '700', fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '6px' }}>Booking</span>
+              <span style={{ color: '#4B5563' }}>{ride.seats_available} of {ride.seats_total} seats</span>
+              <span style={{ color: '#D1D5DB' }}>·</span>
+              <span style={{ fontWeight: '600', color: '#1F2937' }}>£{ride.price_per_seat}/seat</span>
               {ride.luggage_size && ride.luggage_size !== 'none' && (
-                <div>
-                  <p style={{ fontSize: '14px', color: '#4B5563', marginBottom: '5px', fontWeight: '600' }}>Luggage</p>
-                  <p style={{ fontSize: '16px', color: '#1F2937', margin: 0 }}>{getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` (up to ${ride.luggage_count} items)` : ''}</p>
-                </div>
+                <><span style={{ color: '#D1D5DB' }}>·</span>
+                <span style={{ color: '#4B5563' }}>Luggage: {getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` · up to ${ride.luggage_count} item${ride.luggage_count > 1 ? 's' : ''}` : ''}</span></>
               )}
             </div>
           </div>
@@ -265,13 +224,13 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
                     <div style={{ marginBottom: '16px' }}>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Booking for</label>
                       <div style={{ display: 'flex', gap: '8px' }}>
-                        <button onClick={() => setBookingFor('myself')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'myself' ? '2px solid #fcd03a' : '2px solid #E8EBED', backgroundColor: bookingFor === 'myself' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Myself</button>
                         <button onClick={() => setBookingFor('someone-else')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'someone-else' ? '2px solid #fcd03a' : '2px solid #E8EBED', backgroundColor: bookingFor === 'someone-else' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Someone else</button>
+                        <button onClick={() => setBookingFor('myself')} style={{ padding: '8px 16px', borderRadius: '8px', border: bookingFor === 'myself' ? '2px solid #fcd03a' : '2px solid #E8EBED', backgroundColor: bookingFor === 'myself' ? '#f0fdfa' : 'white', color: '#1F2937', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>Myself</button>
                       </div>
                       {bookingFor === 'someone-else' && (
                         <div style={{ marginTop: '8px' }}>
                           <label style={{ fontSize: '13px', fontWeight: '600', color: '#4B5563', marginRight: '12px' }}>Passenger gender:</label>
-                          <select value={bookingForGender} onChange={(e) => setBookingForGender(e.target.value as 'Male' | 'Female')} style={{ padding: '6px 12px', borderRadius: '8px', border: '2px solid #E8EBED', fontSize: '14px' }}>
+                          <select value={bookingForGender} onChange={(e) => setBookingForGender(e.target.value as 'Male' | 'Female')} style={{ padding: '6px 32px 6px 12px', borderRadius: '8px', border: '2px solid #E8EBED', fontSize: '14px' }}>
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                           </select>

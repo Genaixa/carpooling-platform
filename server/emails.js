@@ -598,6 +598,22 @@ export async function sendContactFormEmail({ name, email, subject, message }) {
   );
 }
 
+export async function sendNewUserNotification(user) {
+  return sendEmail(ADMIN_EMAIL, 'New Passenger Registered on ChapaRide',
+    `<h2>New Passenger Sign-Up</h2>
+    <p>A new passenger has registered on ChapaRide.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Name:</strong> ${escapeHtml(user.name)}</p>
+      <p><strong>Email:</strong> <a href="mailto:${escapeHtml(user.email)}">${escapeHtml(user.email)}</a></p>
+      <p><strong>Phone:</strong> ${escapeHtml(user.phone) || '—'}</p>
+      <p><strong>Gender:</strong> ${escapeHtml(user.gender) || '—'}</p>
+      <p><strong>Age Group:</strong> ${escapeHtml(user.age_group) || '—'}</p>
+      <p><strong>City:</strong> ${escapeHtml(user.city) || '—'}</p>
+    </div>
+    <p><a href="${SITE_URL}/#admin-dashboard" style="background:#fcd03a;color:#000;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">View in Admin Dashboard</a></p>`
+  );
+}
+
 export async function testEmail(email, name, type = 'booking-confirmation') {
   return sendBookingConfirmationEmail(email, name,
     { seats_booked: 1, total_paid: 25 },
