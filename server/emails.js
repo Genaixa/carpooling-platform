@@ -98,19 +98,19 @@ export async function sendBookingRequestEmail(bookingData) {
     : 'No reviews yet';
 
   const passengerInfoRows = `
-      <p><strong>Gender:</strong> ${passenger.gender || 'Not specified'}</p>
-      <p><strong>Age group:</strong> ${passenger.age_group || 'Not specified'}</p>
-      <p><strong>Marital status:</strong> ${passenger.marital_status || 'Not specified'}</p>
-      <p><strong>City:</strong> ${passenger.city || 'Not specified'}</p>
+      <p><strong>Gender:</strong> ${escapeHtml(passenger.gender) || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${escapeHtml(passenger.age_group) || 'Not specified'}</p>
+      <p><strong>Marital status:</strong> ${escapeHtml(passenger.marital_status) || 'Not specified'}</p>
+      <p><strong>City:</strong> ${escapeHtml(passenger.city) || 'Not specified'}</p>
       <p><strong>Travelling as:</strong> ${passenger.travel_status === 'couple' ? 'Couple' : 'Solo'}</p>
       <p><strong>Passenger rating:</strong> ${ratingText}</p>`;
 
   const thirdPartySection = thirdParty ? `
     <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 15px; border-radius: 8px; margin: 16px 0;">
       <p style="font-weight: 700; color: #1e40af; margin: 0 0 8px 0;">Booking is for a third-party passenger:</p>
-      <p><strong>Gender:</strong> ${thirdParty.gender || 'Not specified'}</p>
-      <p><strong>Age group:</strong> ${thirdParty.age_group || 'Not specified'}</p>
-      ${thirdParty.special_needs ? `<p><strong>Special needs:</strong> ${thirdParty.special_needs}</p>` : ''}
+      <p><strong>Gender:</strong> ${escapeHtml(thirdParty.gender) || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${escapeHtml(thirdParty.age_group) || 'Not specified'}</p>
+      ${thirdParty.special_needs ? `<p><strong>Special needs:</strong> ${escapeHtml(thirdParty.special_needs)}</p>` : ''}
     </div>` : '';
 
   return sendEmail(driver.email, `New Booking Request: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
@@ -157,10 +157,10 @@ export async function sendBookingAcceptedEmail(bookingData) {
     <div style="background: #fef9e0; border: 1px solid #fcd03a; padding: 15px; border-radius: 8px; margin: 20px 0;">
       <p style="font-weight: 700; margin: 0 0 10px 0; color: #000000;">Your Driver</p>
       <p><strong>Driver ID:</strong> ${getDriverAlias(driver.id)}</p>
-      <p><strong>Gender:</strong> ${driver.gender || 'Not specified'}</p>
-      <p><strong>Age group:</strong> ${driver.age_group || 'Not specified'}</p>
-      <p><strong>Marital status:</strong> ${driver.marital_status || 'Not specified'}</p>
-      <p><strong>Hometown:</strong> ${driver.city || 'Not specified'}</p>
+      <p><strong>Gender:</strong> ${escapeHtml(driver.gender) || 'Not specified'}</p>
+      <p><strong>Age group:</strong> ${escapeHtml(driver.age_group) || 'Not specified'}</p>
+      <p><strong>Marital status:</strong> ${escapeHtml(driver.marital_status) || 'Not specified'}</p>
+      <p><strong>Hometown:</strong> ${escapeHtml(driver.city) || 'Not specified'}</p>
     </div>
     <p style="color: #92400e; background: #fffbeb; border: 1px solid #fde68a; padding: 12px; border-radius: 8px;">
       Contact details (phone number) will be shared with you <strong>24 hours before departure</strong>.
@@ -270,11 +270,11 @@ export async function sendDriverApplicationNotification(application) {
     `<h2>New Driver Application</h2>
     <p>A new driver application has been submitted and needs your review.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
-      <p><strong>Name:</strong> ${application.first_name} ${application.surname}</p>
-      <p><strong>Age group:</strong> ${application.age_group}</p>
-      <p><strong>Gender:</strong> ${application.gender}</p>
-      <p><strong>Car:</strong> ${application.car_make} ${application.car_model}</p>
-      <p><strong>Driving experience:</strong> ${application.years_driving_experience} years</p>
+      <p><strong>Name:</strong> ${escapeHtml(application.first_name)} ${escapeHtml(application.surname)}</p>
+      <p><strong>Age group:</strong> ${escapeHtml(application.age_group)}</p>
+      <p><strong>Gender:</strong> ${escapeHtml(application.gender)}</p>
+      <p><strong>Car:</strong> ${escapeHtml(application.car_make)} ${escapeHtml(application.car_model)}</p>
+      <p><strong>Driving experience:</strong> ${escapeHtml(String(application.years_driving_experience))} years</p>
     </div>
     <p><a href="${SITE_URL}/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: #fcd03a; color: #000000; text-decoration: none; border-radius: 8px; font-weight: 600;">Review Application</a></p>`
   );

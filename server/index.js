@@ -44,6 +44,22 @@ const contactLimiter = rateLimit({
   message: { error: 'Too many messages sent. Please try again in 15 minutes.' },
 });
 
+const paymentLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many payment requests. Please try again shortly.' },
+});
+
+const notifyLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please try again shortly.' },
+});
+
 // Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -355,7 +371,7 @@ app.get('/api/licence-photo-url', async (req, res) => {
 // ============================================================
 
 // Create payment with delayed capture (hold on card)
-app.post('/api/create-payment', async (req, res) => {
+app.post('/api/create-payment', paymentLimiter, async (req, res) => {
   try {
     const { sourceId, verificationToken, amount, rideId, userId, seatsToBook = 1, rideName, thirdPartyPassenger } = req.body;
 
@@ -708,7 +724,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
     // Issue refund via Square
     if (refundAmount > 0 && booking.square_payment_id) {
       const refundCents = BigInt(Math.round(refundAmount * 100));
-      await squareClient.refunds.refundPayment({
+      const refundResult = await squareClient.refunds.refundPayment({
         idempotencyKey: crypto.randomUUID(),
         paymentId: booking.square_payment_id,
         amountMoney: {
@@ -716,6 +732,10 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
           currency: 'GBP',
         },
       });
+      const refundStatus = refundResult?.refund?.status;
+      if (refundStatus === 'FAILED') {
+        throw new Error('Refund failed — please contact support.');
+      }
     }
 
     await supabase.from('bookings').update({
@@ -883,7 +903,7 @@ app.post('/api/driver/complete-ride', async (req, res) => {
 // NEW USER NOTIFICATION
 // ============================================================
 
-app.post('/api/notify-new-user', async (req, res) => {
+app.post('/api/notify-new-user', notifyLimiter, async (req, res) => {
   try {
     const { user } = req.body;
     if (!user) return res.status(400).json({ error: 'Missing user data' });
@@ -899,7 +919,7 @@ app.post('/api/notify-new-user', async (req, res) => {
 // DRIVER APPLICATION NOTIFICATION
 // ============================================================
 
-app.post('/api/notify-driver-application', async (req, res) => {
+app.post('/api/notify-driver-application', notifyLimiter, async (req, res) => {
   try {
     const { application } = req.body;
     if (!application) return res.status(400).json({ error: 'Missing application data' });
@@ -916,7 +936,7 @@ app.post('/api/notify-driver-application', async (req, res) => {
 // NOTIFY LOCAL DRIVERS OF A NEW RIDE WISH
 // ============================================================
 
-app.post('/api/notify-drivers-of-wish', async (req, res) => {
+app.post('/api/notify-drivers-of-wish', notifyLimiter, async (req, res) => {
   try {
     const { wish } = req.body;
     if (!wish) return res.status(400).json({ error: 'Missing wish data' });
@@ -1370,6 +1390,31 @@ app.post('/api/reviews/submit', async (req, res) => {
 
     if (rating < 1 || rating > 5) return res.status(400).json({ error: 'Rating must be between 1 and 5' });
 
+    // Verify booking exists, reviewer is a participant, and ride has taken place
+    const { data: booking } = await supabase
+      .from('bookings')
+      .select('id, passenger_id, ride_id, status')
+      .eq('id', bookingId)
+      .single();
+
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const { data: ride } = await supabase
+      .from('rides')
+      .select('driver_id, date_time')
+      .eq('id', booking.ride_id)
+      .single();
+
+    if (!ride) return res.status(404).json({ error: 'Ride not found' });
+
+    const isPassenger = booking.passenger_id === reviewerId;
+    const isDriver = ride.driver_id === reviewerId;
+    if (!isPassenger && !isDriver) return res.status(403).json({ error: 'You are not a participant in this booking' });
+
+    if (new Date(ride.date_time) > new Date()) {
+      return res.status(400).json({ error: 'You cannot review a ride that has not yet taken place' });
+    }
+
     // Check for existing review
     const { data: existing } = await supabase
       .from('reviews')
@@ -1621,7 +1666,7 @@ async function cleanupPastRides() {
 // ============================================================
 // NOTIFY DRIVER: RIDE POSTED CONFIRMATION
 // ============================================================
-app.post('/api/rides/notify-posted', async (req, res) => {
+app.post('/api/rides/notify-posted', notifyLimiter, async (req, res) => {
   try {
     const { ride_id } = req.body;
     if (!ride_id) return res.status(400).json({ error: 'ride_id required' });
@@ -1642,7 +1687,7 @@ app.post('/api/rides/notify-posted', async (req, res) => {
 // ============================================================
 // CHECK WISH MATCHES (called after a ride is posted)
 // ============================================================
-app.post('/api/check-wish-matches', async (req, res) => {
+app.post('/api/check-wish-matches', notifyLimiter, async (req, res) => {
   try {
     const { ride_id } = req.body;
     if (!ride_id) return res.status(400).json({ error: 'ride_id required' });
