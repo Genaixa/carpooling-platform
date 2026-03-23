@@ -277,9 +277,13 @@ function getEarlyRevealTime(restrictedDay: Date): Date {
   while (isShabbatOrYomTov(day)) {
     day.setDate(day.getDate() - 1);
   }
-  // day is now the day before the restricted period starts — reveal from 8am that day
-  day.setHours(8, 0, 0, 0);
-  return day;
+  // day is now the day before the restricted period starts — reveal from 8am UK time that day
+  const ukDateStr = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/London' }).format(day); // YYYY-MM-DD
+  // Determine London UTC offset (0 for GMT, 1 for BST) by checking noon UTC on that day
+  const noonUTC = new Date(`${ukDateStr}T12:00:00Z`);
+  const londonHourAtNoon = parseInt(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(noonUTC), 10);
+  const londonOffsetHours = londonHourAtNoon - 12;
+  return new Date(`${ukDateStr}T${String(8 - londonOffsetHours).padStart(2, '0')}:00:00Z`);
 }
 
 /**
@@ -299,8 +303,9 @@ export function isContactVisible(rideDateTime: string): boolean {
   // Standard 24h rule
   if ((rideTime.getTime() - now) <= twentyFourHoursMs) return true;
 
-  // Shabbat/Yom Tov early reveal: ride is before noon on the day after a restricted period
-  if (rideTime.getHours() < 12) {
+  // Shabbat/Yom Tov early reveal: ride is before noon (UK time) on the day after a restricted period
+  const rideHourUK = parseInt(new Intl.DateTimeFormat('en-GB', { hour: 'numeric', hour12: false, timeZone: 'Europe/London' }).format(rideTime), 10);
+  if (rideHourUK < 12) {
     const dayBefore = new Date(rideTime);
     dayBefore.setDate(dayBefore.getDate() - 1);
     dayBefore.setHours(12, 0, 0, 0);

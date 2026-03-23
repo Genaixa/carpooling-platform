@@ -439,8 +439,18 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
 
     console.log(`✓ Payment authorized: ${paymentId}, Booking: ${bookingData.id}`);
 
-    // Update available seats to account for pending booking
+    // Update available seats and check for overbooking (race condition guard)
     await recalculateSeats(rideId);
+    const { data: rideAfter } = await supabase.from('rides').select('seats_total').eq('id', rideId).single();
+    const { data: activeBookings } = await supabase.from('bookings').select('seats_booked').eq('ride_id', rideId).in('status', ['confirmed', 'pending_driver']);
+    const totalBooked = (activeBookings || []).reduce((sum, b) => sum + b.seats_booked, 0);
+    if (rideAfter && totalBooked > rideAfter.seats_total) {
+      // Overbooked — cancel this booking and refund the hold
+      await supabase.from('bookings').delete().eq('id', bookingData.id);
+      await recalculateSeats(rideId);
+      try { await squareClient.payments.cancel({ paymentId }); } catch {}
+      return res.status(409).json({ error: 'Sorry, these seats were just taken. Please try again.' });
+    }
 
     // Send email to driver about new booking request
     try {

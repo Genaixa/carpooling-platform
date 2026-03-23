@@ -73,6 +73,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         .single();
 
       if (error) throw error;
+
+      // If user has been banned, sign them out immediately
+      if (data?.is_banned) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+        return;
+      }
+
       setProfile(data);
     } catch (error) {
       console.error('Error loading profile:', error);
