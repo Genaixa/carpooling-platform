@@ -58,7 +58,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const isMobile = useIsMobile();
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users'>('applications');
+  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts'>('applications');
+  const [alertWishes, setAlertWishes] = useState<any[]>([]);
+  const [alertsLoading, setAlertsLoading] = useState(false);
+  const [alertFilter, setAlertFilter] = useState<'all' | 'active' | 'fulfilled' | 'expired'>('all');
   const [filter, setFilter] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [adminNotes, setAdminNotes] = useState<Record<string, string>>({});
@@ -120,6 +123,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       else if (tab === 'licence-reviews') loadPendingLicences();
       else if (tab === 'finances') loadFinancialData();
       else if (tab === 'users') loadUsersData();
+      else if (tab === 'alerts') loadAlertsData();
     }
   }, [user, profile, filter, tab]);
 
@@ -237,6 +241,39 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error('Failed to load users');
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const loadAlertsData = async () => {
+    setAlertsLoading(true);
+    try {
+      const [wishesResult, bookingsResult] = await Promise.all([
+        supabase
+          .from('ride_wishes')
+          .select('*, user:profiles!ride_wishes_user_id_fkey(*)')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('bookings')
+          .select('passenger_id, ride_id, status, ride:rides(departure_location, arrival_location, date_time, price_per_seat, driver:profiles(id, gender, age_group))')
+          .in('status', ['confirmed', 'completed', 'pending_driver']),
+      ]);
+      const bookings = bookingsResult.data || [];
+      const enriched = (wishesResult.data || []).map(wish => {
+        const matched = wish.status === 'fulfilled'
+          ? bookings.find(b =>
+              b.passenger_id === wish.user_id &&
+              (b.ride as any)?.departure_location === wish.departure_location &&
+              (b.ride as any)?.arrival_location === wish.arrival_location &&
+              (b.ride as any)?.date_time?.startsWith(wish.desired_date)
+            )
+          : null;
+        return { ...wish, matchedBooking: matched || null };
+      });
+      setAlertWishes(enriched);
+    } catch (err: any) {
+      toast.error('Failed to load alerts');
+    } finally {
+      setAlertsLoading(false);
     }
   };
 
@@ -734,6 +771,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             { key: 'applications' as const, label: 'Applications' },
             { key: 'licence-reviews' as const, label: `Licences (${allLicences.length || '...'})` },
             { key: 'finances' as const, label: 'Rides & Finances' },
+            { key: 'alerts' as const, label: 'Alerts' },
             { key: 'lookup' as const, label: '🔍 Search' },
             { key: 'users' as const, label: 'All Users' },
           ]).map(t => (
@@ -2460,6 +2498,123 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 );
               })()}
             </div>
+          </>
+        )}
+
+        {/* ==================== ALERTS TAB ==================== */}
+        {tab === 'alerts' && (
+          <>
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap', alignItems: 'center' }}>
+              {(['all', 'active', 'fulfilled', 'expired'] as const).map(f => (
+                <button
+                  key={f}
+                  onClick={() => setAlertFilter(f)}
+                  style={{
+                    padding: '8px 20px', fontWeight: '600', fontSize: '13px', borderRadius: '50px',
+                    border: 'none', cursor: 'pointer', textTransform: 'capitalize',
+                    backgroundColor: alertFilter === f ? '#1F2937' : '#F3F4F6',
+                    color: alertFilter === f ? 'white' : '#374151',
+                  }}
+                >
+                  {f === 'all' ? `All (${alertWishes.length})` : `${f.charAt(0).toUpperCase() + f.slice(1)} (${alertWishes.filter(w => w.status === f).length})`}
+                </button>
+              ))}
+              <button onClick={loadAlertsData} style={{ marginLeft: 'auto', padding: '8px 20px', fontSize: '13px', fontWeight: '600', borderRadius: '50px', border: '1px solid #D1D5DB', backgroundColor: 'white', cursor: 'pointer', color: '#374151' }}>↻ Refresh</button>
+            </div>
+
+            {alertsLoading ? (
+              <div style={{ textAlign: 'center', padding: '80px' }}><Loading /></div>
+            ) : (() => {
+              const filtered = alertFilter === 'all' ? alertWishes : alertWishes.filter(w => w.status === alertFilter);
+              if (filtered.length === 0) {
+                return <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '40px', textAlign: 'center', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}><p style={{ color: '#6B7280', margin: 0 }}>No alerts found.</p></div>;
+              }
+              const statusColors: Record<string, { bg: string; color: string }> = {
+                active: { bg: '#D1FAE5', color: '#065F46' },
+                fulfilled: { bg: '#DBEAFE', color: '#1E40AF' },
+                expired: { bg: '#F3F4F6', color: '#6B7280' },
+              };
+              return (
+                <div style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                  <div style={{ overflowX: 'auto' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '2px solid #E5E7EB' }}>
+                          {['Requested By', 'Route', 'Desired Date', 'Time', 'Passengers', 'Booking For', 'Special Needs', 'Status', 'Matched Driver', 'Price/Seat', 'Created'].map(h => (
+                            <th key={h} style={{ padding: '12px 14px', textAlign: 'left', fontWeight: '700', color: '#374151', whiteSpace: 'nowrap' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {filtered.map((wish, i) => {
+                          const sc = statusColors[wish.status] || statusColors.expired;
+                          const u = wish.user;
+                          const alias = u?.is_approved_driver ? getDriverAlias(wish.user_id) : getPassengerAlias(wish.user_id);
+                          const ride = wish.matchedBooking?.ride as any;
+                          const driver = ride?.driver;
+                          const isGroup = wish.passengers_count > 1;
+                          const ageFlags: string[] = [];
+                          if (wish.third_party_age_group?.includes('children')) ageFlags.push('Children <16');
+                          if (wish.third_party_age_group?.includes('elderly')) ageFlags.push('Over 65');
+                          return (
+                            <tr key={wish.id} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: i % 2 === 0 ? 'white' : '#FAFAFA' }}>
+                              <td style={{ padding: '12px 14px' }}>
+                                <div style={{ fontWeight: '600', color: '#1F2937' }}>{alias}</div>
+                                {u && <div style={{ color: '#6B7280', fontSize: '12px' }}>{u.gender || '—'}{u.age_group ? ` · ${u.age_group}` : ''}</div>}
+                                <div style={{ color: '#9CA3AF', fontSize: '11px', fontFamily: 'monospace' }}>{getUserRef(wish.user_id)}</div>
+                              </td>
+                              <td style={{ padding: '12px 14px', whiteSpace: 'nowrap' }}>
+                                <div style={{ fontWeight: '600', color: '#1F2937' }}>{wish.departure_location}</div>
+                                <div style={{ color: '#6B7280' }}>→ {wish.arrival_location}</div>
+                              </td>
+                              <td style={{ padding: '12px 14px', whiteSpace: 'nowrap', color: '#1F2937' }}>
+                                {new Date(wish.desired_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td style={{ padding: '12px 14px', color: '#4B5563' }}>{wish.desired_time || '—'}</td>
+                              <td style={{ padding: '12px 14px', textAlign: 'center', color: '#1F2937', fontWeight: '600' }}>{wish.passengers_count}</td>
+                              <td style={{ padding: '12px 14px', color: '#4B5563' }}>
+                                {isGroup ? 'Group' : wish.booking_for === 'someone-else' ? 'Someone else' : 'Myself'}
+                                {!isGroup && wish.booking_for === 'someone-else' && wish.third_party_gender && (
+                                  <div style={{ fontSize: '12px', color: '#6B7280' }}>{wish.third_party_gender}{wish.third_party_age_group && !wish.third_party_age_group.includes('children') && !wish.third_party_age_group.includes('elderly') ? ` · ${wish.third_party_age_group}` : ''}</div>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 14px', color: '#4B5563', fontSize: '12px' }}>
+                                {ageFlags.length > 0 ? ageFlags.join(', ') : '—'}
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                <span style={{ backgroundColor: sc.bg, color: sc.color, padding: '3px 10px', borderRadius: '20px', fontWeight: '600', fontSize: '12px', textTransform: 'capitalize', whiteSpace: 'nowrap' }}>
+                                  {wish.status}
+                                </span>
+                              </td>
+                              <td style={{ padding: '12px 14px' }}>
+                                {driver ? (
+                                  <>
+                                    <div style={{ fontWeight: '600', color: '#1F2937' }}>{getDriverAlias(driver.id)}</div>
+                                    <div style={{ color: '#6B7280', fontSize: '12px' }}>{driver.gender || '—'}{driver.age_group ? ` · ${driver.age_group}` : ''}</div>
+                                    <div style={{ color: '#9CA3AF', fontSize: '11px', fontFamily: 'monospace' }}>{getUserRef(driver.id)}</div>
+                                  </>
+                                ) : (
+                                  <span style={{ color: '#9CA3AF', fontSize: '12px' }}>—</span>
+                                )}
+                              </td>
+                              <td style={{ padding: '12px 14px', color: '#1F2937', fontWeight: '600', whiteSpace: 'nowrap' }}>
+                                {ride?.price_per_seat != null ? `£${Number(ride.price_per_seat).toFixed(2)}` : '—'}
+                              </td>
+                              <td style={{ padding: '12px 14px', color: '#9CA3AF', fontSize: '12px', whiteSpace: 'nowrap' }}>
+                                {new Date(wish.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                  <div style={{ padding: '12px 14px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
+                    Showing {filtered.length} of {alertWishes.length} alerts
+                  </div>
+                </div>
+              );
+            })()}
           </>
         )}
 
