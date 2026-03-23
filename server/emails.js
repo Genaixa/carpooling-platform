@@ -394,9 +394,18 @@ export async function sendDriverWishNotificationEmail(driver, wish) {
   const timeText = wish.desired_time ? ` at ${wish.desired_time}` : ' (time flexible)';
   const passengerCount = wish.passengers_count || 1;
 
-  const bookingForText = wish.booking_for === 'someone-else'
-    ? `Booking for someone else${wish.third_party_gender ? ` (${wish.third_party_gender}${wish.third_party_age_group ? ', ' + wish.third_party_age_group : ''})` : ''}`
-    : 'Booking for themselves';
+  const isGroup = passengerCount > 1;
+  let bookingForText;
+  if (isGroup) {
+    const flags = [];
+    if (wish.third_party_age_group?.includes('children')) flags.push('includes children under 16');
+    if (wish.third_party_age_group?.includes('elderly')) flags.push('includes passengers over 65');
+    bookingForText = `Group travel${flags.length ? ' · ' + flags.join(', ') : ''}`;
+  } else if (wish.booking_for === 'someone-else') {
+    bookingForText = `Booking for someone else${wish.third_party_gender ? ` (${wish.third_party_gender}${wish.third_party_age_group ? ', ' + wish.third_party_age_group : ''})` : ''}`;
+  } else {
+    bookingForText = 'Booking for themselves';
+  }
 
   return sendEmail(
     driver.email,

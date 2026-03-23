@@ -31,6 +31,8 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
     bookingFor: 'myself' as 'myself' | 'someone-else',
     thirdPartyGender: 'Male' as 'Male' | 'Female',
     thirdPartyAgeGroup: '',
+    groupIncludesChildren: false,
+    groupIncludesElderly: false,
   });
 
   useEffect(() => {
@@ -74,9 +76,10 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
             .gte('date_time', dateStart)
             .lte('date_time', dateEnd);
 
-          // Filter by gender compatibility
-          const passengerGender = profile?.travel_status === 'couple' ? null : (profile?.gender || null);
+          // Groups (2+ passengers) skip gender compatibility entirely
           const compatible = (rides || []).filter(r => {
+            if (wish.passengers_count > 1) return true;
+            const passengerGender = wish.third_party_gender || profile?.gender || null;
             const driverGender = (r.driver as any)?.gender || null;
             return checkRideCompatibility(passengerGender, driverGender, r.existing_occupants as any);
           });
@@ -125,6 +128,7 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
 
     try {
       setSubmitting(true);
+      const isGroup = parseInt(formData.passengers) > 1;
       const { error } = await supabase.from('ride_wishes').insert([{
         user_id: user.id,
         departure_location: formData.from.trim(),
@@ -132,9 +136,11 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
         desired_date: formData.date,
         desired_time: formData.time || null,
         passengers_count: parseInt(formData.passengers),
-        booking_for: formData.bookingFor,
-        third_party_gender: formData.bookingFor === 'someone-else' ? formData.thirdPartyGender : null,
-        third_party_age_group: formData.bookingFor === 'someone-else' && formData.thirdPartyAgeGroup ? formData.thirdPartyAgeGroup : null,
+        booking_for: isGroup ? 'myself' : formData.bookingFor,
+        third_party_gender: !isGroup && formData.bookingFor === 'someone-else' ? formData.thirdPartyGender : null,
+        third_party_age_group: isGroup
+          ? ([formData.groupIncludesChildren ? 'children' : '', formData.groupIncludesElderly ? 'elderly' : ''].filter(Boolean).join(',') || null)
+          : (formData.bookingFor === 'someone-else' && formData.thirdPartyAgeGroup ? formData.thirdPartyAgeGroup : null),
         status: 'active',
       }]);
 
@@ -154,14 +160,16 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
             desired_date: formData.date,
             desired_time: formData.time || null,
             passengers_count: parseInt(formData.passengers),
-            booking_for: formData.bookingFor,
-            third_party_gender: formData.bookingFor === 'someone-else' ? formData.thirdPartyGender : null,
-            third_party_age_group: formData.bookingFor === 'someone-else' && formData.thirdPartyAgeGroup ? formData.thirdPartyAgeGroup : null,
+            booking_for: parseInt(formData.passengers) > 1 ? 'myself' : formData.bookingFor,
+            third_party_gender: parseInt(formData.passengers) === 1 && formData.bookingFor === 'someone-else' ? formData.thirdPartyGender : null,
+            third_party_age_group: parseInt(formData.passengers) > 1
+              ? ([formData.groupIncludesChildren ? 'children' : '', formData.groupIncludesElderly ? 'elderly' : ''].filter(Boolean).join(',') || null)
+              : (formData.bookingFor === 'someone-else' && formData.thirdPartyAgeGroup ? formData.thirdPartyAgeGroup : null),
           },
         }),
       }).catch(() => {});
 
-      setFormData({ from: '', to: '', date: '', time: '', passengers: '1', bookingFor: 'myself', thirdPartyGender: 'Male', thirdPartyAgeGroup: '' });
+      setFormData({ from: '', to: '', date: '', time: '', passengers: '1', bookingFor: 'myself', thirdPartyGender: 'Male', thirdPartyAgeGroup: '', groupIncludesChildren: false, groupIncludesElderly: false });
       loadWishes();
     } catch (err: any) {
       toast.error(err.message || 'Failed to create alert');
@@ -257,7 +265,9 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                       <span style={{ fontWeight: '600' }}>Passengers:</span> {wish.passengers_count}
                     </div>
                     <div style={{ fontSize: '11px', color: '#6B7280', marginBottom: '10px' }}>
-                      Only drivers of the same gender (or with a matching occupant) will see this alert.
+                      {wish.passengers_count > 1
+                        ? `Group of ${wish.passengers_count}${wish.third_party_age_group?.includes('children') ? ' · includes children under 16' : ''}${wish.third_party_age_group?.includes('elderly') ? ' · includes passengers over 65' : ''} · compatible with any driver.`
+                        : 'Only drivers of the same gender (or with a matching occupant) will see this alert.'}
                     </div>
                     {matches.length > 0 && (
                       <div style={{ marginBottom: '10px', padding: '10px', backgroundColor: '#fef9e0', borderRadius: '10px', border: '1px solid #fcd03a' }}>
@@ -353,7 +363,9 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                     <tr>
                       <td colSpan={showActions ? 6 : 5} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
                         <div style={{ fontSize: '12px', color: '#6B7280', padding: '8px 0 6px' }}>
-                          Only drivers of the same gender (or with a matching occupant) will see this alert.
+                          {wish.passengers_count > 1
+                            ? `Group of ${wish.passengers_count}${wish.third_party_age_group?.includes('children') ? ' · includes children under 16' : ''}${wish.third_party_age_group?.includes('elderly') ? ' · includes passengers over 65' : ''} · compatible with any driver.`
+                            : 'Only drivers of the same gender (or with a matching occupant) will see this alert.'}
                         </div>
                         {matches.length > 0 && (
                           <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '10px', overflow: 'hidden', border: '1px solid #fef9e0' }}>
@@ -500,64 +512,87 @@ export default function RideWishes({ onNavigate }: RideWishesProps) {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (formData.bookingFor === 'someone-else' ? '1fr 1fr 1fr' : '1fr 1fr 1fr'), gap: '16px', marginBottom: '20px' }}>
-              <div>
-                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                  Booking for
+            {parseInt(formData.passengers) > 1 ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.groupIncludesChildren}
+                    onChange={(e) => setFormData(prev => ({ ...prev, groupIncludesChildren: e.target.checked }))}
+                    style={{ width: '20px', height: '20px', accentColor: '#fcd03a', flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#1F2937' }}>The group includes children under 16</span>
                 </label>
-                <select
-                  value={formData.bookingFor}
-                  onChange={(e) => setFormData(prev => ({ ...prev, bookingFor: e.target.value as 'myself' | 'someone-else' }))}
-                  style={{
-                    width: '100%', padding: '14px', fontSize: '16px',
-                    border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
-                    appearance: 'none',
-                    backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundPosition: 'right 16px center',
-                  }}
-                >
-                  <option value="myself">Myself</option>
-                  <option value="someone-else">Someone else</option>
-                </select>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.groupIncludesElderly}
+                    onChange={(e) => setFormData(prev => ({ ...prev, groupIncludesElderly: e.target.checked }))}
+                    style={{ width: '20px', height: '20px', accentColor: '#fcd03a', flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#1F2937' }}>The group includes passengers over 65</span>
+                </label>
               </div>
-              {formData.bookingFor === 'someone-else' && (
-                <>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                      Passenger's gender
-                    </label>
-                    <select value={formData.thirdPartyGender} onChange={(e) => setFormData(prev => ({ ...prev, thirdPartyGender: e.target.value as 'Male' | 'Female' }))} style={{
+            ) : (
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : (formData.bookingFor === 'someone-else' ? '1fr 1fr 1fr' : '1fr'), gap: '16px', marginBottom: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                    Booking for
+                  </label>
+                  <select
+                    value={formData.bookingFor}
+                    onChange={(e) => setFormData(prev => ({ ...prev, bookingFor: e.target.value as 'myself' | 'someone-else' }))}
+                    style={{
                       width: '100%', padding: '14px', fontSize: '16px',
                       border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
                       appearance: 'none',
                       backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
                       backgroundRepeat: 'no-repeat',
                       backgroundPosition: 'right 16px center',
-                    }}>
-                      <option value="Male">Male</option>
-                      <option value="Female">Female</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
-                      Passenger's age group
-                    </label>
-                    <select value={formData.thirdPartyAgeGroup} onChange={(e) => setFormData(prev => ({ ...prev, thirdPartyAgeGroup: e.target.value }))} style={{
-                      width: '100%', padding: '14px', fontSize: '16px',
-                      border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
-                      appearance: 'none',
-                      backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
-                      backgroundRepeat: 'no-repeat',
-                      backgroundPosition: 'right 16px center',
-                    }}>
-                      <option value="">Not specified</option>
-                      {AGE_GROUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-                    </select>
-                  </div>
-                </>
-              )}
-            </div>
+                    }}
+                  >
+                    <option value="myself">Myself</option>
+                    <option value="someone-else">Someone else</option>
+                  </select>
+                </div>
+                {formData.bookingFor === 'someone-else' && (
+                  <>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                        Passenger's gender
+                      </label>
+                      <select value={formData.thirdPartyGender} onChange={(e) => setFormData(prev => ({ ...prev, thirdPartyGender: e.target.value as 'Male' | 'Female' }))} style={{
+                        width: '100%', padding: '14px', fontSize: '16px',
+                        border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2020/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 16px center',
+                      }}>
+                        <option value="Male">Male</option>
+                        <option value="Female">Female</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
+                        Passenger's age group
+                      </label>
+                      <select value={formData.thirdPartyAgeGroup} onChange={(e) => setFormData(prev => ({ ...prev, thirdPartyAgeGroup: e.target.value }))} style={{
+                        width: '100%', padding: '14px', fontSize: '16px',
+                        border: '2px solid #E8EBED', borderRadius: '12px', backgroundColor: 'white',
+                        appearance: 'none',
+                        backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%231F2937' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+                        backgroundRepeat: 'no-repeat',
+                        backgroundPosition: 'right 16px center',
+                      }}>
+                        <option value="">Not specified</option>
+                        {AGE_GROUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                      </select>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
             <button
               type="submit"
               disabled={submitting}

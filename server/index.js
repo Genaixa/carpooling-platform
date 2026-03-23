@@ -1682,16 +1682,18 @@ app.post('/api/check-wish-matches', async (req, res) => {
         // Don't notify the driver about their own wish
         if (wish.user_id === ride.driver_id) continue;
 
-        // Gender compatibility check: can this passenger travel with this driver?
-        const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
-        if (passengerGender) {
-          const occ = occupants || { males: 0, females: 0, couples: 0 };
-          let males = (occ.males || 0) + (occ.couples || 0);
-          let females = (occ.females || 0) + (occ.couples || 0);
-          if (driverGender === 'Male') males++;
-          if (driverGender === 'Female') females++;
-          if (passengerGender === 'Female' && females < 1) continue;
-          if (passengerGender === 'Male' && males < 1) continue;
+        // Groups (2+ passengers) skip gender compatibility check entirely
+        if ((wish.passengers_count || 1) === 1) {
+          const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
+          if (passengerGender) {
+            const occ = occupants || { males: 0, females: 0, couples: 0 };
+            let males = (occ.males || 0) + (occ.couples || 0);
+            let females = (occ.females || 0) + (occ.couples || 0);
+            if (driverGender === 'Male') males++;
+            if (driverGender === 'Female') females++;
+            if (passengerGender === 'Female' && females < 1) continue;
+            if (passengerGender === 'Male' && males < 1) continue;
+          }
         }
 
         try {
