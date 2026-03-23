@@ -302,13 +302,17 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     setLookupDetail(null);
     try {
       if (type === 'user') {
-        const [bookingsResult, ridesResult] = await Promise.all([
+        const [bookingsResult, ridesResult, profileResult, appResult] = await Promise.all([
           supabase.from('bookings').select('*, ride:rides(*)').eq('passenger_id', item.id).order('created_at', { ascending: false }),
           supabase.from('rides').select('*, bookings(*)').eq('driver_id', item.id).order('date_time', { ascending: false }),
+          supabase.from('profiles').select('address_line1, address_line2, city, postcode').eq('id', item.id).single(),
+          supabase.from('driver_applications').select('emergency_contact_name, emergency_contact_phone').eq('user_id', item.id).order('created_at', { ascending: false }).limit(1),
         ]);
         setLookupDetail({
           bookingsAsPassenger: bookingsResult.data || [],
           ridesAsDriver: ridesResult.data || [],
+          address: profileResult.data || null,
+          emergencyContact: appResult.data?.[0] || null,
         });
       } else {
         const { data } = await supabase
@@ -1743,6 +1747,16 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             {selectedLookupItem.data.phone && <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 2px 0' }}>{selectedLookupItem.data.phone}</p>}
                             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 2px 0', fontFamily: 'monospace' }}>Ref: {getUserRef(selectedLookupItem.data.id)}</p>
                             <p style={{ fontSize: '13px', color: '#9CA3AF', margin: '0 0 4px 0' }}>Alias: {selectedLookupItem.data.is_approved_driver ? getDriverAlias(selectedLookupItem.data.id) : getPassengerAlias(selectedLookupItem.data.id)}</p>
+                            {lookupDetail?.address && (() => {
+                              const a = lookupDetail.address;
+                              const addr = [a.address_line1, a.address_line2, a.city, a.postcode].filter(Boolean).join(', ');
+                              return addr ? <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 2px 0' }}>📍 {addr}</p> : null;
+                            })()}
+                            {lookupDetail?.emergencyContact?.emergency_contact_name && (
+                              <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 4px 0' }}>
+                                🆘 Emergency: {lookupDetail.emergencyContact.emergency_contact_name}{lookupDetail.emergencyContact.emergency_contact_phone ? ` · ${lookupDetail.emergencyContact.emergency_contact_phone}` : ''}
+                              </p>
+                            )}
                             <a href={`#public-profile/${selectedLookupItem.data.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline' }}>View reviews ↗</a>
                           </div>
                         </div>
