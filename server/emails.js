@@ -30,7 +30,16 @@ function formatDate(dateString) {
   } catch { return dateString; }
 }
 
+// Simple rate limiter: max 3 emails/second (well under Resend's 5/s limit)
+let lastEmailTime = 0;
+const EMAIL_MIN_GAP_MS = 350;
+
 async function sendEmail(to, subject, html) {
+  const now = Date.now();
+  const wait = EMAIL_MIN_GAP_MS - (now - lastEmailTime);
+  if (wait > 0) await new Promise(r => setTimeout(r, wait));
+  lastEmailTime = Date.now();
+
   try {
     const { error } = await resend.emails.send({
       from: 'ChapaRide <noreply@chaparide.com>',

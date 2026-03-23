@@ -39,9 +39,6 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
   });
 
   const [hasDriversLicense, setHasDriversLicense] = useState(false);
-  const [carInsured, setCarInsured] = useState(false);
-  const [hasMot, setHasMot] = useState(false);
-  const [dbsAcknowledged, setDbsAcknowledged] = useState(false);
   const [confirmedAge, setConfirmedAge] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
@@ -108,15 +105,7 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
       return;
     }
     if (!hasDriversLicense) {
-      setError('You must have a valid driving licence');
-      return;
-    }
-    if (!carInsured) {
-      setError('Your car must be fully insured');
-      return;
-    }
-    if (!hasMot) {
-      setError('Your car must have a valid MOT certificate');
+      setError('You must confirm your driving licence, insurance and MOT compliance');
       return;
     }
     if (!formData.emergencyContactName.trim()) {
@@ -201,12 +190,12 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
         age_group: formData.ageGroup,
         gender: formData.gender,
         has_drivers_license: hasDriversLicense,
-        car_insured: carInsured,
-        has_mot: hasMot,
+        car_insured: hasDriversLicense,
+        has_mot: hasDriversLicense,
         car_make: '',
         car_model: '',
         years_driving_experience: parseInt(formData.yearsExperience),
-        dbs_check_acknowledged: dbsAcknowledged,
+        dbs_check_acknowledged: false,
         emergency_contact_name: formData.emergencyContactName.trim(),
         emergency_contact_phone: formData.emergencyContactPhone.trim(),
         bank_account_name: formData.bankAccountName.trim(),
@@ -273,7 +262,7 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
               Become a Driver
             </h1>
             <p style={{ fontSize: isMobile ? '16px' : '20px', color: 'rgba(0,0,0,0.7)' }}>
-              Create your account and submit your driver application in one step
+              Create your account and submit your driver application
             </p>
           </div>
 
@@ -394,22 +383,15 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
               <p style={sectionHeaderStyle}>3. Compliance</p>
 
               <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '24px' }}>
-                {[
-                  { checked: hasDriversLicense, setter: setHasDriversLicense, label: 'I have a valid driving licence that permits me to legally drive in the UK *' },
-                  { checked: carInsured, setter: setCarInsured, label: 'My car is fully insured *' },
-                  { checked: hasMot, setter: setHasMot, label: 'My car has a valid MOT certificate *' },
-                  { checked: dbsAcknowledged, setter: setDbsAcknowledged, label: 'I acknowledge that a DBS (Disclosure and Barring Service) check may be required' },
-                ].map(({ checked, setter, label }, i) => (
-                  <label key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={(e) => setter(e.target.checked)}
-                      style={{ width: '20px', height: '20px', marginTop: '2px', accentColor: '#fcd03a', flexShrink: 0 }}
-                    />
-                    <span style={{ fontSize: '14px', color: '#1F2937', lineHeight: '1.5' }}>{label}</span>
-                  </label>
-                ))}
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={hasDriversLicense}
+                    onChange={(e) => setHasDriversLicense(e.target.checked)}
+                    style={{ width: '20px', height: '20px', marginTop: '2px', accentColor: '#fcd03a', flexShrink: 0 }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#1F2937', lineHeight: '1.5' }}>I have a valid driving licence that permits me to legally drive in the UK, my car is fully insured, and my car has a valid MOT certificate *</span>
+                </label>
               </div>
 
               {/* ── Licence Photo (optional) ── */}
