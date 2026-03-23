@@ -1537,7 +1537,6 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 {filtered.map((wish, i) => {
                                   const sc = statusColors[wish.status] || statusColors.expired;
                                   const u = wish.user;
-                                  const alias = u?.is_approved_driver ? getDriverAlias(wish.user_id) : getPassengerAlias(wish.user_id);
                                   const ride = wish.matchedBooking?.ride as any;
                                   const driver = ride?.driver;
                                   const isGroup = wish.passengers_count > 1;
@@ -1547,7 +1546,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                   return (
                                     <tr key={wish.id} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: i % 2 === 0 ? 'white' : '#FAFAFA' }}>
                                       <td style={{ padding: '12px 14px' }}>
-                                        <div style={{ fontWeight: '600', color: '#1F2937' }}>{alias}</div>
+                                        <div style={{ fontWeight: '600', color: '#1F2937' }}>{u?.name || '—'}</div>
                                         {u && <div style={{ color: '#6B7280', fontSize: '12px' }}>{u.gender || '—'}{u.age_group ? ` · ${u.age_group}` : ''}</div>}
                                         <div style={{ color: '#9CA3AF', fontSize: '11px', fontFamily: 'monospace' }}>{getUserRef(wish.user_id)}</div>
                                       </td>
@@ -1577,7 +1576,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       <td style={{ padding: '12px 14px' }}>
                                         {driver ? (
                                           <>
-                                            <div style={{ fontWeight: '600', color: '#1F2937' }}>{getDriverAlias(driver.id)}</div>
+                                            <div style={{ fontWeight: '600', color: '#1F2937' }}>{driver.name || '—'}</div>
                                             <div style={{ color: '#6B7280', fontSize: '12px' }}>{driver.gender || '—'}{driver.age_group ? ` · ${driver.age_group}` : ''}</div>
                                             <div style={{ color: '#9CA3AF', fontSize: '11px', fontFamily: 'monospace' }}>{getUserRef(driver.id)}</div>
                                           </>
