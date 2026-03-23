@@ -140,7 +140,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
                       {ride.departure_location} → {ride.arrival_location}
                     </h4>
                     <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 2px' }}>{formatDate(ride.date_time)} at {formatTime(ride.date_time)}</p>
-                    <p style={{ fontSize: '13px', color: '#4B5563', margin: 0 }}>£{ride.price_per_seat} per seat - {ride.seats_available} available</p>
+                    <p style={{ fontSize: '13px', color: '#4B5563', margin: 0 }}>£{Number(ride.price_per_seat).toFixed(2)} per seat - {ride.seats_available} available</p>
                   </div>
                   <button onClick={() => onNavigate('ride-details', ride.id)} style={{ padding: '10px 20px', background: '#000000', color: '#fcd03a', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap' }}>View</button>
                 </div>

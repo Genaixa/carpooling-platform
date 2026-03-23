@@ -822,7 +822,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               {isExpanded && (
                                 <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
                                   <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '6px' }}>
-                                    <span style={{ fontWeight: '600' }}>Seats:</span> {ride.seats_available} / {ride.seats_total} available &nbsp;|&nbsp; <span style={{ fontWeight: '600' }}>Price:</span> £{ride.price_per_seat}
+                                    <span style={{ fontWeight: '600' }}>Seats:</span> {ride.seats_available} / {ride.seats_total} available &nbsp;|&nbsp; <span style={{ fontWeight: '600' }}>Price:</span> £{Number(ride.price_per_seat).toFixed(2)}
                                   </div>
                                   {ride.departure_spot && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '6px' }}><span style={{ fontWeight: '600' }}>Pickup:</span> {ride.departure_spot}</div>}
                                   {ride.luggage_size && ride.luggage_size !== 'none' && <div style={{ fontSize: '13px', color: '#4B5563', marginBottom: '6px' }}><span style={{ fontWeight: '600' }}>Luggage:</span> {getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` (up to ${ride.luggage_count})` : ''}</div>}
@@ -911,7 +911,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                     {ride.seats_available}/{ride.seats_total}
                                   </td>
                                   <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right', fontWeight: '600' }}>
-                                    £{ride.price_per_seat}
+                                    £{Number(ride.price_per_seat).toFixed(2)}
                                   </td>
                                   <td style={{ padding: '12px 16px', fontSize: '13px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
                                     {bookingsForRide.length > 0 ? (

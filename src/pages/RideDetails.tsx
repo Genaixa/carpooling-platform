@@ -148,7 +148,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
               <span style={{ fontWeight: '700', fontSize: '12px', color: '#6B7280', textTransform: 'uppercase', letterSpacing: '0.05em', marginRight: '6px' }}>Booking</span>
               <span style={{ color: '#4B5563' }}>{ride.seats_available} of {ride.seats_total} seats</span>
               <span style={{ color: '#D1D5DB' }}>·</span>
-              <span style={{ fontWeight: '600', color: '#1F2937' }}>£{ride.price_per_seat}/seat</span>
+              <span style={{ fontWeight: '600', color: '#1F2937' }}>£{Number(ride.price_per_seat).toFixed(2)}/seat</span>
               {ride.luggage_size && ride.luggage_size !== 'none' && (
                 <><span style={{ color: '#D1D5DB' }}>·</span>
                 <span style={{ color: '#4B5563' }}>Luggage: {getLuggageLabel(ride.luggage_size)}{ride.luggage_count ? ` · up to ${ride.luggage_count} item${ride.luggage_count > 1 ? 's' : ''}` : ''}</span></>

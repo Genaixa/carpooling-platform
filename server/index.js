@@ -1668,6 +1668,18 @@ async function cleanupPastRides() {
     }
 
     if (cleanedUp > 0) console.log(`✓ Cleaned up ${cleanedUp} stale pending booking(s)`);
+
+    // Mark expired ride wishes (desired_date in the past)
+    const today = new Date().toISOString().split('T')[0];
+    const { data: expiredWishes } = await supabase
+      .from('ride_wishes')
+      .update({ status: 'expired' })
+      .eq('status', 'active')
+      .lt('desired_date', today)
+      .select('id');
+    if (expiredWishes && expiredWishes.length > 0) {
+      console.log(`✓ Marked ${expiredWishes.length} expired ride wish(es)`);
+    }
   } catch (error) {
     console.error('Cleanup past rides error:', error);
   }
