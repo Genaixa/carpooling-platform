@@ -8,6 +8,82 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import multer from 'multer';
 
+// HMRC mileage cap enforcement
+const ROUTE_DISTANCES_MILES = {
+  'Canvey Island|Edgware': 52, 'Canvey Island|Gatwick Airport': 58, 'Canvey Island|Gateshead': 300,
+  'Canvey Island|Heathrow Airport': 48, 'Canvey Island|London - Golders Green/Hendon': 48,
+  'Canvey Island|London - Stamford Hill': 48, 'Canvey Island|Luton Airport': 48,
+  'Canvey Island|Manchester': 230, 'Canvey Island|Manchester Airport': 228,
+  'Canvey Island|Newcastle Airport': 302, 'Canvey Island|Stansted Airport': 38,
+  'Edgware|Gatwick Airport': 33, 'Edgware|Gateshead': 272, 'Edgware|Heathrow Airport': 18,
+  'Edgware|London - Golders Green/Hendon': 5, 'Edgware|London - Stamford Hill': 10,
+  'Edgware|Luton Airport': 24, 'Edgware|Manchester': 200, 'Edgware|Manchester Airport': 198,
+  'Edgware|Newcastle Airport': 273, 'Edgware|Stansted Airport': 40,
+  'Gatwick Airport|Gateshead': 298, 'Gatwick Airport|Heathrow Airport': 28,
+  'Gatwick Airport|London - Golders Green/Hendon': 32, 'Gatwick Airport|London - Stamford Hill': 38,
+  'Gatwick Airport|Luton Airport': 55, 'Gatwick Airport|Manchester': 235,
+  'Gatwick Airport|Manchester Airport': 232, 'Gatwick Airport|Newcastle Airport': 300,
+  'Gatwick Airport|Stansted Airport': 68,
+  'Gateshead|Heathrow Airport': 272, 'Gateshead|London - Golders Green/Hendon': 275,
+  'Gateshead|London - Stamford Hill': 280, 'Gateshead|Luton Airport': 268,
+  'Gateshead|Manchester': 75, 'Gateshead|Manchester Airport': 78,
+  'Gateshead|Newcastle Airport': 8, 'Gateshead|Stansted Airport': 280,
+  'Heathrow Airport|London - Golders Green/Hendon': 19, 'Heathrow Airport|London - Stamford Hill': 23,
+  'Heathrow Airport|Luton Airport': 37, 'Heathrow Airport|Manchester': 195,
+  'Heathrow Airport|Manchester Airport': 195, 'Heathrow Airport|Newcastle Airport': 275,
+  'Heathrow Airport|Stansted Airport': 57,
+  'London - Golders Green/Hendon|London - Stamford Hill': 8,
+  'London - Golders Green/Hendon|Luton Airport': 27, 'London - Golders Green/Hendon|Manchester': 205,
+  'London - Golders Green/Hendon|Manchester Airport': 205, 'London - Golders Green/Hendon|Newcastle Airport': 278,
+  'London - Golders Green/Hendon|Stansted Airport': 38,
+  'London - Stamford Hill|Luton Airport': 32, 'London - Stamford Hill|Manchester': 210,
+  'London - Stamford Hill|Manchester Airport': 210, 'London - Stamford Hill|Newcastle Airport': 283,
+  'London - Stamford Hill|Stansted Airport': 32,
+  'Luton Airport|Manchester': 190, 'Luton Airport|Manchester Airport': 188,
+  'Luton Airport|Newcastle Airport': 270, 'Luton Airport|Stansted Airport': 42,
+  'Manchester|Manchester Airport': 12, 'Manchester|Newcastle Airport': 80, 'Manchester|Stansted Airport': 210,
+  'Manchester Airport|Newcastle Airport': 78, 'Manchester Airport|Stansted Airport': 208,
+  'Newcastle Airport|Stansted Airport': 282,
+};
+
+const _distanceCache = new Map();
+
+async function getRouteMiles(from, to) {
+  const key = [from, to].sort().join('|');
+  if (_distanceCache.has(key)) return _distanceCache.get(key);
+  const hardcoded = ROUTE_DISTANCES_MILES[key];
+  if (hardcoded) { _distanceCache.set(key, hardcoded); return hardcoded; }
+
+  // Dynamic: geocode via Nominatim, then road distance via OSRM
+  try {
+    const geocode = async (place) => {
+      const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(place + ', UK')}&format=json&limit=1&countrycodes=gb`;
+      const r = await fetch(url, { headers: { 'User-Agent': 'ChapaRide/1.0 (info@chaparide.com)' } });
+      const d = await r.json();
+      if (!d || d.length === 0) return null;
+      return { lat: d[0].lat, lon: d[0].lon };
+    };
+    const [a, b] = await Promise.all([geocode(from), geocode(to)]);
+    if (!a || !b) return null;
+    const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${a.lon},${a.lat};${b.lon},${b.lat}?overview=false`;
+    const r2 = await fetch(osrmUrl);
+    const d2 = await r2.json();
+    if (!d2.routes || d2.routes.length === 0) return null;
+    const miles = Math.round(d2.routes[0].distance / 1609.34);
+    _distanceCache.set(key, miles);
+    return miles;
+  } catch (err) {
+    console.error('Dynamic distance error:', err.message);
+    return null;
+  }
+}
+
+async function getHMRCPriceCap(from, to, seats) {
+  const miles = await getRouteMiles(from, to);
+  if (!miles || seats < 1) return null;
+  return Math.round((miles * 0.45) / seats);
+}
+
 // Credentials from environment variables only
 const SQUARE_ACCESS_TOKEN = process.env.SQUARE_ACCESS_TOKEN;
 const VITE_SUPABASE_URL = process.env.VITE_SUPABASE_URL;
@@ -967,12 +1043,37 @@ app.post('/api/notify-drivers-of-wish', notifyLimiter, async (req, res) => {
     if (error) throw error;
 
     // Filter by city match (case-insensitive)
-    const matchingDrivers = (drivers || []).filter(d => {
+    const cityDrivers = (drivers || []).filter(d => {
       if (!d.city) return false;
       const driverCity = d.city.trim().toLowerCase();
       const depCity = departureCity.toLowerCase();
       return driverCity === depCity || driverCity.includes(depCity) || depCity.includes(driverCity);
     });
+
+    // Also find drivers who have previously done this exact route
+    const { data: pastRides } = await supabase
+      .from('rides')
+      .select('driver_id')
+      .eq('departure_location', wish.departure_location)
+      .eq('arrival_location', wish.arrival_location)
+      .neq('driver_id', wish.user_id);
+
+    const pastDriverIds = [...new Set((pastRides || []).map(r => r.driver_id))];
+    let pastDrivers = [];
+    if (pastDriverIds.length > 0) {
+      const { data: pd } = await supabase
+        .from('profiles')
+        .select('id, name, email, city, notify_driver_alerts')
+        .eq('is_approved_driver', true)
+        .eq('notify_driver_alerts', true)
+        .in('id', pastDriverIds)
+        .neq('id', wish.user_id);
+      pastDrivers = pd || [];
+    }
+
+    // Union city drivers + past route drivers, deduplicate by id
+    const seenIds = new Set(cityDrivers.map(d => d.id));
+    const matchingDrivers = [...cityDrivers, ...pastDrivers.filter(d => !seenIds.has(d.id))];
 
     if (matchingDrivers.length === 0) {
       return res.json({ success: true, notified: 0 });
@@ -1178,10 +1279,11 @@ app.get('/api/admin/rides-overview', async (req, res) => {
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
 
-    // Fetch all rides with driver profiles
+    // Fetch all rides with driver profiles — exclude pre-launch test rides
     const { data: rides, error: ridesError } = await supabase
       .from('rides')
       .select('*, driver:profiles!rides_driver_id_fkey(id, name, email, phone, gender, age_group, address_line1, address_line2, city, postcode)')
+      .gte('created_at', '2026-03-21T00:00:00')
       .order('date_time', { ascending: false });
 
     if (ridesError) throw ridesError;
@@ -1224,7 +1326,17 @@ app.get('/api/admin/rides-overview', async (req, res) => {
       };
     });
 
-    res.json({ success: true, rides: ridesWithFinancials });
+    // Exclude rides that never happened:
+    // - cancelled with no bookings (nothing ever occurred)
+    // - upcoming but past their departure date with no bookings (ghost rides)
+    const now = new Date();
+    const visibleRides = ridesWithFinancials.filter(r => {
+      if (r.status === 'cancelled' && r.bookings.length === 0) return false;
+      if (r.status === 'upcoming' && new Date(r.date_time) < now && r.bookings.length === 0) return false;
+      return true;
+    });
+
+    res.json({ success: true, rides: visibleRides });
   } catch (error) {
     console.error('Rides overview error:', error);
     res.status(500).json({ error: error.message });
@@ -1669,16 +1781,26 @@ async function cleanupPastRides() {
 
     if (cleanedUp > 0) console.log(`✓ Cleaned up ${cleanedUp} stale pending booking(s)`);
 
-    // Mark expired ride wishes (desired_date in the past)
+    // Mark expired ride wishes (desired_date in the past) and notify passengers
     const today = new Date().toISOString().split('T')[0];
     const { data: expiredWishes } = await supabase
       .from('ride_wishes')
       .update({ status: 'expired' })
       .eq('status', 'active')
       .lt('desired_date', today)
-      .select('id');
+      .select('*');
     if (expiredWishes && expiredWishes.length > 0) {
       console.log(`✓ Marked ${expiredWishes.length} expired ride wish(es)`);
+      const { sendWishExpiredEmail } = await import('./emails.js');
+      for (const wish of expiredWishes) {
+        try {
+          const { data: wisher } = await supabase.from('profiles').select('id, name, email').eq('id', wish.user_id).single();
+          if (wisher) await sendWishExpiredEmail(wish, wisher);
+          await new Promise(r => setTimeout(r, 300)); // stay within Resend rate limit
+        } catch (emailErr) {
+          console.error(`Failed to send expiry email for wish ${wish.id}:`, emailErr);
+        }
+      }
     }
   } catch (error) {
     console.error('Cleanup past rides error:', error);
@@ -1696,12 +1818,249 @@ app.post('/api/rides/notify-posted', notifyLimiter, async (req, res) => {
     const { data: ride, error } = await supabase.from('rides').select('*').eq('id', ride_id).single();
     if (error || !ride) return res.status(404).json({ error: 'Ride not found' });
 
+    // HMRC price cap enforcement — silently correct overpriced rides
+    const cap = await getHMRCPriceCap(ride.departure_location, ride.arrival_location, ride.seats_total);
+    if (cap !== null && parseFloat(ride.price_per_seat) > cap) {
+      console.warn(`⚠ Ride ${ride_id} price £${ride.price_per_seat} exceeds HMRC cap £${cap} — correcting`);
+      await supabase.from('rides').update({ price_per_seat: cap }).eq('id', ride_id);
+    }
+
     const { sendRidePostedEmail } = await import('./emails.js');
     sendRidePostedEmail(ride).catch(err => console.error('Ride posted email error:', err));
 
     res.json({ success: true });
   } catch (error) {
     console.error('notify-posted error:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// LIVE BOOKINGS (for homepage panel — needs service role key)
+// ============================================================
+app.get('/api/live-bookings', async (req, res) => {
+  try {
+    const { data: bookings, error: bErr } = await supabase
+      .from('bookings')
+      .select('ride_id')
+      .in('status', ['confirmed', 'pending_driver']);
+    if (bErr) throw bErr;
+    if (!bookings || bookings.length === 0) return res.json({ rides: [] });
+
+    const countMap = {};
+    for (const b of bookings) countMap[b.ride_id] = (countMap[b.ride_id] || 0) + 1;
+    const rideIds = Object.keys(countMap);
+
+    const { data: rides, error: rErr } = await supabase
+      .from('rides')
+      .select('id, departure_location, arrival_location, date_time, seats_available')
+      .in('id', rideIds)
+      .eq('status', 'upcoming')
+      .gte('date_time', new Date().toISOString())
+      .order('date_time', { ascending: true })
+      .limit(6);
+    if (rErr) throw rErr;
+
+    res.json({ rides: (rides || []).map(r => ({ ...r, bookedCount: countMap[r.id] || 0 })) });
+  } catch (err) {
+    console.error('live-bookings error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// ROUTE DISTANCE (for dynamic HMRC cap on custom locations)
+// ============================================================
+app.get('/api/route-distance', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+    const miles = await getRouteMiles(from, to);
+    res.json({ miles: miles ?? null });
+  } catch (err) {
+    console.error('route-distance error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// ROUTE PRICING (historical price suggestion for PostRide form)
+// ============================================================
+app.get('/api/route-pricing', async (req, res) => {
+  try {
+    const { from, to } = req.query;
+    if (!from || !to) return res.status(400).json({ error: 'from and to required' });
+
+    // Fetch recent rides on this route (last 6 months)
+    const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: rides, error } = await supabase
+      .from('rides')
+      .select('id, price_per_seat')
+      .eq('departure_location', from)
+      .eq('arrival_location', to)
+      .gte('date_time', sixMonthsAgo)
+      .in('status', ['upcoming', 'completed']);
+
+    if (error) throw error;
+    if (!rides || rides.length < 2) return res.json({ insufficient_data: true });
+
+    const prices = rides.map(r => Number(r.price_per_seat)).filter(p => p > 0);
+    if (prices.length < 2) return res.json({ insufficient_data: true });
+
+    // Find rides that had at least one confirmed booking (these prices "worked")
+    const rideIds = rides.map(r => r.id);
+    const { data: bookedRideIds } = await supabase
+      .from('bookings')
+      .select('ride_id')
+      .in('ride_id', rideIds)
+      .in('status', ['confirmed', 'completed']);
+
+    const bookedIds = new Set((bookedRideIds || []).map(b => b.ride_id));
+    const bookedPrices = rides
+      .filter(r => bookedIds.has(r.id))
+      .map(r => Number(r.price_per_seat))
+      .filter(p => p > 0);
+
+    const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    const bookedAvg = bookedPrices.length >= 2
+      ? bookedPrices.reduce((a, b) => a + b, 0) / bookedPrices.length
+      : null;
+
+    res.json({
+      avg: Math.round(avg * 100) / 100,
+      min: Math.round(min * 100) / 100,
+      max: Math.round(max * 100) / 100,
+      booked_avg: bookedAvg !== null ? Math.round(bookedAvg * 100) / 100 : null,
+      sample_size: prices.length,
+      booked_sample_size: bookedPrices.length,
+    });
+  } catch (err) {
+    console.error('route-pricing error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// ============================================================
+// USER HISTORY (admin — bypasses RLS via service role key)
+// ============================================================
+app.get('/api/admin/user-history/:userId', async (req, res) => {
+  // Verify caller is an authenticated admin
+  const authHeader = req.headers['authorization'] || '';
+  const token = authHeader.replace('Bearer ', '');
+  if (!token) return res.status(401).json({ error: 'Unauthorized' });
+
+  try {
+    const { data: { user }, error: authErr } = await supabase.auth.getUser(token);
+    if (authErr || !user) return res.status(401).json({ error: 'Unauthorized' });
+
+    const { data: callerProfile } = await supabase.from('profiles').select('is_admin').eq('id', user.id).single();
+    if (!callerProfile?.is_admin) return res.status(403).json({ error: 'Forbidden' });
+
+    const { userId } = req.params;
+
+    const [bookingsRes, ridesRes] = await Promise.all([
+      supabase
+        .from('bookings')
+        .select('id, seats_booked, total_paid, status, created_at, ride:rides(departure_location, arrival_location, date_time, status)')
+        .eq('passenger_id', userId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('rides')
+        .select('id, departure_location, arrival_location, date_time, status, seats_total, seats_available, price_per_seat')
+        .eq('driver_id', userId)
+        .order('date_time', { ascending: false }),
+    ]);
+
+    res.json({
+      bookingsAsPassenger: bookingsRes.data || [],
+      ridesAsDriver: ridesRes.data || [],
+    });
+  } catch (err) {
+    console.error('user-history error:', err);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ============================================================
+// WISH COUNT (demand signal for PostRide form)
+// ============================================================
+// ============================================================
+// DEMAND GAPS — routes with active wishes but no matching rides
+// ============================================================
+app.get('/api/demand-gaps', async (req, res) => {
+  try {
+    const today = new Date().toISOString().slice(0, 10);
+
+    // All active wishes for future dates
+    const { data: wishes, error: wErr } = await supabase
+      .from('ride_wishes')
+      .select('departure_location, arrival_location, desired_date')
+      .eq('status', 'active')
+      .gte('desired_date', today)
+      .order('desired_date', { ascending: true });
+
+    if (wErr) throw wErr;
+    if (!wishes || wishes.length === 0) return res.json({ gaps: [] });
+
+    // All upcoming rides with seats available
+    const { data: rides, error: rErr } = await supabase
+      .from('rides')
+      .select('departure_location, arrival_location, date_time')
+      .eq('status', 'upcoming')
+      .gt('seats_available', 0)
+      .gte('date_time', new Date().toISOString());
+
+    if (rErr) throw rErr;
+
+    // Build a set of available route+date combos
+    const rideRouteSet = new Set((rides || []).map(r =>
+      `${r.departure_location}|${r.arrival_location}`
+    ));
+
+    // Group wishes by route
+    const routeMap = {};
+    for (const w of wishes) {
+      const key = `${w.departure_location}|${w.arrival_location}`;
+      if (!routeMap[key]) {
+        routeMap[key] = { from: w.departure_location, to: w.arrival_location, dates: [], count: 0 };
+      }
+      routeMap[key].count++;
+      if (!routeMap[key].dates.includes(w.desired_date)) {
+        routeMap[key].dates.push(w.desired_date);
+      }
+    }
+
+    // Keep only routes with NO available ride
+    const gaps = Object.values(routeMap)
+      .filter(r => !rideRouteSet.has(`${r.from}|${r.to}`))
+      .sort((a, b) => a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
+
+    res.json({ gaps });
+  } catch (err) {
+    console.error('demand-gaps error:', err);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+app.get('/api/wish-count', async (req, res) => {
+  try {
+    const { from, to, date } = req.query;
+    if (!from || !to || !date) return res.status(400).json({ error: 'from, to, date required' });
+
+    const { count, error } = await supabase
+      .from('ride_wishes')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'active')
+      .eq('departure_location', from)
+      .eq('arrival_location', to)
+      .eq('desired_date', date);
+
+    if (error) throw error;
+    res.json({ count: count || 0 });
+  } catch (err) {
+    console.error('wish-count error:', err);
     res.status(500).json({ error: 'Server error' });
   }
 });
@@ -1877,10 +2236,264 @@ async function sendContactDetailEmails() {
   }
 }
 
+// ============================================================
+// FLEXIBLE DATE MATCHING — notify passengers of nearby rides
+// when no exact date match exists (runs ~24hrs after wish creation)
+// ============================================================
+async function checkFlexibleDateMatches() {
+  try {
+    const now = new Date();
+    // Window: wishes created between 24h and 24h14m ago — 15min cron hits this once per wish
+    const upperBound = new Date(now.getTime() - 24 * 60 * 60 * 1000).toISOString();
+    const lowerBound = new Date(now.getTime() - (24 * 60 + 14) * 60 * 1000).toISOString();
+    const todayStr = now.toISOString().split('T')[0];
+
+    const { data: wishes } = await supabase
+      .from('ride_wishes')
+      .select('*, user:profiles!ride_wishes_user_id_fkey(id, name, email, gender, travel_status)')
+      .eq('status', 'active')
+      .gte('desired_date', todayStr)
+      .lte('created_at', upperBound)
+      .gte('created_at', lowerBound);
+
+    if (!wishes || wishes.length === 0) return;
+
+    const { sendFlexibleDateMatchEmail } = await import('./emails.js');
+
+    for (const wish of wishes) {
+      try {
+        // Skip if an exact date match already exists — the normal check-wish-matches handles that
+        const { count: exactCount } = await supabase
+          .from('rides')
+          .select('id', { count: 'exact', head: true })
+          .eq('departure_location', wish.departure_location)
+          .eq('arrival_location', wish.arrival_location)
+          .eq('status', 'upcoming')
+          .gte('date_time', `${wish.desired_date}T00:00:00`)
+          .lte('date_time', `${wish.desired_date}T23:59:59`);
+
+        if (exactCount && exactCount > 0) continue;
+
+        // Check ±3 days for matching rides (excluding the exact date)
+        const wishDate = new Date(wish.desired_date + 'T12:00:00');
+        const rangeStart = new Date(wishDate.getTime() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+        const rangeEnd = new Date(wishDate.getTime() + 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+        const { data: nearbyRides } = await supabase
+          .from('rides')
+          .select('id, date_time, seats_available, price_per_seat, existing_occupants, driver:profiles!rides_driver_id_fkey(id, gender)')
+          .eq('departure_location', wish.departure_location)
+          .eq('arrival_location', wish.arrival_location)
+          .eq('status', 'upcoming')
+          .gt('seats_available', 0)
+          .gte('date_time', `${rangeStart}T00:00:00`)
+          .lte('date_time', `${rangeEnd}T23:59:59`)
+          .neq('date_time', `${wish.desired_date}`) // exclude exact date
+          .order('date_time', { ascending: true });
+
+        if (!nearbyRides || nearbyRides.length === 0) continue;
+
+        // Apply gender compatibility filter (same rules as everywhere else)
+        const compatible = nearbyRides.filter(r => {
+          if ((wish.passengers_count || 1) > 1) return true;
+          const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
+          if (!passengerGender) return true;
+          const driverGender = r.driver?.gender || null;
+          const occ = r.existing_occupants || { males: 0, females: 0, couples: 0 };
+          let males = (occ.males || 0) + (occ.couples || 0);
+          let females = (occ.females || 0) + (occ.couples || 0);
+          if (driverGender === 'Male') males++;
+          if (driverGender === 'Female') females++;
+          if (passengerGender === 'Female' && females < 1) return false;
+          if (passengerGender === 'Male' && males < 1) return false;
+          return true;
+        });
+
+        if (compatible.length === 0) continue;
+
+        // Don't notify the wish creator if they are also the driver of a nearby ride
+        const filteredForDriver = compatible.filter(r => r.driver?.id !== wish.user_id);
+        if (filteredForDriver.length === 0) continue;
+
+        const wisher = wish.user;
+        if (!wisher?.email) continue;
+
+        await sendFlexibleDateMatchEmail(wish, wisher, filteredForDriver);
+        await new Promise(r => setTimeout(r, 300));
+        console.log(`✓ Flexible date match: notified ${wisher.name} about ${filteredForDriver.length} nearby ride(s) for ${wish.departure_location} → ${wish.arrival_location}`);
+      } catch (wishErr) {
+        console.error(`Flexible date match error for wish ${wish.id}:`, wishErr);
+      }
+    }
+  } catch (err) {
+    console.error('checkFlexibleDateMatches error:', err);
+  }
+}
+
+// ============================================================
+// PRICE NUDGE — email drivers whose ride has no bookings and
+// is priced above the route average, ~48hrs before departure
+// ============================================================
+async function checkUnfilledRidePricing() {
+  try {
+    const now = new Date();
+    // Target rides departing in 47h–48h14m (14-min window, one cron hit per ride)
+    const windowStart = new Date(now.getTime() + 47 * 60 * 60 * 1000).toISOString();
+    const windowEnd = new Date(now.getTime() + (48 * 60 + 14) * 60 * 1000).toISOString();
+
+    const { data: rides } = await supabase
+      .from('rides')
+      .select('id, driver_id, departure_location, arrival_location, date_time, price_per_seat, seats_available, seats_total')
+      .eq('status', 'upcoming')
+      .gte('date_time', windowStart)
+      .lte('date_time', windowEnd);
+
+    if (!rides || rides.length === 0) return;
+
+    const { sendPriceNudgeEmail } = await import('./emails.js');
+
+    for (const ride of rides) {
+      try {
+        // Skip if ride already has confirmed bookings
+        const { count: bookingCount } = await supabase
+          .from('bookings')
+          .select('id', { count: 'exact', head: true })
+          .eq('ride_id', ride.id)
+          .in('status', ['confirmed', 'pending_driver']);
+
+        if (bookingCount && bookingCount > 0) continue;
+
+        // Get route average price from recent completed/upcoming rides
+        const sixMonthsAgo = new Date(Date.now() - 180 * 24 * 60 * 60 * 1000).toISOString();
+        const { data: routeRides } = await supabase
+          .from('rides')
+          .select('price_per_seat')
+          .eq('departure_location', ride.departure_location)
+          .eq('arrival_location', ride.arrival_location)
+          .gte('date_time', sixMonthsAgo)
+          .in('status', ['upcoming', 'completed'])
+          .neq('id', ride.id);
+
+        if (!routeRides || routeRides.length < 3) continue; // not enough data
+
+        const prices = routeRides.map(r => Number(r.price_per_seat)).filter(p => p > 0);
+        if (prices.length < 3) continue;
+
+        const routeAvg = prices.reduce((a, b) => a + b, 0) / prices.length;
+        const ridePrice = Number(ride.price_per_seat);
+
+        // Only nudge if ride is priced 15%+ above route average
+        if (ridePrice <= routeAvg * 1.15) continue;
+
+        const { data: driver } = await supabase
+          .from('profiles')
+          .select('id, name, email')
+          .eq('id', ride.driver_id)
+          .single();
+
+        if (!driver?.email) continue;
+
+        const hoursUntilDeparture = Math.round((new Date(ride.date_time) - now) / (1000 * 60 * 60));
+        await sendPriceNudgeEmail(ride, driver, routeAvg, hoursUntilDeparture);
+        await new Promise(r => setTimeout(r, 300));
+        console.log(`✓ Price nudge sent to ${driver.name} for ride ${ride.id.slice(0,8).toUpperCase()} (£${ridePrice.toFixed(2)} vs avg £${routeAvg.toFixed(2)})`);
+      } catch (rideErr) {
+        console.error(`Price nudge error for ride ${ride.id}:`, rideErr);
+      }
+    }
+  } catch (err) {
+    console.error('checkUnfilledRidePricing error:', err);
+  }
+}
+
+// Re-notify drivers about wishes that are still unfulfilled after 48 hours
+async function nudgeUnfulfilledWishes() {
+  try {
+    const now = new Date();
+    // Target wishes created between 48h and 48h15m ago (14-minute window ensures one cron fires per wish)
+    const upperBound = new Date(now.getTime() - 48 * 60 * 60 * 1000).toISOString();
+    const lowerBound = new Date(now.getTime() - (48 * 60 + 14) * 60 * 1000).toISOString();
+    const todayStr = now.toISOString().split('T')[0];
+
+    const { data: wishes } = await supabase
+      .from('ride_wishes')
+      .select('*')
+      .eq('status', 'active')
+      .gte('desired_date', todayStr)
+      .lte('created_at', upperBound)
+      .gte('created_at', lowerBound);
+
+    if (!wishes || wishes.length === 0) return;
+
+    const { sendDriverWishNotificationEmail } = await import('./emails.js');
+
+    for (const wish of wishes) {
+      const departureCity = wish.departure_location.includes(' - ')
+        ? wish.departure_location.split(' - ')[0].trim()
+        : wish.departure_location.trim();
+
+      // City drivers
+      const { data: cityDrivers } = await supabase
+        .from('profiles')
+        .select('id, name, email, city, notify_driver_alerts')
+        .eq('is_approved_driver', true)
+        .eq('notify_driver_alerts', true)
+        .neq('id', wish.user_id);
+
+      const filtered = (cityDrivers || []).filter(d => {
+        if (!d.city) return false;
+        const dc = d.city.trim().toLowerCase();
+        const dep = departureCity.toLowerCase();
+        return dc === dep || dc.includes(dep) || dep.includes(dc);
+      });
+
+      // Past route drivers
+      const { data: pastRides } = await supabase
+        .from('rides')
+        .select('driver_id')
+        .eq('departure_location', wish.departure_location)
+        .eq('arrival_location', wish.arrival_location)
+        .neq('driver_id', wish.user_id);
+
+      const pastDriverIds = [...new Set((pastRides || []).map(r => r.driver_id))];
+      let pastDrivers = [];
+      if (pastDriverIds.length > 0) {
+        const { data: pd } = await supabase
+          .from('profiles')
+          .select('id, name, email, city, notify_driver_alerts')
+          .eq('is_approved_driver', true)
+          .eq('notify_driver_alerts', true)
+          .in('id', pastDriverIds)
+          .neq('id', wish.user_id);
+        pastDrivers = pd || [];
+      }
+
+      const seenIds = new Set(filtered.map(d => d.id));
+      const drivers = [...filtered, ...pastDrivers.filter(d => !seenIds.has(d.id))];
+
+      for (const driver of drivers) {
+        try {
+          await sendDriverWishNotificationEmail(driver, wish);
+          await new Promise(r => setTimeout(r, 300)); // stay within Resend rate limit
+        } catch (err) {
+          console.error(`Nudge: failed to notify driver ${driver.id}:`, err);
+        }
+      }
+
+      if (drivers.length > 0) console.log(`✓ 48hr nudge: notified ${drivers.length} driver(s) for wish ${wish.id}`);
+    }
+  } catch (err) {
+    console.error('nudgeUnfulfilledWishes error:', err);
+  }
+}
+
 // Run every 15 minutes
 setInterval(cleanupPastRides, 15 * 60 * 1000);
 setInterval(sendPostRideReminders, 15 * 60 * 1000);
 setInterval(sendContactDetailEmails, 15 * 60 * 1000);
+setInterval(nudgeUnfulfilledWishes, 15 * 60 * 1000);
+setInterval(checkFlexibleDateMatches, 15 * 60 * 1000);
+setInterval(checkUnfilledRidePricing, 15 * 60 * 1000);
 
 // Global error handler — catches multer errors (file size/type) and returns JSON
 app.use((err, req, res, next) => {
@@ -1895,4 +2508,7 @@ app.listen(PORT, () => {
   setTimeout(cleanupPastRides, 5000);
   setTimeout(sendPostRideReminders, 10000);
   setTimeout(sendContactDetailEmails, 15000);
+  setTimeout(nudgeUnfulfilledWishes, 20000);
+  setTimeout(checkFlexibleDateMatches, 25000);
+  setTimeout(checkUnfilledRidePricing, 30000);
 });

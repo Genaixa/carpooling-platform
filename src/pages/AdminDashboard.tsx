@@ -372,15 +372,17 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     if (userHistoryData[userId] || userHistoryLoading === userId) return;
     setUserHistoryLoading(userId);
     try {
-      const [bookingsResult, ridesResult] = await Promise.all([
-        supabase.from('bookings').select('*, ride:rides(departure_location, arrival_location, date_time, status)').eq('passenger_id', userId).order('created_at', { ascending: false }),
-        supabase.from('rides').select('id, departure_location, arrival_location, date_time, status, seats_total, seats_available, price_per_seat').eq('driver_id', userId).order('date_time', { ascending: false }),
-      ]);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/user-history/${userId}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      });
+      if (!res.ok) throw new Error('Failed to load history');
+      const data = await res.json();
       setUserHistoryData(prev => ({
         ...prev,
         [userId]: {
-          bookingsAsPassenger: bookingsResult.data || [],
-          ridesAsDriver: ridesResult.data || [],
+          bookingsAsPassenger: data.bookingsAsPassenger || [],
+          ridesAsDriver: data.ridesAsDriver || [],
         },
       }));
     } catch {
