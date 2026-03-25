@@ -80,7 +80,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [payoutModal, setPayoutModal] = useState<{ driverId: string; driverName: string; balance: number } | null>(null);
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutNotes, setPayoutNotes] = useState('');
-  const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'overdue' | 'completed' | 'cancelled'>('all');
+  const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
 
   // Users tab state
   const [usersData, setUsersData] = useState<any[]>([]);
@@ -91,6 +91,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<Record<string, any>>({});
   const [editUserLoading, setEditUserLoading] = useState(false);
+  const [userHistoryData, setUserHistoryData] = useState<Record<string, { bookingsAsPassenger: any[]; ridesAsDriver: any[] }>>({});
+  const [userHistoryLoading, setUserHistoryLoading] = useState<string | null>(null);
 
   // Search & Lookup state
   const [lookupQuery, setLookupQuery] = useState('');
@@ -214,10 +216,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           .from('bookings')
           .select('passenger_id')
           .not('status', 'eq', 'cancelled'),
-        // Fetch all ride driver IDs to count per user
+        // Fetch all non-cancelled ride driver IDs to count per user
         supabase
           .from('rides')
-          .select('driver_id'),
+          .select('driver_id')
+          .not('status', 'eq', 'cancelled'),
       ]);
 
       // Build lookup maps: userId -> count
@@ -362,6 +365,28 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error('Failed to load details: ' + (err.message || 'Unknown error'));
     } finally {
       setLookupDetailLoading(false);
+    }
+  };
+
+  const loadUserHistory = async (userId: string) => {
+    if (userHistoryData[userId] || userHistoryLoading === userId) return;
+    setUserHistoryLoading(userId);
+    try {
+      const [bookingsResult, ridesResult] = await Promise.all([
+        supabase.from('bookings').select('*, ride:rides(departure_location, arrival_location, date_time, status)').eq('passenger_id', userId).order('created_at', { ascending: false }),
+        supabase.from('rides').select('id, departure_location, arrival_location, date_time, status, seats_total, seats_available, price_per_seat').eq('driver_id', userId).order('date_time', { ascending: false }),
+      ]);
+      setUserHistoryData(prev => ({
+        ...prev,
+        [userId]: {
+          bookingsAsPassenger: bookingsResult.data || [],
+          ridesAsDriver: ridesResult.data || [],
+        },
+      }));
+    } catch {
+      toast.error('Failed to load user history');
+    } finally {
+      setUserHistoryLoading(null);
     }
   };
 
@@ -703,12 +728,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   };
 
   const now = new Date();
-  const overdueRides = ridesOverview.filter(r => r.status === 'upcoming' && new Date(r.date_time) < now);
+  const liveBookingRides = ridesOverview.filter(r =>
+    r.status === 'upcoming' &&
+    r.bookings.some(b => b.status === 'confirmed' || b.status === 'pending_driver')
+  ).sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime());
   const filteredRides = rideStatusFilter === 'all'
     ? ridesOverview
-    : rideStatusFilter === 'overdue'
-      ? overdueRides.sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime())
-      : ridesOverview.filter(r => r.status === rideStatusFilter);
+    : ridesOverview.filter(r => r.status === rideStatusFilter);
 
   // Totals for summary cards - reflect current filter
   const totalRevenue = filteredRides.reduce((sum, r) => sum + (parseFloat(r.totalRevenue as any) || 0), 0);
@@ -1203,6 +1229,63 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         {/* ==================== RIDES & FINANCES TAB ==================== */}
         {tab === 'finances' && (
           <>
+            {/* ========= LIVE BOOKINGS PANEL ========= */}
+            {!loading && liveBookingRides.length > 0 && (
+              <div style={{ marginBottom: '28px', border: '2px solid #fcd03a', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 4px 24px rgba(252,208,58,0.25)' }}>
+                <div style={{ backgroundColor: '#fcd03a', padding: '14px 20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '18px' }}>🟢</span>
+                  <span style={{ fontWeight: '700', fontSize: '16px', color: '#000' }}>Live Bookings</span>
+                  <span style={{ marginLeft: 'auto', backgroundColor: '#000', color: '#fcd03a', borderRadius: '20px', padding: '2px 12px', fontSize: '13px', fontWeight: '700' }}>{liveBookingRides.reduce((n, r) => n + r.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending_driver').length, 0)} booking{liveBookingRides.reduce((n, r) => n + r.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending_driver').length, 0) !== 1 ? 's' : ''}</span>
+                </div>
+                <div style={{ backgroundColor: 'white' }}>
+                  {liveBookingRides.map((ride, idx) => {
+                    const activeBookings = ride.bookings.filter(b => b.status === 'confirmed' || b.status === 'pending_driver');
+                    const deptDate = new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                    const deptTime = new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                    return (
+                      <div key={ride.id} style={{ borderTop: idx > 0 ? '1px solid #E8EBED' : 'none', padding: '16px 20px' }}>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'flex-start', gap: '12px', marginBottom: activeBookings.length > 0 ? '12px' : '0' }}>
+                          <div style={{ flex: 1, minWidth: '200px' }}>
+                            <div style={{ fontWeight: '700', fontSize: '15px', color: '#1F2937' }}>{ride.departure_location} → {ride.arrival_location}</div>
+                            <div style={{ fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>{deptDate} at {deptTime}</div>
+                          </div>
+                          <div style={{ fontSize: '13px', color: '#4B5563' }}>
+                            <span style={{ fontWeight: '600' }}>Driver:</span> {ride.driver?.name || '—'}
+                          </div>
+                          <div style={{ display: 'flex', gap: '16px', fontSize: '13px' }}>
+                            <span><span style={{ color: '#6B7280' }}>Revenue:</span> <strong>£{(parseFloat(ride.totalRevenue as any) || 0).toFixed(2)}</strong></span>
+                            <span><span style={{ color: '#6B7280' }}>Commission:</span> <strong style={{ color: '#000' }}>£{(parseFloat(ride.totalCommission as any) || 0).toFixed(2)}</strong></span>
+                            <span><span style={{ color: '#6B7280' }}>Driver:</span> <strong style={{ color: '#1e40af' }}>£{(parseFloat(ride.totalDriverPayout as any) || 0).toFixed(2)}</strong></span>
+                          </div>
+                          <button
+                            onClick={() => {
+                            setFinanceSubTab('rides');
+                            setRideStatusFilter('upcoming');
+                            setExpandedRide(ride.id);
+                            setTimeout(() => document.getElementById('admin-rides-table')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+                          }}
+                            style={{ padding: '6px 14px', fontSize: '12px', fontWeight: '600', background: '#1F2937', color: 'white', border: 'none', borderRadius: '8px', cursor: 'pointer', whiteSpace: 'nowrap' }}
+                          >
+                            Full Details ↓
+                          </button>
+                        </div>
+                        {activeBookings.map(b => (
+                          <div key={b.id} style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: '10px', backgroundColor: b.status === 'confirmed' ? '#f0fdf4' : '#fef9e0', border: `1px solid ${b.status === 'confirmed' ? '#86efac' : '#fcd03a'}`, borderRadius: '10px', padding: '10px 14px', marginTop: '6px' }}>
+                            <span style={{ display: 'inline-block', padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', backgroundColor: b.status === 'confirmed' ? '#dcfce7' : '#fef9e0', color: b.status === 'confirmed' ? '#166534' : '#92400e', border: `1px solid ${b.status === 'confirmed' ? '#86efac' : '#fcd03a'}` }}>{b.status === 'confirmed' ? '✓ Confirmed' : '⏳ Pending'}</span>
+                            <span style={{ fontWeight: '600', fontSize: '14px', color: '#1F2937' }}>{b.passenger?.name || '—'}</span>
+                            <span style={{ fontSize: '13px', color: '#4B5563' }}>{b.passenger?.email}</span>
+                            {b.passenger?.phone && <span style={{ fontSize: '13px', color: '#4B5563' }}>{b.passenger.phone}</span>}
+                            <span style={{ fontSize: '13px', color: '#4B5563' }}>{b.seats_booked} seat{b.seats_booked !== 1 ? 's' : ''}</span>
+                            <span style={{ fontSize: '13px', fontWeight: '600', color: '#1F2937', marginLeft: 'auto' }}>£{(parseFloat(b.total_paid as any) || 0).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             {/* Summary Cards */}
             {!loading && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '16px', marginBottom: '24px' }}>
@@ -1269,11 +1352,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 {/* ========= ALL RIDES SUB-TAB ========= */}
                 {financeSubTab === 'rides' && (
                   <>
+                    <div id="admin-rides-table" />
                     {/* Ride status filter */}
                     <div style={{ display: 'flex', gap: '8px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                      {(['all', 'upcoming', 'overdue', 'completed', 'cancelled'] as const).map(s => {
-                        const count = s === 'all' ? ridesOverview.length : s === 'overdue' ? overdueRides.length : ridesOverview.filter(r => r.status === s).length;
-                        const isOverdue = s === 'overdue';
+                      {(['all', 'upcoming', 'completed', 'cancelled'] as const).map(s => {
+                        const count = s === 'all' ? ridesOverview.length : ridesOverview.filter(r => r.status === s).length;
                         const isActive = rideStatusFilter === s;
                         return (
                           <button
@@ -1281,13 +1364,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             onClick={() => setRideStatusFilter(s)}
                             style={{
                               padding: '8px 18px', fontWeight: '600', fontSize: '13px', borderRadius: '50px',
-                              border: isOverdue && !isActive ? '1px solid #F59E0B' : '1px solid #E8EBED',
+                              border: '1px solid #E8EBED',
                               cursor: 'pointer', textTransform: 'capitalize',
-                              backgroundColor: isActive ? (isOverdue ? '#D97706' : '#374151') : (isOverdue ? '#FEF3C7' : 'white'),
-                              color: isActive ? 'white' : (isOverdue ? '#92400E' : '#374151'),
+                              backgroundColor: isActive ? '#374151' : 'white',
+                              color: isActive ? 'white' : '#374151',
                             }}
                           >
-                            {isOverdue ? `⚠ Overdue` : s} ({count})
+                            {s} ({count})
                           </button>
                         );
                       })}
@@ -1302,12 +1385,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         {filteredRides.map(ride => {
                           const rsc = statusColors[ride.status] || statusColors.upcoming;
                           const isExpanded = expandedRide === ride.id;
-                          const isOverdueRide = rideStatusFilter === 'overdue';
+                          const hasLiveBooking = ride.bookings.some(b => b.status === 'confirmed' || b.status === 'pending_driver');
                           return (
-                            <div key={ride.id} style={{ backgroundColor: 'white', borderRadius: '16px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                            <div key={ride.id} style={{ backgroundColor: hasLiveBooking ? '#f0fdf4' : 'white', borderRadius: '16px', boxShadow: hasLiveBooking ? '0 4px 20px rgba(134,239,172,0.25)' : '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden', border: hasLiveBooking ? '1.5px solid #86efac' : 'none' }}>
                               <div
                                 onClick={() => setExpandedRide(isExpanded ? null : ride.id)}
-                                style={{ padding: '20px 24px', cursor: 'pointer', borderLeft: `4px solid ${isOverdueRide ? '#F59E0B' : rsc.border}` }}
+                                style={{ padding: '20px 24px', cursor: 'pointer', borderLeft: `4px solid ${hasLiveBooking ? '#22c55e' : rsc.border}` }}
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
                                   <div style={{ flex: 1, minWidth: '200px' }}>
@@ -1315,14 +1398,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       <h4 style={{ fontSize: '16px', fontWeight: '600', color: '#1F2937', margin: 0 }}>
                                         {ride.departure_location} → {ride.arrival_location}
                                       </h4>
-                                      {isOverdueRide ? (
-                                        <span style={{
-                                          padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
-                                          backgroundColor: '#FEF3C7', color: '#92400E',
-                                        }}>
-                                          ⚠ Overdue
-                                        </span>
-                                      ) : (ride.status === 'completed' || ride.status === 'cancelled') && (
+                                      {(ride.status === 'completed' || ride.status === 'cancelled') && (
                                         <span style={{
                                           padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600',
                                           textTransform: 'capitalize', backgroundColor: rsc.bg, color: rsc.color,
@@ -1356,38 +1432,6 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       <p style={{ fontSize: '11px', fontWeight: '600', color: '#6B7280', margin: 0 }}>Driver</p>
                                       <p style={{ fontSize: isMobile ? '15px' : '18px', fontWeight: '700', color: '#1e40af', margin: 0 }}>£{((parseFloat(ride.totalRevenue as any) || 0) - (parseFloat(ride.totalCommission as any) || 0)).toFixed(2)}</p>
                                     </div>
-                                    {rideStatusFilter === 'overdue' && (
-                                      <button
-                                        onClick={async (e) => {
-                                          e.stopPropagation();
-                                          if (!user) return;
-                                          setActionLoading(`reminder-${ride.id}`);
-                                          try {
-                                            const { data: { session } } = await supabase.auth.getSession();
-                                            const res = await fetch(`${API_URL}/api/admin/resend-email`, {
-                                              method: 'POST',
-                                              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
-                                              body: JSON.stringify({ adminId: user.id, rideId: ride.id, emailType: 'driver-post-ride-reminder' }),
-                                            });
-                                            const data = await res.json();
-                                            if (data.success) toast.success('Reminder sent to driver');
-                                            else toast.error(data.error || 'Failed to send reminder');
-                                          } catch {
-                                            toast.error('Failed to send reminder');
-                                          } finally {
-                                            setActionLoading(null);
-                                          }
-                                        }}
-                                        disabled={actionLoading === `reminder-${ride.id}`}
-                                        style={{
-                                          padding: '7px 14px', fontSize: '12px', fontWeight: '600', borderRadius: '8px',
-                                          border: '1px solid #F59E0B', backgroundColor: '#FEF3C7', color: '#92400E',
-                                          cursor: 'pointer', whiteSpace: 'nowrap',
-                                        }}
-                                      >
-                                        {actionLoading === `reminder-${ride.id}` ? 'Sending…' : '✉ Send Reminder'}
-                                      </button>
-                                    )}
                                     <span style={{ fontSize: '18px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>
                                       ▼
                                     </span>
@@ -1627,7 +1671,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       </div>
                     ) : (() => {
                       const toPay = driverSummaries.filter(ds => ds.balanceOwed > 0);
-                      const paid = driverSummaries.filter(ds => ds.balanceOwed === 0);
+                      const paid = driverSummaries.filter(ds => ds.balanceOwed === 0 && ds.totalEarned > 0);
                       const thStyle: React.CSSProperties = { padding: '10px 14px', textAlign: 'left', fontWeight: '700', fontSize: '12px', color: '#374151', backgroundColor: '#F9FAFB', whiteSpace: 'nowrap' };
                       const tdStyle: React.CSSProperties = { padding: '11px 14px', fontSize: '13px', color: '#1F2937', verticalAlign: 'top' };
                       const renderTable = (rows: typeof driverSummaries, showAction: boolean) => (
@@ -2374,7 +2418,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937', cursor: 'pointer' }} onClick={() => setExpandedUser(expandedUser === u.id ? null : u.id)}>
+                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937', cursor: 'pointer' }} onClick={() => { const next = expandedUser === u.id ? null : u.id; setExpandedUser(next); if (next) loadUserHistory(next); }}>
                               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {u.name || '—'}
                                 <span style={{ fontSize: '10px', color: '#9CA3AF', transform: expandedUser === u.id ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.2s' }}>▼</span>
@@ -2608,6 +2652,92 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       ✏ Edit Profile
                                     </button>
                                   )}
+
+                                  {/* Ride & Booking History */}
+                                  <div style={{ marginTop: '18px', borderTop: '1px solid #E5E7EB', paddingTop: '14px' }}>
+                                    <p style={{ fontSize: '12px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', margin: '0 0 12px 0', letterSpacing: '0.05em' }}>Ride & Booking History</p>
+                                    {userHistoryLoading === u.id ? (
+                                      <p style={{ fontSize: '13px', color: '#9CA3AF' }}>Loading history...</p>
+                                    ) : userHistoryData[u.id] ? (
+                                      <>
+                                        {/* Rides as Driver */}
+                                        <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', margin: '0 0 6px 0' }}>
+                                          Rides as Driver ({userHistoryData[u.id].ridesAsDriver.length})
+                                        </p>
+                                        {userHistoryData[u.id].ridesAsDriver.length === 0 ? (
+                                          <p style={{ fontSize: '12px', color: '#9CA3AF', margin: '0 0 12px 0' }}>None</p>
+                                        ) : (
+                                          <div style={{ overflowX: 'auto', marginBottom: '14px' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                              <thead>
+                                                <tr style={{ backgroundColor: '#F9FAFB' }}>
+                                                  {['Route', 'Date', 'Status', 'Seats', '£/seat'].map(h => (
+                                                    <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>{h}</th>
+                                                  ))}
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {userHistoryData[u.id].ridesAsDriver.map((r: any) => {
+                                                  const sc = statusColors[r.status] || statusColors.upcoming;
+                                                  return (
+                                                    <tr key={r.id} style={{ borderTop: '1px solid #F3F4F6' }}>
+                                                      <td style={{ padding: '6px 10px', color: '#1F2937', whiteSpace: 'nowrap' }}>{r.departure_location} → {r.arrival_location}</td>
+                                                      <td style={{ padding: '6px 10px', color: '#6B7280', whiteSpace: 'nowrap' }}>{new Date(r.date_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                                                      <td style={{ padding: '6px 10px' }}>
+                                                        <span style={{ backgroundColor: sc.bg, color: sc.color, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>{r.status}</span>
+                                                      </td>
+                                                      <td style={{ padding: '6px 10px', color: '#6B7280' }}>{r.seats_total - r.seats_available}/{r.seats_total} filled</td>
+                                                      <td style={{ padding: '6px 10px', color: '#1F2937', fontWeight: '600' }}>£{parseFloat(r.price_per_seat).toFixed(2)}</td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+
+                                        {/* Bookings as Passenger */}
+                                        <p style={{ fontSize: '12px', fontWeight: '600', color: '#374151', margin: '0 0 6px 0' }}>
+                                          Bookings as Passenger ({userHistoryData[u.id].bookingsAsPassenger.length})
+                                        </p>
+                                        {userHistoryData[u.id].bookingsAsPassenger.length === 0 ? (
+                                          <p style={{ fontSize: '12px', color: '#9CA3AF', margin: 0 }}>None</p>
+                                        ) : (
+                                          <div style={{ overflowX: 'auto' }}>
+                                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
+                                              <thead>
+                                                <tr style={{ backgroundColor: '#F9FAFB' }}>
+                                                  {['Route', 'Date', 'Status', 'Seats', 'Paid'].map(h => (
+                                                    <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>{h}</th>
+                                                  ))}
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {userHistoryData[u.id].bookingsAsPassenger.map((b: any) => {
+                                                  const sc = statusColors[b.status] || statusColors.pending;
+                                                  return (
+                                                    <tr key={b.id} style={{ borderTop: '1px solid #F3F4F6' }}>
+                                                      <td style={{ padding: '6px 10px', color: '#1F2937', whiteSpace: 'nowrap' }}>
+                                                        {b.ride ? `${b.ride.departure_location} → ${b.ride.arrival_location}` : '—'}
+                                                      </td>
+                                                      <td style={{ padding: '6px 10px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                                        {b.ride ? new Date(b.ride.date_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}
+                                                      </td>
+                                                      <td style={{ padding: '6px 10px' }}>
+                                                        <span style={{ backgroundColor: sc.bg, color: sc.color, padding: '2px 8px', borderRadius: '10px', fontSize: '11px', fontWeight: '600' }}>{b.status}</span>
+                                                      </td>
+                                                      <td style={{ padding: '6px 10px', color: '#6B7280' }}>{b.seats_booked}</td>
+                                                      <td style={{ padding: '6px 10px', color: '#1F2937', fontWeight: '600' }}>£{parseFloat(b.total_paid || 0).toFixed(2)}</td>
+                                                    </tr>
+                                                  );
+                                                })}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        )}
+                                      </>
+                                    ) : null}
+                                  </div>
                                 </div>
                               </td>
                             </tr>
