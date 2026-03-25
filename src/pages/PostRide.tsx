@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { supabase } from '../lib/supabase';
-import { LUGGAGE_OPTIONS } from '../lib/constants';
+import { LUGGAGE_OPTIONS, getRouteMiles, HMRC_RATE_PER_MILE, HMRC_COMMISSION_UPLIFT } from '../lib/constants';
 import LocationDropdown from '../components/LocationDropdown';
 import type { NavigateFn } from '../lib/types';
 
@@ -34,6 +34,84 @@ export default function PostRide({ onNavigate }: PostRideProps) {
   const [driverDeclaration, setDriverDeclaration] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [wishCount, setWishCount] = useState<number | null>(null);
+  const [pricingHint, setPricingHint] = useState<{ avg: number; min: number; max: number; booked_avg: number | null; sample_size: number } | null>(null);
+  const [dynamicMiles, setDynamicMiles] = useState<number | null>(null);
+  const [dynamicMilesLoading, setDynamicMilesLoading] = useState(false);
+  const [demandGaps, setDemandGaps] = useState<{ from: string; to: string; count: number; dates: string[] }[]>([]);
+
+  useEffect(() => {
+    fetch(`${API_URL}/api/demand-gaps`)
+      .then(r => r.json())
+      .then(d => setDemandGaps(d.gaps || []))
+      .catch(() => {});
+  }, []);
+
+  // Prefill from demand gap click (Home page or sidebar)
+  useEffect(() => {
+    const prefill = sessionStorage.getItem('postRidePrefill');
+    if (prefill) {
+      sessionStorage.removeItem('postRidePrefill');
+      try {
+        const { from, to, date } = JSON.parse(prefill);
+        setFormData(prev => ({
+          ...prev,
+          ...(from ? { from } : {}),
+          ...(to ? { to } : {}),
+          ...(date ? { date } : {}),
+        }));
+      } catch {}
+    }
+  }, []);
+
+  const prefillFromGap = (gap: { from: string; to: string; dates: string[] }) => {
+    const date = gap.dates.length === 1 ? gap.dates[0] : '';
+    setFormData(prev => ({ ...prev, from: gap.from, to: gap.to, ...(date ? { date } : {}) }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Fetch dynamic distance for non-preset (custom) routes
+  useEffect(() => {
+    if (!formData.from || !formData.to) { setDynamicMiles(null); return; }
+    if (getRouteMiles(formData.from, formData.to) !== null) { setDynamicMiles(null); return; } // covered by preset table
+    setDynamicMilesLoading(true);
+    setDynamicMiles(null);
+    const params = new URLSearchParams({ from: formData.from, to: formData.to });
+    fetch(`${API_URL}/api/route-distance?${params}`)
+      .then(r => r.json())
+      .then(d => setDynamicMiles(d.miles ?? null))
+      .catch(() => setDynamicMiles(null))
+      .finally(() => setDynamicMilesLoading(false));
+  }, [formData.from, formData.to]);
+
+  // Fetch historical pricing when route is filled
+  useEffect(() => {
+    if (!formData.from || !formData.to) {
+      setPricingHint(null);
+      return;
+    }
+    const params = new URLSearchParams({ from: formData.from, to: formData.to });
+    fetch(`${API_URL}/api/route-pricing?${params}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.insufficient_data || data.error) { setPricingHint(null); return; }
+        setPricingHint(data);
+      })
+      .catch(() => setPricingHint(null));
+  }, [formData.from, formData.to]);
+
+  // Fetch demand signal when route + date are all filled
+  useEffect(() => {
+    if (!formData.from || !formData.to || !formData.date) {
+      setWishCount(null);
+      return;
+    }
+    const params = new URLSearchParams({ from: formData.from, to: formData.to, date: formData.date });
+    fetch(`${API_URL}/api/wish-count?${params}`)
+      .then(r => r.json())
+      .then(data => setWishCount(data.count ?? null))
+      .catch(() => setWishCount(null));
+  }, [formData.from, formData.to, formData.date]);
 
   // Pre-fill from wish data if available
   useEffect(() => {
@@ -238,13 +316,15 @@ export default function PostRide({ onNavigate }: PostRideProps) {
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero Section with Form */}
       <section style={{ background: '#fcd03a', padding: isMobile ? '32px 16px' : '60px 20px', minHeight: 'calc(100vh - 90px)' }}>
-        <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+        <div style={{ maxWidth: '1200px', margin: '0 auto' }}>
           <div style={{ textAlign: 'center', marginBottom: isMobile ? '24px' : '40px' }}>
             <h1 style={{ fontSize: isMobile ? '28px' : '48px', fontWeight: 'bold', color: '#000000', marginBottom: '15px' }}>Post a Ride</h1>
             <p style={{ fontSize: '20px', color: 'rgba(0,0,0,0.7)' }}>Share your ride and help others travel</p>
           </div>
 
-          <div style={{ backgroundColor: 'white', borderRadius: '24px', padding: isMobile ? '24px' : '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', animation: 'floatUp 0.7s ease-out' }}>
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'flex-start' }}>
+
+          <div style={{ flex: 1, minWidth: 0, backgroundColor: 'white', borderRadius: '24px', padding: isMobile ? '24px' : '40px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)', animation: 'floatUp 0.7s ease-out' }}>
             <form onSubmit={handleSubmit}>
               {/* From and To - Location Dropdowns */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -289,6 +369,16 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   {errors.time && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.time}</p>}
                 </div>
               </div>
+
+              {/* Demand signal */}
+              {wishCount !== null && wishCount > 0 && (
+                <div style={{ backgroundColor: '#fef9e0', border: '2px solid #fcd03a', borderRadius: '12px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <span style={{ fontSize: '20px' }}>👥</span>
+                  <span style={{ fontSize: '15px', fontWeight: '600', color: '#1F2937' }}>
+                    {wishCount} passenger{wishCount !== 1 ? 's are' : ' is'} already waiting for this route on this date!
+                  </span>
+                </div>
+              )}
 
               {/* Car Make and Model */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
@@ -346,7 +436,36 @@ export default function PostRide({ onNavigate }: PostRideProps) {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : formData.luggageSize !== 'none' ? '1fr 1fr' : '1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Price per Seat (£) *</label>
-                  <input name="pricePerSeat" type="number" min="0" step="0.01" value={formData.pricePerSeat} onChange={handleChange} required placeholder="0.00" style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.pricePerSeat ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }} />
+                  {(() => {
+                    const miles = dynamicMiles ?? getRouteMiles(formData.from, formData.to);
+                    const totalCap = miles ? Math.round(miles * HMRC_RATE_PER_MILE * HMRC_COMMISSION_UPLIFT) : null;
+                    return (
+                      <>
+                        <input
+                          name="pricePerSeat"
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={formData.pricePerSeat}
+                          onChange={(e) => {
+                            handleChange(e);
+                            if (errors.pricePerSeat) setErrors(prev => { const n = { ...prev }; delete n.pricePerSeat; return n; });
+                          }}
+                          required
+                          placeholder="0.00"
+                          style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.pricePerSeat ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }}
+                        />
+                        {dynamicMilesLoading && (
+                          <p style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '4px' }}>Calculating distance...</p>
+                        )}
+                        {totalCap !== null && !dynamicMilesLoading && (
+                          <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '4px' }}>
+                            {formData.from} to {formData.to} — max recommended HMRC compliant rate: £{totalCap} in total
+                          </p>
+                        )}
+                      </>
+                    );
+                  })()}
                   {errors.pricePerSeat && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.pricePerSeat}</p>}
                   {parseFloat(formData.pricePerSeat) > 0 ? (
                     <p style={{ fontSize: '13px', color: '#000000', marginTop: '6px', fontWeight: '600' }}>
@@ -356,6 +475,15 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                     <p style={{ fontSize: '12px', color: '#6B7280', marginTop: '6px' }}>
                       ChapaRide deducts a 25% fee from each seat sold. You keep 75% of the price you set.
                     </p>
+                  )}
+                  {pricingHint && (
+                    <div style={{ marginTop: '10px', padding: '10px 14px', backgroundColor: '#f0fdf4', border: '1px solid #86efac', borderRadius: '8px', fontSize: '13px', color: '#166534' }}>
+                      <strong>💡 Price suggestion:</strong> Similar rides on this route go for £{pricingHint.min.toFixed(2)}–£{pricingHint.max.toFixed(2)}
+                      {pricingHint.booked_avg !== null && (
+                        <span> · rides that filled seats averaged <strong>£{pricingHint.booked_avg.toFixed(2)}</strong></span>
+                      )}
+                      <span style={{ color: '#4ade80', marginLeft: '6px' }}>({pricingHint.sample_size} rides sampled)</span>
+                    </div>
                   )}
                 </div>
                 {formData.luggageSize !== 'none' && (
@@ -377,8 +505,11 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                 <p style={{ fontWeight: '700', color: '#92400e', margin: '0 0 10px 0', fontSize: '15px' }}>
                   Driver Responsibility Declaration
                 </p>
-                <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#374151', margin: '0 0 12px 0' }}>
+                <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#374151', margin: '0 0 8px 0' }}>
                   By publishing a ride on ChapaRide, you confirm that this journey was pre-planned and that passengers are only sharing your fuel and travel expenses. This service is for cost-sharing purposes only and not for profit.
+                </p>
+                <p style={{ fontSize: '12px', lineHeight: '1.6', color: '#6B7280', margin: '0 0 12px 0', fontStyle: 'italic' }}>
+                  Under HMRC rules, drivers may recover travel costs at up to 45p per mile. Charging passengers more than your actual journey costs may constitute a taxable income and could require a private hire licence. ChapaRide enforces a per-seat price cap based on the HMRC approved mileage rate.
                 </p>
                 <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#374151', margin: '0 0 12px 0' }}>
                   You confirm that you hold a valid driving licence, have permission to drive this vehicle, and that the vehicle has at least third-party insurance, a valid MOT, and current tax. You are responsible for ensuring your vehicle is roadworthy and legally compliant.
@@ -424,6 +555,59 @@ export default function PostRide({ onNavigate }: PostRideProps) {
               </div>
             </form>
           </div>
+
+          {/* Demand gaps sidebar — desktop */}
+          {demandGaps.length > 0 && !isMobile && (
+            <div style={{ width: '300px', flexShrink: 0, position: 'sticky', top: '80px' }}>
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '20px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#1F2937', marginBottom: '14px' }}>Passengers waiting</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {demandGaps.map((gap, i) => (
+                    <div key={i} onClick={() => prefillFromGap(gap)} style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd03a', borderRadius: '12px', padding: '12px', cursor: 'pointer' }}>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#1F2937', marginBottom: '6px' }}>
+                        {gap.from} → {gap.to}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
+                        <div>
+                          <span style={{ backgroundColor: '#fcd03a', color: '#000', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px', display: 'inline-block', marginBottom: '4px' }}>
+                            {gap.count} {gap.count === 1 ? 'passenger' : 'passengers'}
+                          </span>
+                          <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                            {gap.dates.slice(0, 3).map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })).join(', ')}
+                            {gap.dates.length > 3 ? ` +${gap.dates.length - 3}` : ''}
+                          </div>
+                        </div>
+                        <span style={{ fontSize: '11px', color: '#6B7280' }}>↑ Fill form</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          </div>{/* end flex row */}
+
+          {/* Demand gaps — mobile */}
+          {demandGaps.length > 0 && isMobile && (
+            <div style={{ marginTop: '24px', backgroundColor: 'white', borderRadius: '20px', padding: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}>
+              <div style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937', marginBottom: '14px' }}>Passengers waiting</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {demandGaps.map((gap, i) => (
+                  <div key={i} onClick={() => prefillFromGap(gap)} style={{ backgroundColor: '#fffbeb', border: '1px solid #fcd03a', borderRadius: '12px', padding: '12px', cursor: 'pointer' }}>
+                    <div style={{ fontWeight: '700', fontSize: '13px', color: '#1F2937', marginBottom: '4px' }}>{gap.from} → {gap.to}</div>
+                    <span style={{ backgroundColor: '#fcd03a', color: '#000', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px' }}>
+                      {gap.count} {gap.count === 1 ? 'passenger' : 'passengers'} waiting
+                    </span>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+                      {gap.dates.slice(0, 3).map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })).join(', ')}
+                      {gap.dates.length > 3 ? ` +${gap.dates.length - 3} more` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
