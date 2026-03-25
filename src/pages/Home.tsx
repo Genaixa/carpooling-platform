@@ -2,6 +2,9 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarLabel, getDriverAlias } from '../lib/supabase';
 import { NavigateFn } from '../lib/types';
+import { ROUTE_LOCATIONS } from '../lib/constants';
+
+const UK_LOCATIONS_SET = new Set<string>(ROUTE_LOCATIONS as unknown as string[]);
 import { useIsMobile } from '../hooks/useIsMobile';
 import Loading from '../components/Loading';
 import { SkeletonCard } from '../components/SkeletonLoader';
@@ -74,6 +77,24 @@ export default function Home({ onNavigate }: HomeProps) {
   // City filter for logged-in users — defaults to the passenger's registered city
   const [cityFilter, setCityFilter] = useState<string>('All');
   const cityFilterInitialized = useRef(false);
+
+  // Live bookings for hero panel
+  const [liveBookings, setLiveBookings] = useState<{ id: string; departure_location: string; arrival_location: string; date_time: string; seats_available: number; bookedCount: number }[]>([]);
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/live-bookings`)
+      .then(r => r.json())
+      .then(d => setLiveBookings(d.rides || []))
+      .catch(() => {});
+  }, []);
+
+  // Demand gaps
+  const [demandGaps, setDemandGaps] = useState<{ from: string; to: string; count: number; dates: string[] }[]>([]);
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL || ''}/api/demand-gaps`)
+      .then(r => r.json())
+      .then(d => setDemandGaps(d.gaps || []))
+      .catch(() => {});
+  }, []);
 
 
   useEffect(() => {
@@ -243,10 +264,10 @@ export default function Home({ onNavigate }: HomeProps) {
   }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy, effectiveGender, bookingFor, bookingForGender, profile, cityFilter, user]);
 
   // Group rides by destination, sorted chronologically within groups,
-  // groups ordered by their earliest ride's departure time
+  // groups split into UK and European destinations, sorted alphabetically
   const groupedRides = useMemo(() => {
     const groups: Record<string, RideWithCompatibility[]> = {};
-    // First sort all rides chronologically (soonest first)
+    // Sort all rides chronologically within each group
     const chronological = [...rides].sort(
       (a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime()
     );
@@ -255,11 +276,12 @@ export default function Home({ onNavigate }: HomeProps) {
       if (!groups[dest]) groups[dest] = [];
       groups[dest].push(ride);
     });
-    // Sort groups by the earliest ride in each group
-    const entries = Object.entries(groups).sort(
-      ([, a], [, b]) => new Date(a[0].date_time).getTime() - new Date(b[0].date_time).getTime()
-    );
-    return entries;
+    // Sort groups alphabetically
+    const entries = Object.entries(groups).sort(([a], [b]) => a.localeCompare(b));
+    // Split into UK and Europe
+    const uk = entries.filter(([dest]) => UK_LOCATIONS_SET.has(dest));
+    const europe = entries.filter(([dest]) => !UK_LOCATIONS_SET.has(dest));
+    return { uk, europe };
   }, [rides]);
 
   // Unique departure cities from all loaded rides (for the city filter dropdown)
@@ -469,6 +491,222 @@ export default function Home({ onNavigate }: HomeProps) {
     }
   };
 
+  const renderDestGroup = (entries: [string, RideWithCompatibility[]][]) =>
+    entries.map(([destination, destRides]) => (
+      <div
+        key={destination}
+        style={{
+          backgroundColor: 'white',
+          borderRadius: '20px',
+          boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
+          overflow: 'hidden',
+        }}
+      >
+        {/* Destination Header */}
+        <div style={{
+          background: '#000000',
+          padding: isMobile ? '16px 20px' : '18px 28px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <svg style={{ width: '20px', height: '20px', color: 'white', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '700', color: 'white', margin: 0 }}>
+              Destination: {destination}
+            </h3>
+          </div>
+          <span style={{
+            fontSize: '13px',
+            fontWeight: '600',
+            backgroundColor: '#fcd03a',
+            color: '#000000',
+            padding: '4px 12px',
+            borderRadius: '20px',
+          }}>
+            {destRides.length} {destRides.length === 1 ? 'ride' : 'rides'}
+          </span>
+        </div>
+
+        {/* Rides within this destination */}
+        <div>
+          {destRides.map((ride, rideIdx) => {
+            const isGold = (ride.driver as any).driver_tier === 'gold';
+            return (
+            <div
+              key={ride.id}
+              style={{
+                padding: isMobile ? '16px 20px' : '20px 28px',
+                borderBottom: rideIdx < destRides.length - 1 ? '1px solid #F3F4F6' : 'none',
+                borderLeft: isGold ? '4px solid #fcd03a' : '4px solid transparent',
+                backgroundColor: isGold ? '#fffef5' : 'transparent',
+                opacity: ride.compatible ? 1 : 0.5,
+                position: 'relative',
+                transition: 'background-color 0.2s',
+              }}
+              onMouseOver={(e) => { if (ride.compatible) e.currentTarget.style.backgroundColor = isGold ? '#fff9d6' : '#FAFBFC'; }}
+              onMouseOut={(e) => { e.currentTarget.style.backgroundColor = isGold ? '#fffef5' : 'transparent'; }}
+            >
+              {/* Gold corner ribbon */}
+              {isGold && (
+                <div style={{
+                  position: 'absolute', top: 0, right: 0,
+                  width: '72px', height: '72px',
+                  overflow: 'hidden', pointerEvents: 'none',
+                }}>
+                  <div style={{
+                    position: 'absolute', top: '14px', right: '-18px',
+                    width: '80px', backgroundColor: '#fcd03a', color: '#000000',
+                    fontSize: '10px', fontWeight: '800', textAlign: 'center',
+                    padding: '3px 0', transform: 'rotate(45deg)',
+                    boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
+                    letterSpacing: '0.5px',
+                  }}>
+                    GOLD
+                  </div>
+                </div>
+              )}
+
+              {/* Incompatibility notice */}
+              {!ride.compatible && ride.incompatibilityReason && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  marginBottom: '10px', padding: '6px 12px',
+                  backgroundColor: '#FEF3C7', borderRadius: '8px',
+                  width: 'fit-content',
+                }}>
+                  <svg style={{ width: '14px', height: '14px', color: '#D97706', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                  <span style={{ fontSize: '12px', color: '#92400E', fontWeight: '500' }}>{ride.incompatibilityReason}</span>
+                </div>
+              )}
+
+              {/* Main row: From + details + price + actions */}
+              <div style={{
+                display: 'flex',
+                alignItems: isMobile ? 'flex-start' : 'center',
+                gap: isMobile ? '12px' : '20px',
+                flexDirection: isMobile ? 'column' : 'row',
+              }}>
+                {/* Left: Route + schedule */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '13px' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '3px 0', verticalAlign: 'middle' }}>
+                          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>{ride.departure_location}</span>
+                          {' '}<span style={{ color: '#9CA3AF' }}>→</span>{' '}
+                          <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>{ride.arrival_location}</span>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td style={{ padding: '3px 0', color: '#374151', verticalAlign: 'middle' }}>
+                          <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                          {' · '}
+                          <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
+                          {' · '}{ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''} available
+                        </td>
+                      </tr>
+                      {ride.driver && (() => {
+                        const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
+                        const males = (occupants?.males || 0) + (occupants?.couples || 0);
+                        const females = (occupants?.females || 0) + (occupants?.couples || 0);
+                        const totalPassengers = males + females;
+                        const passengerParts = [...(males > 0 ? [`Male: ${males}`] : []), ...(females > 0 ? [`Female: ${females}`] : [])];
+                        return (
+                          <>
+                            <tr>
+                              <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
+                                <button onClick={() => onNavigate('public-profile', undefined, ride.driver.id)} style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', padding: 0 }}>{getDriverAlias(ride.driver.id)}</button>
+                                {isGold && <span style={{ marginLeft: '5px', fontSize: '11px', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde047', borderRadius: '8px', padding: '1px 6px' }}>⭐ Gold</span>}
+                                {' · '}{ride.driver?.gender || 'Unknown'}
+                                {(ride.driver as any).age_group && <>{' · '}Age {(ride.driver as any).age_group}</>}
+                                {(ride.driver as any).city && <>{' · '}{(ride.driver as any).city}</>}
+                                {(ride.driver as any).marital_status && <>{' · '}{(ride.driver as any).marital_status}</>}
+                                {ride.driver.average_rating != null && ride.driver.average_rating > 0 && <>{' · '}★ {ride.driver.average_rating.toFixed(1)}</>}
+                              </td>
+                            </tr>
+                            <tr>
+                              <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
+                                Passengers: {passengerParts.length > 0 ? passengerParts.join(', ') : 'None yet'} · Total in vehicle: {1 + totalPassengers}
+                              </td>
+                            </tr>
+                          </>
+                        );
+                      })()}
+                      {(ride.luggage_size && ride.luggage_size !== 'none' || ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && (
+                        <tr>
+                          <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
+                            {ride.luggage_size && ride.luggage_size !== 'none' && <>{getLuggageLabel(ride.luggage_size)}</>}
+                            {ride.luggage_size && ride.luggage_size !== 'none' && (ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && ' · '}
+                            {(ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && <>{[ride.vehicle_color, ride.vehicle_make, ride.vehicle_model].filter(Boolean).join(' ')}</>}
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Right: Price + actions */}
+                <div style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto' }}>
+                  <table style={{ borderCollapse: 'collapse', width: '100%' }}>
+                    <tbody>
+                      <tr>
+                        <td style={{ padding: '4px 8px 4px 0', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>Price</td>
+                        <td style={{ padding: '4px 0', whiteSpace: 'nowrap' }}>
+                          <span style={{ fontSize: '18px', fontWeight: '800', color: '#1F2937' }}>£{ride.price_per_seat.toFixed(2)}</span>
+                          <span style={{ fontSize: '12px', color: '#6B7280', marginLeft: '2px' }}>/seat</span>
+                        </td>
+                      </tr>
+                      {ride.seats_available > 1 && (
+                        <tr>
+                          <td style={{ padding: '4px 8px 4px 0', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>Seats</td>
+                          <td style={{ padding: '4px 0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                              <button onClick={() => { const c = getSelectedSeats(ride.id); if (c > 1) handleSeatChange(ride.id, c - 1); }} disabled={getSelectedSeats(ride.id) <= 1} style={{ width: '24px', height: '24px', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', lineHeight: '24px', textAlign: 'center', padding: 0 }}>-</button>
+                              <span style={{ width: '18px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1F2937' }}>{getSelectedSeats(ride.id)}</span>
+                              <button onClick={() => { const c = getSelectedSeats(ride.id); if (c < ride.seats_available) handleSeatChange(ride.id, c + 1); }} disabled={getSelectedSeats(ride.id) >= ride.seats_available} style={{ width: '24px', height: '24px', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', lineHeight: '24px', textAlign: 'center', padding: 0 }}>+</button>
+                              {getSelectedSeats(ride.id) > 1 && <span style={{ fontSize: '12px', fontWeight: '700', color: '#fcd03a', marginLeft: '4px' }}>£{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}</span>}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      <tr>
+                        <td colSpan={2} style={{ padding: '8px 0 4px' }}>
+                          <button
+                            onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
+                            disabled={bookingRide === ride.id || !ride.compatible}
+                            style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: 'none', fontWeight: '700', fontSize: '13px', cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer', background: !ride.compatible ? '#D1D5DB' : '#000000', color: !ride.compatible ? '#9CA3AF' : '#fcd03a', boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)', whiteSpace: 'nowrap', textAlign: 'center' }}
+                          >
+                            {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
+                          </button>
+                        </td>
+                      </tr>
+                      <tr>
+                        <td colSpan={2} style={{ padding: '4px 0 0' }}>
+                          <button
+                            onClick={() => onNavigate('ride-details', ride.id)}
+                            style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: '1px solid #E5E7EB', background: 'none', fontSize: '13px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' }}
+                          >
+                            Booking for Someone Else
+                          </button>
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          );
+          })}
+        </div>
+      </div>
+    ));
+
   return (
     <div style={{ minHeight: '100vh', backgroundColor: '#F8FAFB' }}>
       {/* Hero Section with Background */}
@@ -490,8 +728,9 @@ export default function Home({ onNavigate }: HomeProps) {
             </p>
           </div>
 
-          {/* Booking Form - White Card Container */}
-          <div style={{ maxWidth: '900px', margin: '0 auto' }}>
+          {/* Booking Form + Live Bookings side by side */}
+          <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0, width: isMobile ? '100%' : undefined }}>
             <div style={{
               backgroundColor: 'white',
               borderRadius: isMobile ? '16px' : '20px',
@@ -744,7 +983,96 @@ export default function Home({ onNavigate }: HomeProps) {
                 </button>
               </div>
             </div>
-          </div>
+          </div>{/* end left col / form card */}
+
+          {/* Live Bookings panel */}
+          {liveBookings.length > 0 && !isMobile && (
+            <div style={{ width: '300px', flexShrink: 0 }}>
+              <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '20px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+                  <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)', flexShrink: 0 }} />
+                  <span style={{ fontSize: '14px', fontWeight: '700', color: '#1F2937' }}>Live Bookings</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {liveBookings.map(r => (
+                    <div key={r.id} style={{ borderRadius: '12px', border: '1px solid #E5E7EB', padding: '12px', backgroundColor: '#f9fafb' }}>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#1F2937', marginBottom: '4px' }}>
+                        {r.departure_location} → {r.arrival_location}
+                      </div>
+                      <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '6px' }}>
+                        {new Date(r.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                        {' · '}
+                        {new Date(r.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: r.seats_available > 0 ? '8px' : '0' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#dcfce7', color: '#16a34a' }}>
+                          {r.bookedCount} booked
+                        </span>
+                        <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#f3f4f6', color: '#374151' }}>
+                          {r.seats_available} seat{r.seats_available !== 1 ? 's' : ''} left
+                        </span>
+                      </div>
+                      {r.seats_available > 0 && (
+                        <button
+                          onClick={() => onNavigate('ride-details', r.id)}
+                          style={{ width: '100%', padding: '7px', backgroundColor: '#fcd03a', color: '#000', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                        >
+                          Book a seat →
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button
+                  onClick={() => document.getElementById('rides-section')?.scrollIntoView({ behavior: 'smooth' })}
+                  style={{ marginTop: '14px', width: '100%', padding: '10px', backgroundColor: '#000', color: '#fcd03a', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                >
+                  See all available rides ↓
+                </button>
+              </div>
+            </div>
+          )}
+          </div>{/* end flex row */}
+
+          {/* Live Bookings — mobile: horizontal scroll strip */}
+          {liveBookings.length > 0 && isMobile && (
+            <div style={{ marginTop: '20px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', backgroundColor: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 3px rgba(34,197,94,0.2)', flexShrink: 0 }} />
+                <span style={{ fontSize: '14px', fontWeight: '700', color: '#000' }}>Live Bookings</span>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {liveBookings.map(r => (
+                  <div key={r.id} style={{ backgroundColor: 'white', borderRadius: '14px', padding: '14px', boxShadow: '0 4px 16px rgba(0,0,0,0.1)' }}>
+                    <div style={{ fontWeight: '700', fontSize: '13px', color: '#1F2937', marginBottom: '4px' }}>
+                      {r.departure_location} → {r.arrival_location}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#6B7280', marginBottom: '8px' }}>
+                      {new Date(r.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                      {' · '}
+                      {new Date(r.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px', marginBottom: r.seats_available > 0 ? '10px' : '0' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#dcfce7', color: '#16a34a' }}>
+                        {r.bookedCount} booked
+                      </span>
+                      <span style={{ fontSize: '11px', fontWeight: '600', padding: '2px 8px', borderRadius: '20px', backgroundColor: '#f3f4f6', color: '#374151' }}>
+                        {r.seats_available} left
+                      </span>
+                    </div>
+                    {r.seats_available > 0 && (
+                      <button
+                        onClick={() => onNavigate('ride-details', r.id)}
+                        style={{ width: '100%', padding: '8px', backgroundColor: '#fcd03a', color: '#000', border: 'none', borderRadius: '8px', fontSize: '12px', fontWeight: '700', cursor: 'pointer' }}
+                      >
+                        Book a seat →
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </section>
 
@@ -977,7 +1305,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
       {/* Rides Section */}
       <main id="rides-section" style={{
-        maxWidth: '900px',
+        maxWidth: '1200px',
         margin: '0 auto',
         padding: '48px 20px 64px',
       }}>
@@ -1088,6 +1416,10 @@ export default function Home({ onNavigate }: HomeProps) {
           )}
         </div>
 
+        {/* Two-column layout: rides left, demand gaps right */}
+        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '24px', alignItems: 'flex-start' }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+
         {loading ? (
           <div style={{ display: 'grid', gap: '20px' }}>
             {[1, 2, 3].map((i) => (
@@ -1152,220 +1484,24 @@ export default function Home({ onNavigate }: HomeProps) {
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-            {groupedRides.map(([destination, destRides]) => (
-              <div
-                key={destination}
-                style={{
-                  backgroundColor: 'white',
-                  borderRadius: '20px',
-                  boxShadow: '0 4px 24px rgba(0,0,0,0.06)',
-                  overflow: 'hidden',
-                }}
-              >
-                {/* Destination Header */}
-                <div style={{
-                  background: '#000000',
-                  padding: isMobile ? '16px 20px' : '18px 28px',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'space-between',
-                }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                    <svg style={{ width: '20px', height: '20px', color: 'white', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '700', color: 'white', margin: 0 }}>
-                      {destination}
-                    </h3>
-                  </div>
-                  <span style={{
-                    fontSize: '13px',
-                    fontWeight: '600',
-                    backgroundColor: '#fcd03a',
-                    color: '#000000',
-                    padding: '4px 12px',
-                    borderRadius: '20px',
-                  }}>
-                    {destRides.length} {destRides.length === 1 ? 'ride' : 'rides'}
-                  </span>
+            {groupedRides.uk.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: '#1F2937', margin: 0 }}>UK Destinations</h2>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
                 </div>
-
-                {/* Rides within this destination */}
-                <div>
-                  {destRides.map((ride, rideIdx) => {
-                    const isGold = (ride.driver as any).driver_tier === 'gold';
-                    return (
-                    <div
-                      key={ride.id}
-                      style={{
-                        padding: isMobile ? '16px 20px' : '20px 28px',
-                        borderBottom: rideIdx < destRides.length - 1 ? '1px solid #F3F4F6' : 'none',
-                        borderLeft: isGold ? '4px solid #fcd03a' : '4px solid transparent',
-                        backgroundColor: isGold ? '#fffef5' : 'transparent',
-                        opacity: ride.compatible ? 1 : 0.5,
-                        position: 'relative',
-                        transition: 'background-color 0.2s',
-                      }}
-                      onMouseOver={(e) => { if (ride.compatible) e.currentTarget.style.backgroundColor = isGold ? '#fff9d6' : '#FAFBFC'; }}
-                      onMouseOut={(e) => { e.currentTarget.style.backgroundColor = isGold ? '#fffef5' : 'transparent'; }}
-                    >
-                      {/* Gold corner ribbon */}
-                      {isGold && (
-                        <div style={{
-                          position: 'absolute', top: 0, right: 0,
-                          width: '72px', height: '72px',
-                          overflow: 'hidden', pointerEvents: 'none',
-                        }}>
-                          <div style={{
-                            position: 'absolute', top: '14px', right: '-18px',
-                            width: '80px', backgroundColor: '#fcd03a', color: '#000000',
-                            fontSize: '10px', fontWeight: '800', textAlign: 'center',
-                            padding: '3px 0', transform: 'rotate(45deg)',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.15)',
-                            letterSpacing: '0.5px',
-                          }}>
-                            GOLD
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Incompatibility notice */}
-                      {!ride.compatible && ride.incompatibilityReason && (
-                        <div style={{
-                          display: 'flex', alignItems: 'center', gap: '6px',
-                          marginBottom: '10px', padding: '6px 12px',
-                          backgroundColor: '#FEF3C7', borderRadius: '8px',
-                          width: 'fit-content',
-                        }}>
-                          <svg style={{ width: '14px', height: '14px', color: '#D97706', flexShrink: 0 }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                          </svg>
-                          <span style={{ fontSize: '12px', color: '#92400E', fontWeight: '500' }}>{ride.incompatibilityReason}</span>
-                        </div>
-                      )}
-
-                      {/* Main row: From + details + price + actions */}
-                      <div style={{
-                        display: 'flex',
-                        alignItems: isMobile ? 'flex-start' : 'center',
-                        gap: isMobile ? '12px' : '20px',
-                        flexDirection: isMobile ? 'column' : 'row',
-                      }}>
-                        {/* Left: Route + schedule */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: '13px' }}>
-                            <tbody>
-                              <tr>
-                                <td style={{ padding: '3px 0', verticalAlign: 'middle' }}>
-                                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>{ride.departure_location}</span>
-                                  {' '}<span style={{ color: '#9CA3AF' }}>→</span>{' '}
-                                  <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>{ride.arrival_location}</span>
-                                </td>
-                              </tr>
-                              <tr>
-                                <td style={{ padding: '3px 0', color: '#374151', verticalAlign: 'middle' }}>
-                                  <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
-                                  {' · '}
-                                  <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-                                  {' · '}{ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''} available
-                                </td>
-                              </tr>
-                              {ride.driver && (() => {
-                                const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
-                                const males = (occupants?.males || 0) + (occupants?.couples || 0);
-                                const females = (occupants?.females || 0) + (occupants?.couples || 0);
-                                const totalPassengers = males + females;
-                                const passengerParts = [...(males > 0 ? [`Male: ${males}`] : []), ...(females > 0 ? [`Female: ${females}`] : [])];
-                                return (
-                                  <>
-                                    <tr>
-                                      <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
-                                        <button onClick={() => onNavigate('public-profile', undefined, ride.driver.id)} style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', padding: 0 }}>{getDriverAlias(ride.driver.id)}</button>
-                                        {isGold && <span style={{ marginLeft: '5px', fontSize: '11px', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde047', borderRadius: '8px', padding: '1px 6px' }}>⭐ Gold</span>}
-                                        {' · '}{ride.driver?.gender || 'Unknown'}
-                                        {(ride.driver as any).age_group && <>{' · '}Age {(ride.driver as any).age_group}</>}
-                                        {(ride.driver as any).city && <>{' · '}{(ride.driver as any).city}</>}
-                                        {(ride.driver as any).marital_status && <>{' · '}{(ride.driver as any).marital_status}</>}
-                                        {ride.driver.average_rating != null && ride.driver.average_rating > 0 && <>{' · '}★ {ride.driver.average_rating.toFixed(1)}</>}
-                                      </td>
-                                    </tr>
-                                    <tr>
-                                      <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
-                                        Passengers: {passengerParts.length > 0 ? passengerParts.join(', ') : 'None yet'} · Total in vehicle: {1 + totalPassengers}
-                                      </td>
-                                    </tr>
-                                  </>
-                                );
-                              })()}
-                              {(ride.luggage_size && ride.luggage_size !== 'none' || ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && (
-                                <tr>
-                                  <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
-                                    {ride.luggage_size && ride.luggage_size !== 'none' && <>{getLuggageLabel(ride.luggage_size)}</>}
-                                    {ride.luggage_size && ride.luggage_size !== 'none' && (ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && ' · '}
-                                    {(ride.vehicle_make || ride.vehicle_model || ride.vehicle_color) && <>{[ride.vehicle_color, ride.vehicle_make, ride.vehicle_model].filter(Boolean).join(' ')}</>}
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
-                        </div>
-
-                        {/* Right: Price + actions */}
-                        <div style={{ flexShrink: 0, width: isMobile ? '100%' : 'auto' }}>
-                          <table style={{ borderCollapse: 'collapse', width: '100%' }}>
-                            <tbody>
-                              <tr>
-                                <td style={{ padding: '4px 8px 4px 0', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>Price</td>
-                                <td style={{ padding: '4px 0', whiteSpace: 'nowrap' }}>
-                                  <span style={{ fontSize: '18px', fontWeight: '800', color: '#1F2937' }}>£{ride.price_per_seat.toFixed(2)}</span>
-                                  <span style={{ fontSize: '12px', color: '#6B7280', marginLeft: '2px' }}>/seat</span>
-                                </td>
-                              </tr>
-                              {ride.seats_available > 1 && (
-                                <tr>
-                                  <td style={{ padding: '4px 8px 4px 0', fontSize: '12px', fontWeight: '600', color: '#6B7280', whiteSpace: 'nowrap' }}>Seats</td>
-                                  <td style={{ padding: '4px 0' }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                                      <button onClick={() => { const c = getSelectedSeats(ride.id); if (c > 1) handleSeatChange(ride.id, c - 1); }} disabled={getSelectedSeats(ride.id) <= 1} style={{ width: '24px', height: '24px', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', lineHeight: '24px', textAlign: 'center', padding: 0 }}>-</button>
-                                      <span style={{ width: '18px', textAlign: 'center', fontSize: '14px', fontWeight: '700', color: '#1F2937' }}>{getSelectedSeats(ride.id)}</span>
-                                      <button onClick={() => { const c = getSelectedSeats(ride.id); if (c < ride.seats_available) handleSeatChange(ride.id, c + 1); }} disabled={getSelectedSeats(ride.id) >= ride.seats_available} style={{ width: '24px', height: '24px', backgroundColor: '#F3F4F6', borderRadius: '6px', color: '#374151', border: 'none', cursor: 'pointer', fontSize: '15px', fontWeight: 'bold', lineHeight: '24px', textAlign: 'center', padding: 0 }}>+</button>
-                                      {getSelectedSeats(ride.id) > 1 && <span style={{ fontSize: '12px', fontWeight: '700', color: '#fcd03a', marginLeft: '4px' }}>£{(ride.price_per_seat * getSelectedSeats(ride.id)).toFixed(2)}</span>}
-                                    </div>
-                                  </td>
-                                </tr>
-                              )}
-                              <tr>
-                                <td colSpan={2} style={{ padding: '8px 0 4px' }}>
-                                  <button
-                                    onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
-                                    disabled={bookingRide === ride.id || !ride.compatible}
-                                    style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: 'none', fontWeight: '700', fontSize: '13px', cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer', background: !ride.compatible ? '#D1D5DB' : '#000000', color: !ride.compatible ? '#9CA3AF' : '#fcd03a', boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)', whiteSpace: 'nowrap', textAlign: 'center' }}
-                                  >
-                                    {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
-                                  </button>
-                                </td>
-                              </tr>
-                              <tr>
-                                <td colSpan={2} style={{ padding: '4px 0 0' }}>
-                                  <button
-                                    onClick={() => onNavigate('ride-details', ride.id)}
-                                    style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: '1px solid #E5E7EB', background: 'none', fontSize: '13px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' }}
-                                  >
-                                    Booking for Someone Else
-                                  </button>
-                                </td>
-                              </tr>
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                  })}
+                {renderDestGroup(groupedRides.uk)}
+              </>
+            )}
+            {groupedRides.europe.length > 0 && (
+              <>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: groupedRides.uk.length > 0 ? '8px' : 0 }}>
+                  <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: '#1F2937', margin: 0 }}>European Destinations</h2>
+                  <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
                 </div>
-              </div>
-            ))}
+                {renderDestGroup(groupedRides.europe)}
+              </>
+            )}
 
             {/* Can't find a suitable ride? */}
             <div style={{
@@ -1401,6 +1537,106 @@ export default function Home({ onNavigate }: HomeProps) {
               >
                 Set Up a Ride Alert
               </button>
+            </div>
+          </div>
+        )}
+          </div>{/* end left column */}
+
+          {/* Right sidebar: demand gaps — desktop only */}
+          {demandGaps.length > 0 && !isMobile && (
+            <div style={{ width: '300px', flexShrink: 0, position: 'sticky', top: '80px' }}>
+              <div style={{
+                backgroundColor: '#fffbeb',
+                border: '2px solid #fcd03a',
+                borderRadius: '20px',
+                padding: '20px',
+              }}>
+                <div style={{ fontSize: '14px', fontWeight: '700', color: '#1F2937', marginBottom: '14px' }}>Passengers waiting</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  {demandGaps.map((gap, i) => (
+                    <div key={i} style={{
+                      backgroundColor: 'white',
+                      borderRadius: '12px',
+                      padding: '12px',
+                      boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                    }}>
+                      <div style={{ fontWeight: '700', fontSize: '13px', color: '#1F2937', marginBottom: '6px' }}>
+                        {gap.from} → {gap.to}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', flexWrap: 'wrap' }}>
+                        <div>
+                          <span style={{
+                            backgroundColor: '#fcd03a', color: '#000', fontSize: '11px',
+                            fontWeight: '700', padding: '2px 8px', borderRadius: '20px',
+                            display: 'inline-block', marginBottom: '4px',
+                          }}>
+                            {gap.count} {gap.count === 1 ? 'passenger' : 'passengers'}
+                          </span>
+                          <div style={{ fontSize: '11px', color: '#9CA3AF' }}>
+                            {gap.dates.slice(0, 3).map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })).join(', ')}
+                            {gap.dates.length > 3 ? ` +${gap.dates.length - 3}` : ''}
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => {
+                            sessionStorage.setItem('postRidePrefill', JSON.stringify({ from: gap.from, to: gap.to, date: gap.dates.length === 1 ? gap.dates[0] : '' }));
+                            onNavigate('post-ride');
+                          }}
+                          style={{
+                            padding: '6px 12px', backgroundColor: '#000', color: '#fcd03a',
+                            border: 'none', borderRadius: '20px', fontSize: '11px',
+                            fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap',
+                          }}
+                        >
+                          Post ride
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>{/* end two-column flex row */}
+
+        {/* Demand gaps — mobile: shown below rides */}
+        {demandGaps.length > 0 && isMobile && (
+          <div style={{
+            marginTop: '24px',
+            backgroundColor: '#fffbeb',
+            border: '2px solid #fcd03a',
+            borderRadius: '20px',
+            padding: '20px 16px',
+          }}>
+            <div style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937', marginBottom: '14px' }}>Passengers waiting</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {demandGaps.map((gap, i) => (
+                <div key={i} style={{
+                  backgroundColor: 'white', borderRadius: '12px', padding: '12px 14px',
+                  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                  flexWrap: 'wrap', gap: '8px', boxShadow: '0 1px 4px rgba(0,0,0,0.06)',
+                }}>
+                  <div>
+                    <div style={{ fontWeight: '700', fontSize: '13px', color: '#1F2937', marginBottom: '4px' }}>{gap.from} → {gap.to}</div>
+                    <span style={{ backgroundColor: '#fcd03a', color: '#000', fontSize: '11px', fontWeight: '700', padding: '2px 8px', borderRadius: '20px' }}>
+                      {gap.count} {gap.count === 1 ? 'passenger' : 'passengers'} waiting
+                    </span>
+                    <div style={{ fontSize: '11px', color: '#9CA3AF', marginTop: '4px' }}>
+                      {gap.dates.slice(0, 3).map(d => new Date(d + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })).join(', ')}
+                      {gap.dates.length > 3 ? ` +${gap.dates.length - 3} more` : ''}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      sessionStorage.setItem('postRidePrefill', JSON.stringify({ from: gap.from, to: gap.to, date: gap.dates.length === 1 ? gap.dates[0] : '' }));
+                      onNavigate('post-ride');
+                    }}
+                    style={{ padding: '7px 16px', backgroundColor: '#000', color: '#fcd03a', border: 'none', borderRadius: '20px', fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}
+                  >
+                    Post this ride
+                  </button>
+                </div>
+              ))}
             </div>
           </div>
         )}
