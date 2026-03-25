@@ -88,7 +88,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
       faqs: [
         {
           question: 'How do I become a driver?',
-          answer: 'Create an account, then submit a driver application with your driving licence details, vehicle information, insurance details, and bank details for payouts. Our team reviews every application manually.',
+          answer: 'Create an account, then submit a driver application with your bank details for payouts. Uploading your driving licence is optional but recommended. Our team reviews every application manually.',
         },
         {
           question: 'What do I need to drive on ChapaRide?',
