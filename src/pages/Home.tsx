@@ -516,7 +516,7 @@ export default function Home({ onNavigate }: HomeProps) {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <h3 style={{ fontSize: isMobile ? '18px' : '20px', fontWeight: '700', color: 'white', margin: 0 }}>
-              Destination: {destination}
+              <span style={{ fontSize: isMobile ? '11px' : '12px', fontWeight: '500', opacity: 0.7, letterSpacing: '0.05em', textTransform: 'uppercase', marginRight: '6px' }}>Destination:</span>{destination}
             </h3>
           </div>
           <span style={{
