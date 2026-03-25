@@ -1326,12 +1326,9 @@ app.get('/api/admin/rides-overview', async (req, res) => {
       };
     });
 
-    // Exclude rides that never happened:
-    // - cancelled with no bookings (nothing ever occurred)
-    // - upcoming but past their departure date with no bookings (ghost rides)
+    // Exclude ghost rides: upcoming but past their departure date with no bookings
     const now = new Date();
     const visibleRides = ridesWithFinancials.filter(r => {
-      if (r.status === 'cancelled' && r.bookings.length === 0) return false;
       if (r.status === 'upcoming' && new Date(r.date_time) < now && r.bookings.length === 0) return false;
       return true;
     });
