@@ -96,7 +96,7 @@ export default function FAQs({ onNavigate }: FAQsProps) {
         },
         {
           question: 'How much can I charge?',
-          answer: 'You set your own price per seat. Prices should reflect genuine cost-sharing (fuel, tolls, wear and tear). ChapaRide is not a taxi service and rides must not be used for profit.',
+          answer: 'You set your own price per seat. Prices should reflect genuine cost-sharing (fuel, tolls, wear and tear). ChapaRide is not a taxi service and rides must not be used for profit. Under HMRC rules, drivers may recover travel costs at up to 45p per mile. Charging passengers beyond your actual journey costs may constitute taxable income and could require a private hire licence. ChapaRide enforces a price cap based on this rate.',
         },
         {
           question: 'How do I get paid?',
