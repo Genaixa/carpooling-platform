@@ -905,7 +905,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
     }
 
     // Cancel the ride
-    await supabase.from('rides').update({ status: 'cancelled' }).eq('id', rideId);
+    await supabase.from('rides').update({ status: 'cancelled', cancelled_by: 'driver' }).eq('id', rideId);
 
     // Send emails to passengers
     try {
