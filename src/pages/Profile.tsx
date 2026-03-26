@@ -32,6 +32,7 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [licenceUploading, setLicenceUploading] = useState(false);
+  const [notifyDriverAlerts, setNotifyDriverAlerts] = useState(true);
 
   useEffect(() => {
     if (profile) {
@@ -47,8 +48,20 @@ export default function Profile({ onNavigate }: ProfileProps) {
         marital_status: profile.marital_status || '',
       });
       setPhotoPreview(profile.profile_photo_url || null);
+      setNotifyDriverAlerts(profile.notify_driver_alerts !== false);
     }
   }, [profile]);
+
+  const handleToggleNotifyAlerts = async (checked: boolean) => {
+    setNotifyDriverAlerts(checked);
+    try {
+      await updateProfile({ notify_driver_alerts: checked });
+      toast.success(checked ? 'Alert emails enabled' : 'Alert emails disabled');
+    } catch {
+      setNotifyDriverAlerts(!checked);
+      toast.error('Failed to update preference');
+    }
+  };
 
   useEffect(() => {
     if (!user) {
@@ -690,6 +703,34 @@ export default function Profile({ onNavigate }: ProfileProps) {
             </div>
           </form>
         </div>
+
+        {/* Driver Alert Notifications — approved drivers only */}
+        {/* Passenger Alert Notifications — hidden while feature is paused
+        {profile.is_approved_driver && (
+          <div style={{
+            backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px',
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1F2937', marginBottom: '8px' }}>
+              Passenger Alert Notifications
+            </h3>
+            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '20px', margin: '0 0 20px 0' }}>
+              Get notified by email when passengers in your city create a ride alert.
+            </p>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', backgroundColor: '#fef9e0', border: '2px solid #fcd03a', borderRadius: '12px', padding: '16px 20px', boxShadow: '0 2px 8px rgba(252,208,58,0.2)' }}>
+              <input
+                type="checkbox"
+                checked={notifyDriverAlerts}
+                onChange={(e) => handleToggleNotifyAlerts(e.target.checked)}
+                style={{ width: '20px', height: '20px', accentColor: '#fcd03a', cursor: 'pointer', flexShrink: 0 }}
+              />
+              <span style={{ fontSize: '15px', fontWeight: '700', color: '#1F2937' }}>
+                Email me when passengers in my city create alerts
+              </span>
+            </label>
+          </div>
+        )}
+        */}
 
         {/* Safety Info Card */}
         <div style={{

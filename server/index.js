@@ -1023,6 +1023,8 @@ app.post('/api/notify-driver-application', notifyLimiter, async (req, res) => {
 // ============================================================
 
 app.post('/api/notify-drivers-of-wish', notifyLimiter, async (req, res) => {
+  // Driver alert emails are temporarily paused — return silently so client logic is unaffected
+  return res.json({ success: true, paused: true });
   try {
     const { wish } = req.body;
     if (!wish) return res.status(400).json({ error: 'Missing wish data' });
@@ -2405,6 +2407,8 @@ async function checkUnfilledRidePricing() {
 
 // Re-notify drivers about wishes that are still unfulfilled after 48 hours
 async function nudgeUnfulfilledWishes() {
+  // Driver alert emails are temporarily paused
+  return;
   try {
     const now = new Date();
     // Target wishes created between 48h and 48h15m ago (14-minute window ensures one cron fires per wish)

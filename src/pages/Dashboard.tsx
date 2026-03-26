@@ -511,15 +511,17 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
                     Passengers Looking for Rides
                   </h2>
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#4B5563', backgroundColor: '#f8fafc', border: '1px solid #E8EBED', borderRadius: '10px', padding: '8px 14px' }}>
+                  {/* Driver alert notification toggle — hidden while feature is paused
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: '#1F2937', backgroundColor: '#fef9e0', border: '2px solid #fcd03a', borderRadius: '12px', padding: '12px 18px', boxShadow: '0 2px 8px rgba(252,208,58,0.2)' }}>
                     <input
                       type="checkbox"
                       checked={notifyDriverAlerts}
                       onChange={(e) => handleToggleNotifyAlerts(e.target.checked)}
-                      style={{ width: '16px', height: '16px', accentColor: '#fcd03a', cursor: 'pointer' }}
+                      style={{ width: '20px', height: '20px', accentColor: '#fcd03a', cursor: 'pointer', flexShrink: 0 }}
                     />
                     Email me when passengers in my city create alerts
                   </label>
+                  */}
                 </div>
                 <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
                   These passengers are looking for rides. Would you offer them a ride?
