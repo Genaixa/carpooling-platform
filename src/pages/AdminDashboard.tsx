@@ -25,6 +25,7 @@ interface RideOverview {
   price_per_seat: number;
   status: string;
   cancelled_by: string | null;
+  completed_by: string | null;
   driver: { id: string; name: string; email: string; phone: string | null; gender: string | null; age_group: string | null; address_line1: string | null; address_line2: string | null; city: string | null; postcode: string | null } | null;
   bookings: Array<{
     id: string;
@@ -1408,6 +1409,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                         }}>
                                           {ride.status === 'cancelled'
                                             ? `Cancelled by ${ride.cancelled_by || 'unknown'}`
+                                            : ride.status === 'completed'
+                                            ? `Completed by ${ride.completed_by || 'unknown'}`
                                             : ride.status}
                                         </span>
                                       )}

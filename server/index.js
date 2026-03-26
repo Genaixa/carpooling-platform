@@ -950,7 +950,7 @@ app.post('/api/driver/complete-ride', async (req, res) => {
     }
 
     // Mark ride as completed
-    await supabase.from('rides').update({ status: 'completed' }).eq('id', rideId);
+    await supabase.from('rides').update({ status: 'completed', completed_by: 'driver' }).eq('id', rideId);
 
     // Mark all confirmed bookings as completed
     const { data: completedBookings } = await supabase
