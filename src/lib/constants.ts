@@ -96,6 +96,9 @@ export const ROUTE_DISTANCES_MILES: Record<string, number> = {
 export const HMRC_RATE_PER_MILE = 0.45; // 45p per mile
 // Gross-up factor so the driver still recovers full HMRC costs after the 25% platform fee
 export const HMRC_COMMISSION_UPLIFT = 1.25;
+// Short routes (≤35 miles) get a £10 fixed-cost addition before uplift
+export const SHORT_ROUTE_THRESHOLD_MILES = 35;
+export const SHORT_ROUTE_FIXED_COST = 10;
 
 /** Returns the road distance in miles between two preset locations, or null if unknown. */
 export function getRouteMiles(from: string, to: string): number | null {
@@ -104,13 +107,24 @@ export function getRouteMiles(from: string, to: string): number | null {
 }
 
 /**
+ * Returns the HMRC-based total cap for a journey (not divided by seats).
+ * Short routes (≤35mi): ((miles × 45p) + £10) × 1.25
+ * Long routes:          (miles × 45p) × 1.25
+ */
+export function calcHMRCTotalCap(miles: number): number {
+  const base = miles <= SHORT_ROUTE_THRESHOLD_MILES
+    ? (miles * HMRC_RATE_PER_MILE + SHORT_ROUTE_FIXED_COST) * HMRC_COMMISSION_UPLIFT
+    : miles * HMRC_RATE_PER_MILE * HMRC_COMMISSION_UPLIFT;
+  return Math.round(base);
+}
+
+/**
  * Returns the HMRC-based maximum price per seat, or null if route is unknown.
- * Cap = (distance × 45p × 1.25 commission uplift) ÷ seats
  */
 export function getHMRCPriceCap(from: string, to: string, seats: number): number | null {
   const miles = getRouteMiles(from, to);
   if (!miles || seats < 1) return null;
-  return Math.round((miles * HMRC_RATE_PER_MILE * HMRC_COMMISSION_UPLIFT) / seats);
+  return Math.round(calcHMRCTotalCap(miles) / seats);
 }
 
 export const COMMISSION_RATE = 0.25; // 25% platform commission

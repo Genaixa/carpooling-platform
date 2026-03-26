@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { supabase } from '../lib/supabase';
-import { LUGGAGE_OPTIONS, getRouteMiles, HMRC_RATE_PER_MILE, HMRC_COMMISSION_UPLIFT } from '../lib/constants';
+import { LUGGAGE_OPTIONS, getRouteMiles, calcHMRCTotalCap } from '../lib/constants';
 import LocationDropdown from '../components/LocationDropdown';
 import type { NavigateFn } from '../lib/types';
 
@@ -438,7 +438,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Price per Seat (£) *</label>
                   {(() => {
                     const miles = dynamicMiles ?? getRouteMiles(formData.from, formData.to);
-                    const totalCap = miles ? Math.round(miles * HMRC_RATE_PER_MILE * HMRC_COMMISSION_UPLIFT) : null;
+                    const totalCap = miles ? calcHMRCTotalCap(miles) : null;
                     return (
                       <>
                         <input
