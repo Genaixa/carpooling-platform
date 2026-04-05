@@ -140,7 +140,7 @@ export default function Home({ onNavigate }: HomeProps) {
         .select(`
           *,
           driver:profiles(id, name, gender, age_group, marital_status, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier),
-          bookings(group_description, passenger:profiles(gender))
+          bookings(group_description, passenger:profiles!bookings_passenger_id_fkey(gender))
         `)
         .eq('status', 'upcoming')
         .gte('date_time', new Date().toISOString())
