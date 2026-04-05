@@ -15,6 +15,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
     firstName: '',
     surname: '',
     email: '',
+    confirmEmail: '',
     phone: '',
     password: '',
     confirmPassword: '',
@@ -45,6 +46,11 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
   
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
+      return;
+    }
+
+    if (formData.email !== formData.confirmEmail) {
+      setError('Email addresses do not match');
       return;
     }
 
@@ -139,6 +145,18 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                 ? 'Start saving money by sharing your journeys across the UK'
                 : 'Join thousands of travellers saving money on rides'}
             </p>
+            {intent !== 'driver' && (
+              <p style={{ fontSize: isMobile ? '14px' : '16px', color: 'rgba(0,0,0,0.7)', marginTop: '10px' }}>
+                Would you also like to{' '}
+                <button
+                  type="button"
+                  onClick={() => onNavigate('register-driver')}
+                  style={{ background: 'none', border: 'none', color: '#000000', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline', padding: 0, fontSize: 'inherit', fontFamily: 'inherit' }}
+                >
+                  register as a Driver?
+                </button>
+              </p>
+            )}
           </div>
 
           {/* Step indicator for driver intent */}
@@ -223,6 +241,24 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
                     transition: 'border-color 0.3s'
                   }}
                 />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Confirm Email Address *</label>
+                <input
+                  type="email"
+                  name="confirmEmail"
+                  value={formData.confirmEmail}
+                  onChange={handleChange}
+                  required
+                  placeholder="Re-enter your email address"
+                  style={{ width: '100%', padding: '14px', fontSize: '16px', border: `2px solid ${formData.confirmEmail ? (formData.email === formData.confirmEmail ? '#16a34a' : '#ef4444') : '#E8EBED'}`, borderRadius: '12px', backgroundColor: 'white', transition: 'border-color 0.3s' }}
+                />
+                {formData.confirmEmail && (
+                  <p style={{ margin: '6px 0 0 4px', fontSize: '13px', fontWeight: '600', color: formData.email === formData.confirmEmail ? '#16a34a' : '#ef4444' }}>
+                    {formData.email === formData.confirmEmail ? '✓ Email addresses match' : '✗ Email addresses do not match'}
+                  </p>
+                )}
               </div>
 
               <div style={{ marginBottom: '20px' }}>

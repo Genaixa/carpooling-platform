@@ -34,6 +34,21 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
   const [tpName, setTpName] = useState('');
   const [tpAgeGroup, setTpAgeGroup] = useState('');
   const [tpSpecialNeeds, setTpSpecialNeeds] = useState('');
+
+  // Group description (mandatory when seatsToBook > 1)
+  const [groupType, setGroupType] = useState('');
+  const [groupTypeOther, setGroupTypeOther] = useState('');
+
+  const GROUP_OPTIONS = [
+    { value: 'couple', label: 'Couple' },
+    { value: 'family-babies', label: 'Family with babies (under 2)' },
+    { value: 'family-children', label: 'Family with young children (ages 2–12)' },
+    { value: 'family-teens', label: 'Family with teenagers' },
+    { value: 'elderly', label: 'Passengers over 60' },
+    { value: 'adults', label: 'Group of adults' },
+    { value: 'colleagues', label: 'Work colleagues' },
+    { value: 'other', label: 'Other (please describe)' },
+  ];
   const cardRef = useRef<any>(null);
   const paymentsRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
@@ -115,6 +130,11 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
       if (!tpAgeGroup) { setError('Please select the passenger\'s age group'); return; }
     }
 
+    if (seatsToBook > 1) {
+      if (!groupType) { setError('Please describe who is travelling in your group'); return; }
+      if (groupType === 'other' && !groupTypeOther.trim()) { setError('Please describe your group'); return; }
+    }
+
     setProcessing(true);
     setError(null);
 
@@ -158,6 +178,10 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
         special_needs: tpSpecialNeeds || null,
       } : null;
 
+      const groupDescription = seatsToBook > 1
+        ? (groupType === 'other' ? groupTypeOther.trim() : GROUP_OPTIONS.find(o => o.value === groupType)?.label || groupType)
+        : null;
+
       const { data: { session } } = await supabase.auth.getSession();
       const response = await fetch(`${API_URL}/api/create-payment`, {
         method: 'POST',
@@ -173,6 +197,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
           seatsToBook,
           rideName,
           ...(thirdPartyPassenger ? { thirdPartyPassenger } : {}),
+          ...(groupDescription ? { groupDescription } : {}),
         }),
       });
 
@@ -318,6 +343,40 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
 
           {/* Right column (or full width when not booking for someone else): Declaration + Card + Buttons */}
           <div>
+            {/* Group Description — mandatory when booking 2+ seats */}
+            {seatsToBook > 1 && (
+              <div style={{
+                backgroundColor: '#F0FDF4', border: '1px solid #BBF7D0', borderRadius: '12px',
+                padding: '16px', marginBottom: '16px',
+              }}>
+                <p style={{ margin: '0 0 12px', fontSize: '13px', fontWeight: '700', color: '#166534' }}>
+                  Who is travelling? *
+                </p>
+                <p style={{ margin: '0 0 10px', fontSize: '12px', color: '#374151' }}>
+                  You're booking {seatsToBook} seats. Please let the driver know who will be in your group so they can make an informed decision.
+                </p>
+                <select
+                  value={groupType}
+                  onChange={(e) => { setGroupType(e.target.value); setGroupTypeOther(''); }}
+                  style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '2px solid #E5E7EB', borderRadius: '8px', backgroundColor: 'white', boxSizing: 'border-box' as const, marginBottom: groupType === 'other' ? '10px' : 0 }}
+                >
+                  <option value="">Select group type...</option>
+                  {GROUP_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+                {groupType === 'other' && (
+                  <input
+                    type="text"
+                    value={groupTypeOther}
+                    onChange={(e) => setGroupTypeOther(e.target.value)}
+                    placeholder="Please describe who is travelling..."
+                    style={{ width: '100%', padding: '10px 12px', fontSize: '14px', border: '2px solid #E5E7EB', borderRadius: '8px', boxSizing: 'border-box' as const }}
+                    onFocus={(e) => e.target.style.borderColor = '#fcd03a'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                  />
+                )}
+              </div>
+            )}
+
             {/* Passenger Responsibility Declaration */}
             <div style={{
               backgroundColor: '#fef9e0',

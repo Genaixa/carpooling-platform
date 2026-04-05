@@ -81,6 +81,8 @@ export interface Booking {
   cancelled_at: string | null;
   contact_email_sent?: boolean;
   completed_at: string | null;
+  is_phone_booking: boolean | null;
+  group_description: string | null;
   created_at: string;
   updated_at: string;
   ride?: Ride;
@@ -210,12 +212,14 @@ export function getCarLabel(
 export function checkRideCompatibility(
   passengerGender: string | null,
   driverGender: string | null,
-  existingOccupants?: { males: number; females: number; couples: number } | null
+  existingOccupants?: { males: number; females: number; couples: number } | null,
+  seatsRequested?: number
 ): boolean {
   const composition = getCarComposition(driverGender, existingOccupants || null);
 
   if (passengerGender === 'Female') {
-    return composition.females >= 1;
+    // Compatible if there's already a female in the car, OR if booking 2+ seats (travelling with a companion)
+    return composition.females >= 1 || (seatsRequested !== undefined && seatsRequested >= 2);
   }
 
   if (passengerGender === 'Male') {
@@ -232,14 +236,15 @@ export function checkRideCompatibility(
 export function getIncompatibilityReason(
   passengerGender: string | null,
   driverGender: string | null,
-  existingOccupants?: { males: number; females: number; couples: number } | null
+  existingOccupants?: { males: number; females: number; couples: number } | null,
+  seatsRequested?: number
 ): string | null {
-  if (checkRideCompatibility(passengerGender, driverGender, existingOccupants)) {
+  if (checkRideCompatibility(passengerGender, driverGender, existingOccupants, seatsRequested)) {
     return null;
   }
 
   if (passengerGender === 'Female') {
-    return 'No women or couples currently in this car';
+    return 'No women currently in this car — book 2 seats to travel with a female companion, with your spouse or another family relative';
   }
 
   if (passengerGender === 'Male') {

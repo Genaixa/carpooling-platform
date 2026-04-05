@@ -255,10 +255,10 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
                 Login
               </button>
               <button onClick={() => onNavigate('register')} className="header-cta-btn" style={{ padding: '12px 28px', background: '#fcd03a', color: '#000000', borderRadius: '50px', fontSize: '16px', fontWeight: '700', border: 'none', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 14px rgba(252,208,58,0.35)' }}>
-                Sign Up to Ride
+                Passengers Signup
               </button>
-              <button onClick={() => onNavigate('register-driver')} className="header-cta-btn" style={{ padding: '12px 28px', background: '#000000', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '16px', fontWeight: '700', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 14px rgba(252,208,58,0.25)' }}>
-                Sign Up to Drive
+              <button onClick={() => onNavigate('register-driver')} className="header-cta-btn" style={{ padding: '13px 32px', background: '#ffffff', color: '#000000', border: 'none', borderRadius: '50px', fontSize: '18px', fontWeight: '800', cursor: 'pointer', letterSpacing: '0.3px', boxShadow: '0 4px 18px rgba(255,255,255,0.25)' }}>
+                Drivers Signup
               </button>
             </>
           )}
@@ -326,8 +326,8 @@ export default function Header({ onNavigate, currentPage }: HeaderProps) {
             {!user && (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', paddingTop: '16px' }}>
                 <button onClick={() => { onNavigate('login'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: 'transparent', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '18px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 8px rgba(252,208,58,0.15)' }}>Login</button>
-                <button onClick={() => { onNavigate('register'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: '#fcd03a', color: '#000000', borderRadius: '50px', fontSize: '18px', fontWeight: '700', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(252,208,58,0.35)' }}>Sign Up to Ride</button>
-                <button onClick={() => { onNavigate('register-driver'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: '#000000', color: '#fcd03a', border: '2px solid #fcd03a', borderRadius: '50px', fontSize: '18px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 4px 14px rgba(252,208,58,0.25)' }}>Sign Up to Drive</button>
+                <button onClick={() => { onNavigate('register'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: '#fcd03a', color: '#000000', borderRadius: '50px', fontSize: '18px', fontWeight: '700', border: 'none', cursor: 'pointer', boxShadow: '0 4px 14px rgba(252,208,58,0.35)' }}>Passengers Signup</button>
+                <button onClick={() => { onNavigate('register-driver'); setMobileMenuOpen(false); }} style={{ width: '100%', padding: '16px', background: '#ffffff', color: '#000000', border: 'none', borderRadius: '50px', fontSize: '20px', fontWeight: '800', cursor: 'pointer', boxShadow: '0 4px 18px rgba(255,255,255,0.25)' }}>Drivers Signup</button>
               </div>
             )}
           </div>

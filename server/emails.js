@@ -25,7 +25,8 @@ function escapeHtml(str) {
 function formatDate(dateString) {
   try {
     return new Date(dateString).toLocaleDateString('en-GB', {
-      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit'
+      weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
+      timeZone: 'Europe/London'
     });
   } catch { return dateString; }
 }
@@ -128,6 +129,11 @@ export async function sendBookingRequestEmail(bookingData) {
       ${passengerInfoRows}
     </div>
     ${thirdPartySection}
+    ${bookingData.group_description ? `
+    <div style="background: #f0fdf4; border: 1px solid #bbf7d0; padding: 15px; border-radius: 8px; margin: 16px 0;">
+      <p style="font-weight: 700; color: #166534; margin: 0 0 6px 0;">Group travelling:</p>
+      <p style="margin: 0; color: #1F2937; font-size: 15px;">${escapeHtml(bookingData.group_description)}</p>
+    </div>` : ''}
     <div style="margin: 24px 0;">
       <a href="${acceptUrl}" style="display: inline-block; padding: 14px 28px; background: #000000; color: #fcd03a; text-decoration: none; border-radius: 8px; font-weight: 600; margin-right: 12px;">Accept Booking</a>
       <a href="${rejectUrl}" style="display: inline-block; padding: 14px 28px; background: #991b1b; color: white; text-decoration: none; border-radius: 8px; font-weight: 600;">Reject Booking</a>
@@ -144,6 +150,31 @@ export async function sendBookingRequestEmail(bookingData) {
 export async function sendBookingAcceptedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
+
+  // Manual (phone) booking — no real passenger email, alert admin to contact them instead
+  if (passenger.email.endsWith('@chaparide.internal')) {
+    return sendEmail(ADMIN_EMAIL, `ACTION REQUIRED: Phone booking accepted — contact ${escapeHtml(passenger.name)}`,
+      `<h2>Phone Booking Accepted ✅ — Please Contact Passenger</h2>
+      <p>The driver has <strong>accepted</strong> a manual phone booking. Please contact the passenger to confirm their booking.</p>
+      <div style="background: #fef9e0; border: 2px solid #fcd03a; padding: 16px; border-radius: 8px; margin: 20px 0;">
+        <p style="font-weight: 700; margin: 0 0 8px 0; font-size: 16px;">Passenger to contact:</p>
+        <p style="font-size: 18px; margin: 0 0 6px 0;"><strong>${escapeHtml(passenger.name)}</strong></p>
+        <p style="font-size: 18px; margin: 0;"><strong>${escapeHtml(passenger.phone) || 'No phone on record'}</strong></p>
+      </div>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+        <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+        <p><strong>Seats booked:</strong> ${bookingData.seats_booked}</p>
+        <p><strong>Total charged:</strong> £${Number(bookingData.total_paid).toFixed(2)}</p>
+        <p><strong>Booking ref:</strong> ${getRideRef(ride.id)}</p>
+      </div>
+      <p style="background:#d1fae5;border:1px solid #6ee7b7;padding:12px;border-radius:8px;color:#065f46;">
+        Tell the passenger: their booking is confirmed, they will be charged £${Number(bookingData.total_paid).toFixed(2)}, and driver contact details will be shared 24 hours before departure.
+      </p>
+      <p><a href="${SITE_URL}/#admin-dashboard" style="display:inline-block;padding:12px 24px;background:#fcd03a;color:#000;text-decoration:none;border-radius:8px;font-weight:600;">View in Admin Dashboard</a></p>`
+    );
+  }
+
   return sendEmail(passenger.email, `Booking Confirmed: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Booking Confirmed! ✅</h2>
     <p>Hi ${passenger.name},</p>
@@ -177,6 +208,29 @@ export async function sendBookingAcceptedEmail(bookingData) {
 export async function sendBookingRejectedEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
+
+  // Manual (phone) booking — alert admin to contact passenger instead
+  if (passenger.email.endsWith('@chaparide.internal')) {
+    return sendEmail(ADMIN_EMAIL, `ACTION REQUIRED: Phone booking declined — contact ${escapeHtml(passenger.name)}`,
+      `<h2>Phone Booking Declined ❌ — Please Contact Passenger</h2>
+      <p>The driver has <strong>declined</strong> a manual phone booking. Please contact the passenger to let them know and offer alternatives.</p>
+      <div style="background: #fee2e2; border: 2px solid #fca5a5; padding: 16px; border-radius: 8px; margin: 20px 0;">
+        <p style="font-weight: 700; margin: 0 0 8px 0; font-size: 16px;">Passenger to contact:</p>
+        <p style="font-size: 18px; margin: 0 0 6px 0;"><strong>${escapeHtml(passenger.name)}</strong></p>
+        <p style="font-size: 18px; margin: 0;"><strong>${escapeHtml(passenger.phone) || 'No phone on record'}</strong></p>
+      </div>
+      <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+        <p><strong>Route:</strong> ${ride.departure_location} → ${ride.arrival_location}</p>
+        <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+        <p><strong>Booking ref:</strong> ${getRideRef(ride.id)}</p>
+      </div>
+      <p style="background:#fee2e2;border:1px solid #fca5a5;padding:12px;border-radius:8px;color:#991b1b;">
+        Tell the passenger: their booking was not accepted and the card hold has been released — they will not be charged.
+      </p>
+      <p><a href="${SITE_URL}/#admin-dashboard" style="display:inline-block;padding:12px 24px;background:#fcd03a;color:#000;text-decoration:none;border-radius:8px;font-weight:600;">View in Admin Dashboard</a></p>`
+    );
+  }
+
   return sendEmail(passenger.email, `Booking Declined: ${ride.departure_location} → ${ride.arrival_location} - Ride Ref: ${getRideRef(ride.id)}`,
     `<h2>Booking Declined</h2>
     <p>Hi ${passenger.name},</p>
@@ -629,6 +683,122 @@ export async function sendNewUserNotification(user) {
       <p><strong>City:</strong> ${escapeHtml(user.city) || '—'}</p>
     </div>
     <p><a href="${SITE_URL}/#admin-dashboard" style="background:#fcd03a;color:#000;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">View in Admin Dashboard</a></p>`
+  );
+}
+
+// 20. Price nudge for driver (ride has no bookings close to departure, price above route average)
+export async function sendPriceNudgeEmail(ride, driver, routeAvg, hoursUntilDeparture) {
+  const departureFormatted = formatDate(ride.date_time);
+  const suggestedPrice = Math.floor(routeAvg * 0.95 * 100) / 100; // 5% below avg as sweet spot
+  return sendEmail(
+    driver.email,
+    `Your ride tomorrow has no bookings yet — Ride Ref: ${getRideRef(ride.id)}`,
+    `<h2>No Bookings Yet — Quick Tip</h2>
+    <p>Hi ${driver.name},</p>
+    <p>Your ride (<strong>${getRideRef(ride.id)}</strong>) from <strong>${ride.departure_location}</strong> to <strong>${ride.arrival_location}</strong> is departing in about ${hoursUntilDeparture} hours and doesn't have any bookings yet.</p>
+    <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:20px 0;">
+      <p><strong>Departure:</strong> ${departureFormatted}</p>
+      <p><strong>Your price:</strong> £${Number(ride.price_per_seat).toFixed(2)} per seat</p>
+      <p><strong>Route average:</strong> £${routeAvg.toFixed(2)} per seat</p>
+    </div>
+    <p>Your price is a little above what similar rides on this route typically charge. Lowering it to around <strong>£${suggestedPrice.toFixed(2)}</strong> could help attract passengers before departure.</p>
+    <p><a href="${SITE_URL}/#dashboard" style="display:inline-block;padding:12px 24px;background:#fcd03a;color:#000;text-decoration:none;border-radius:8px;font-weight:600;">Edit Your Ride</a></p>
+    <p style="color:#6B7280;font-size:13px;">Of course, the choice is entirely yours — this is just a suggestion based on historical data.</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Ride Ref: <strong>${getRideRef(ride.id)}</strong> &nbsp;·&nbsp; Your Ref: <strong>${getUserRef(driver.id)}</strong><br>
+      <span style="font-size:11px;">Quote these if you contact support.</span>
+    </p>`
+  );
+}
+
+// 21. Flexible date match notification (to passenger — nearby rides when exact date has no match)
+export async function sendFlexibleDateMatchEmail(wish, wisher, nearbyRides) {
+  const requestedDate = new Date(wish.desired_date + 'T12:00:00').toLocaleDateString('en-GB', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+
+  const ridesHtml = nearbyRides.slice(0, 3).map(r => {
+    const rideDate = new Date(r.date_time).toLocaleDateString('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/London',
+    });
+    const rideTime = new Date(r.date_time).toLocaleTimeString('en-GB', {
+      hour: 'numeric', minute: '2-digit', hour12: true, timeZone: 'Europe/London',
+    });
+    const daysAway = Math.round((new Date(r.date_time) - new Date(wish.desired_date + 'T12:00:00')) / (1000 * 60 * 60 * 24));
+    const dayLabel = daysAway === 0 ? 'same day' : daysAway > 0 ? `${daysAway} day${daysAway > 1 ? 's' : ''} later` : `${Math.abs(daysAway)} day${Math.abs(daysAway) > 1 ? 's' : ''} earlier`;
+    return `<div style="background:#f5f5f5;padding:14px;border-radius:8px;margin-bottom:12px;">
+      <p style="margin:0 0 6px;"><strong>${rideDate}</strong> at ${rideTime} <span style="color:#6B7280;font-size:13px;">(${dayLabel})</span></p>
+      <p style="margin:0 0 6px;">💺 ${r.seats_available} seat${r.seats_available !== 1 ? 's' : ''} available &nbsp;·&nbsp; £${Number(r.price_per_seat).toFixed(2)} per seat</p>
+      <a href="${SITE_URL}/#ride-details/${r.id}" style="display:inline-block;margin-top:8px;padding:8px 18px;background:#fcd03a;color:#000;text-decoration:none;border-radius:6px;font-weight:600;font-size:14px;">View Ride</a>
+    </div>`;
+  }).join('');
+
+  return sendEmail(
+    wisher.email,
+    `No ride on ${requestedDate.split(',')[0]} yet — but we found nearby options`,
+    `<h2>No Exact Match Yet — But Here's What's Nearby</h2>
+    <p>Hi ${wisher.name},</p>
+    <p>You have an alert for <strong>${wish.departure_location} → ${wish.arrival_location}</strong> on <strong>${requestedDate}</strong>, but no ride has been posted for that exact date yet.</p>
+    <p>However, we found ${nearbyRides.length === 1 ? 'a ride' : 'rides'} on nearby dates that might work for you:</p>
+    ${ridesHtml}
+    <p style="color:#6B7280;font-size:13px;margin-top:16px;">Your original alert is still active — you'll be notified automatically if a ride appears on your requested date.</p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Your Ref: <strong>${getUserRef(wisher.id)}</strong><br>
+      <span style="font-size:11px;">Quote this if you contact support.</span>
+    </p>`
+  );
+}
+
+// 21. Ride wish expired notification (to passenger)
+export async function sendWishExpiredEmail(wish, wisher) {
+  const dateFormatted = new Date(wish.desired_date + 'T12:00:00').toLocaleDateString('en-GB', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric',
+  });
+  return sendEmail(
+    wisher.email,
+    `Your Ride Alert Has Expired: ${wish.departure_location} → ${wish.arrival_location}`,
+    `<h2>Your Ride Alert Has Expired</h2>
+    <p>Hi ${wisher.name},</p>
+    <p>Unfortunately, no matching ride was found for your alert before the travel date passed.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Route:</strong> ${wish.departure_location} → ${wish.arrival_location}</p>
+      <p><strong>Date:</strong> ${dateFormatted}</p>
+      <p><strong>Passengers:</strong> ${wish.passengers_count || 1}</p>
+    </div>
+    <p>If you still need a ride on a future date, you can post a new alert and our drivers will be notified.</p>
+    <p><a href="${SITE_URL}/#ride-wishes" style="display: inline-block; padding: 12px 24px; background: #fcd03a; color: #000000; text-decoration: none; border-radius: 8px; font-weight: 600;">Post a New Alert</a></p>
+    <p style="font-size:12px;color:#6B7280;background:#F9FAFB;border:1px solid #E5E7EB;border-radius:6px;padding:10px 14px;margin-top:20px;">
+      Your Ref: <strong>${getUserRef(wisher.id)}</strong><br>
+      <span style="font-size:11px;">Quote this if you contact support.</span>
+    </p>`
+  );
+}
+
+export async function sendPhoneBookingAdminEmail({ bookingId, passengerName, passengerPhone, passengerEmail, ride, seats, amount }) {
+  const shortRef = bookingId.substring(0, 8).toUpperCase();
+  const rideRef = getRideRef(ride.id);
+  return sendEmail(
+    ADMIN_EMAIL,
+    `Phone Booking Created: ${passengerName} · ${ride.departure_location} → ${ride.arrival_location} · Ref ${shortRef}`,
+    `<h2>Phone Booking Created</h2>
+    <p>A manual phone booking was just processed via the admin dashboard.</p>
+    <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:20px 0;">
+      <p><strong>Booking Ref:</strong> <span style="font-family:monospace;font-size:16px;">${shortRef}</span></p>
+      <p><strong>Ride Ref:</strong> ${rideRef}</p>
+      <p><strong>Route:</strong> ${escapeHtml(ride.departure_location)} → ${escapeHtml(ride.arrival_location)}</p>
+      <p><strong>Date:</strong> ${formatDate(ride.date_time)}</p>
+      <p><strong>Seats:</strong> ${seats}</p>
+      <p><strong>Amount held on card:</strong> £${Number(amount).toFixed(2)}</p>
+    </div>
+    <div style="background:#f5f5f5;padding:15px;border-radius:8px;margin:20px 0;">
+      <p style="font-weight:700;margin:0 0 8px;">Passenger Details</p>
+      <p><strong>Name:</strong> ${escapeHtml(passengerName)}</p>
+      <p><strong>Phone:</strong> ${escapeHtml(passengerPhone)}</p>
+      ${passengerEmail ? `<p><strong>Email:</strong> ${escapeHtml(passengerEmail)}</p>` : '<p><strong>Email:</strong> Not provided</p>'}
+    </div>
+    <p style="background:#fef9e0;border:1px solid #fcd03a;border-radius:8px;padding:12px 16px;font-size:13px;">
+      <strong>Next step:</strong> Text the passenger their booking reference <strong>${shortRef}</strong>. The card hold will be captured once the driver accepts.
+    </p>`
   );
 }
 

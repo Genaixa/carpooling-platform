@@ -509,7 +509,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   By publishing a ride on ChapaRide, you confirm that this journey was pre-planned and that passengers are only sharing your fuel and travel expenses. This service is for cost-sharing purposes only and not for profit.
                 </p>
                 <p style={{ fontSize: '12px', lineHeight: '1.6', color: '#6B7280', margin: '0 0 12px 0', fontStyle: 'italic' }}>
-                  Under HMRC rules, drivers may recover travel costs at up to 45p per mile. Charging passengers more than your actual journey costs may constitute a taxable income and could require a private hire licence. ChapaRide enforces a per-seat price cap based on the HMRC approved mileage rate.
+                  Under HMRC rules, drivers may recover travel costs at up to 45p per mile. Charging passengers more than your actual journey costs may constitute a taxable income and could require a private hire licence.
                 </p>
                 <p style={{ fontSize: '13px', lineHeight: '1.6', color: '#374151', margin: '0 0 12px 0' }}>
                   You confirm that you hold a valid driving licence, have permission to drive this vehicle, and that the vehicle has at least third-party insurance, a valid MOT, and current tax. You are responsible for ensuring your vehicle is roadworthy and legally compliant.

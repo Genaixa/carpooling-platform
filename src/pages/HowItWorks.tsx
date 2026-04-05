@@ -97,7 +97,7 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px' }}>
             {[
               { step: '1', title: 'Apply to Drive', desc: 'Complete your profile, submit a driver application and bank details for payouts. By applying, you confirm that you hold a valid driving licence, appropriate insurance, and that your vehicle is roadworthy and legally compliant.' },
-              { step: '2', title: 'Post a Ride', desc: 'Once approved, post your journey with departure, destination, date, time, price per seat, available seats, and luggage capacity. You set up the amount towards your travel costs.' },
+              { step: '2', title: 'Post a Ride', desc: 'Once approved, post your journey with departure, destination, date, time, price per seat, available seats, and luggage capacity. You set up the amount towards your travel costs.', note: 'Under HMRC rules, drivers may recover travel costs at up to 45p per mile. Charging passengers beyond your actual journey costs may constitute taxable income and could require a private hire licence.' },
               { step: '3', title: 'Manage Bookings', desc: 'When a passenger books, you\'ll receive a notification. Accept or decline the booking from your dashboard. Accepted bookings capture the passenger\'s payment.' },
               { step: '4', title: 'Complete & Get Paid', desc: 'After the journey, mark the ride as complete in your dashboard. The platform takes a 25% fee and the remaining 75% is paid out to your bank account. You will get paid within 3–5 working days.' },
             ].map((item) => (
@@ -115,7 +115,10 @@ export default function HowItWorks({ onNavigate }: HowItWorksProps) {
                   boxShadow: '0 2px 8px rgba(252,208,58,0.4)',
                 }}>{item.step}</div>
                 <h3 style={{ fontSize: '17px', fontWeight: '700', color: '#1F2937', marginBottom: '8px', marginTop: '6px' }}>{item.title}</h3>
-                <p style={{ fontSize: '14px', color: '#4B5563', lineHeight: '1.7', margin: 0 }}>{item.desc}</p>
+                <p style={{ fontSize: '14px', color: '#4B5563', lineHeight: '1.7', margin: (item as any).note ? '0 0 8px 0' : 0 }}>{item.desc}</p>
+                {(item as any).note && (
+                  <p style={{ fontSize: '12px', color: '#9CA3AF', lineHeight: '1.6', margin: 0, fontStyle: 'italic' }}>{(item as any).note}</p>
+                )}
               </div>
             ))}
           </div>

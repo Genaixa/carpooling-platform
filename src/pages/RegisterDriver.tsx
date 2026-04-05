@@ -19,6 +19,7 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
     firstName: '',
     surname: '',
     email: '',
+    confirmEmail: '',
     phone: '',
     password: '',
     confirmPassword: '',
@@ -73,6 +74,11 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
       setError('Passwords do not match');
       return;
     }
+    if (formData.email !== formData.confirmEmail) {
+      setError('Email addresses do not match');
+      return;
+    }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(formData.email)) {
       setError('Please enter a valid email address');
@@ -298,6 +304,16 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
               <div style={{ marginBottom: '20px' }}>
                 <label style={labelStyle}>Email Address *</label>
                 <input type="email" name="email" value={formData.email} onChange={handleChange} required placeholder="your.email@example.com" style={inputStyle} />
+              </div>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={labelStyle}>Confirm Email Address *</label>
+                <input type="email" name="confirmEmail" value={formData.confirmEmail} onChange={handleChange} required placeholder="Re-enter your email address" style={{ ...inputStyle, border: `2px solid ${formData.confirmEmail ? (formData.email === formData.confirmEmail ? '#16a34a' : '#ef4444') : '#E8EBED'}` }} />
+                {formData.confirmEmail && (
+                  <p style={{ margin: '6px 0 0 4px', fontSize: '13px', fontWeight: '600', color: formData.email === formData.confirmEmail ? '#16a34a' : '#ef4444' }}>
+                    {formData.email === formData.confirmEmail ? '✓ Email addresses match' : '✗ Email addresses do not match'}
+                  </p>
+                )}
               </div>
 
               <div style={{ marginBottom: '20px' }}>

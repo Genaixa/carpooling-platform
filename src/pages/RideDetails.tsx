@@ -192,8 +192,8 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
             const effectiveGender = bookingFor === 'myself' ? (profile?.gender || null) : bookingForGender;
             const driverGender = driver?.gender || null;
             const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
-            const compatible = checkRideCompatibility(effectiveGender, driverGender, occupants);
-            const incompatReason = getIncompatibilityReason(effectiveGender, driverGender, occupants);
+            const compatible = checkRideCompatibility(effectiveGender, driverGender, occupants, selectedSeats);
+            const incompatReason = getIncompatibilityReason(effectiveGender, driverGender, occupants, selectedSeats);
             const alreadyBooked = bookings.some(b => b.passenger_id === user.id);
             const totalAmount = selectedSeats * ride.price_per_seat;
 
