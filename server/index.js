@@ -99,6 +99,21 @@ if (!SQUARE_ACCESS_TOKEN || !VITE_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const COMMISSION_RATE = 0.25; // 25% platform commission
 const DRIVER_RATE = 0.75;    // 75% to driver
 
+const TELEGRAM_BOT_TOKEN = '8645116179:AAF9nwZI6CluAhHCUR4A38LA6ilAPMDXCss';
+const TELEGRAM_CHAT_ID = '6749360113';
+
+async function sendTelegramAlert(message) {
+  try {
+    await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ chat_id: TELEGRAM_CHAT_ID, text: message, parse_mode: 'Markdown' }),
+    });
+  } catch (e) {
+    console.error('Telegram alert failed:', e.message);
+  }
+}
+
 const app = express();
 
 const squareClient = new SquareClient({
@@ -509,6 +524,7 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
 
     if (bookingError) {
       console.error('Booking creation error:', bookingError);
+      sendTelegramAlert(`🔴 *Booking DB error* after payment was taken\nPayment: \`${paymentId}\`\nRide: ${rideId}\nError: ${bookingError.message}`);
       // Cancel the payment hold if booking fails
       try { await squareClient.payments.cancel({ paymentId }); } catch {}
       throw bookingError;
@@ -554,6 +570,8 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
     if (hasCode('GENERIC_DECLINE')) {
       return res.status(402).json({ error: 'Your card was declined by your bank. This is sometimes due to online payment restrictions or fraud prevention. Please contact your bank or try a different card.' });
     }
+    // Unexpected server error — alert immediately
+    sendTelegramAlert(`🔴 *Payment failed* (unexpected error)\nRide: ${req.body?.rideId || 'unknown'}\nUser: ${req.body?.userId || 'unknown'}\nError: ${errMsg}`);
     res.status(500).json({ error: errMsg || 'Payment failed' });
   }
 });
@@ -1828,6 +1846,7 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
       });
       if (createError) {
         console.error('Create user error:', createError);
+        sendTelegramAlert(`🔴 *Phone booking failed* — could not create passenger account\nPassenger: ${passengerName} (${passengerPhone})\nError: ${createError.message}`);
         return res.status(500).json({ error: 'Failed to create passenger account' });
       }
 
@@ -1849,6 +1868,7 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
       });
       if (profileError) {
         console.error('Profile insert error:', profileError);
+        sendTelegramAlert(`🔴 *Phone booking failed* — passenger auth created but profile insert failed\nPassenger: ${passengerName} (${passengerPhone})\nError: ${profileError.message}`);
         return res.status(500).json({ error: 'Failed to create passenger profile' });
       }
 
@@ -1890,6 +1910,7 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
 
     if (bookingError) {
       console.error('Booking error:', bookingError);
+      sendTelegramAlert(`🔴 *Phone booking DB error* after payment taken\nPassenger: ${passengerName} (${passengerPhone})\nPayment: \`${paymentId}\`\nError: ${bookingError.message}`);
       try { await squareClient.payments.cancel({ paymentId }); } catch {}
       throw bookingError;
     }
@@ -1926,9 +1947,11 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
     const squareErrors = error.errors || [];
     const hasCode = (code) => squareErrors.some(e => e.code === code);
     if (hasCode('CARD_DECLINED') || hasCode('GENERIC_DECLINE')) {
+      sendTelegramAlert(`⚠️ *Phone booking — card declined*\nPassenger: ${req.body?.passengerName} (${req.body?.passengerPhone})\nRide: ${req.body?.rideId}`);
       return res.status(402).json({ error: 'Card was declined. Please check the card details with the passenger and try again.' });
     }
     if (hasCode('INSUFFICIENT_FUNDS')) {
+      sendTelegramAlert(`⚠️ *Phone booking — insufficient funds*\nPassenger: ${req.body?.passengerName} (${req.body?.passengerPhone})`);
       return res.status(402).json({ error: 'Card has insufficient funds. Please ask the passenger for an alternative card.' });
     }
     if (hasCode('CVV_FAILURE')) {
@@ -1937,6 +1960,7 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
     if (hasCode('EXPIRY_FAILURE')) {
       return res.status(402).json({ error: 'Card expiry date is invalid. Please re-confirm with the passenger.' });
     }
+    sendTelegramAlert(`🔴 *Phone booking failed* (unexpected error)\nPassenger: ${req.body?.passengerName} (${req.body?.passengerPhone})\nError: ${error.message}`);
     res.status(500).json({ error: error.message || 'Manual booking failed' });
   }
 });

@@ -139,7 +139,8 @@ export default function Home({ onNavigate }: HomeProps) {
         .from('rides')
         .select(`
           *,
-          driver:profiles(id, name, gender, age_group, marital_status, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
+          driver:profiles(id, name, gender, age_group, marital_status, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier),
+          bookings(group_description, passenger:profiles(gender))
         `)
         .eq('status', 'upcoming')
         .gte('date_time', new Date().toISOString())
@@ -181,18 +182,27 @@ export default function Home({ onNavigate }: HomeProps) {
       } else if (profile || bookingFor === 'someone-else') {
         const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
         const seatsRequested = parseInt(heroPassengers) || 1;
+        // Check if any booked passenger is female — use actual gender data from bookings
+        // Also count Couple bookings as having a female (couple = 1 male + 1 female)
+        const bookings = (ride as any).bookings as Array<{ group_description: string | null; passenger: { gender: string } | null }> | null;
+        const hasBookedFemale = bookings?.some(b => b.passenger?.gender === 'Female' || b.group_description === 'Couple') ?? false;
+        const hasBookedMale = bookings?.some(b => b.passenger?.gender === 'Male' || b.group_description === 'Couple') ?? false;
         compatible = checkRideCompatibility(
           effectiveGender,
           ride.driver.gender,
           occupants,
-          seatsRequested
+          seatsRequested,
+          hasBookedFemale,
+          hasBookedMale
         );
         if (!compatible) {
           incompatibilityReason = getIncompatibilityReason(
             effectiveGender,
             ride.driver.gender,
             occupants,
-            seatsRequested
+            seatsRequested,
+            hasBookedFemale,
+            hasBookedMale
           );
         }
       }

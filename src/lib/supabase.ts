@@ -206,24 +206,28 @@ export function getCarLabel(
  * Each couple counts as 1 man + 1 woman (already expanded in getCarComposition).
  *
  * Rules:
- * - Female passenger → compatible if at least 1 female in the car
- * - Male passenger → compatible if at least 1 male in the car
+ * - Female passenger → compatible if at least 1 female in the car (driver/declared/booked),
+ *   OR booking 2+ seats (travelling with a companion)
+ * - Male passenger → compatible if at least 1 male in the car (driver/declared/booked)
  */
 export function checkRideCompatibility(
   passengerGender: string | null,
   driverGender: string | null,
   existingOccupants?: { males: number; females: number; couples: number } | null,
-  seatsRequested?: number
+  seatsRequested?: number,
+  hasBookedFemale?: boolean,
+  hasBookedMale?: boolean
 ): boolean {
   const composition = getCarComposition(driverGender, existingOccupants || null);
 
   if (passengerGender === 'Female') {
-    // Compatible if there's already a female in the car, OR if booking 2+ seats (travelling with a companion)
-    return composition.females >= 1 || (seatsRequested !== undefined && seatsRequested >= 2);
+    return composition.females >= 1
+      || hasBookedFemale === true
+      || (seatsRequested !== undefined && seatsRequested >= 2);
   }
 
   if (passengerGender === 'Male') {
-    return composition.males >= 1;
+    return composition.males >= 1 || hasBookedMale === true;
   }
 
   // Unknown gender - allow access
@@ -237,9 +241,11 @@ export function getIncompatibilityReason(
   passengerGender: string | null,
   driverGender: string | null,
   existingOccupants?: { males: number; females: number; couples: number } | null,
-  seatsRequested?: number
+  seatsRequested?: number,
+  hasBookedFemale?: boolean,
+  hasBookedMale?: boolean
 ): string | null {
-  if (checkRideCompatibility(passengerGender, driverGender, existingOccupants, seatsRequested)) {
+  if (checkRideCompatibility(passengerGender, driverGender, existingOccupants, seatsRequested, hasBookedFemale, hasBookedMale)) {
     return null;
   }
 

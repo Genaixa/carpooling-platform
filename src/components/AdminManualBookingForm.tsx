@@ -488,7 +488,9 @@ export default function AdminManualBookingForm({ adminId }: AdminManualBookingFo
                             const incompatReason = getIncompatibilityReason(
                               passengerGender || null,
                               r.driver?.gender ?? null,
-                              r.existing_occupants
+                              r.existing_occupants,
+                              undefined,
+                              undefined
                             );
                             const isIncompat = !!incompatReason;
                             return (
