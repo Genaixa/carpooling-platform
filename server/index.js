@@ -449,7 +449,7 @@ app.get('/api/licence-photo-url', async (req, res) => {
 // Create payment with delayed capture (hold on card)
 app.post('/api/create-payment', paymentLimiter, async (req, res) => {
   try {
-    const { sourceId, verificationToken, amount, rideId, userId, seatsToBook = 1, rideName, thirdPartyPassenger } = req.body;
+    const { sourceId, verificationToken, amount, rideId, userId, seatsToBook = 1, rideName, thirdPartyPassenger, groupDescription } = req.body;
 
     if (!sourceId || !amount || !rideId || !userId) {
       return res.status(400).json({ error: 'Missing required fields' });
@@ -502,6 +502,7 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
         square_payment_id: paymentId,
         status: 'pending_driver',
         ...(thirdPartyPassenger ? { third_party_passenger: thirdPartyPassenger } : {}),
+        ...(groupDescription ? { group_description: groupDescription } : {}),
       }])
       .select()
       .single();
@@ -985,6 +986,53 @@ app.post('/api/driver/complete-ride', async (req, res) => {
   }
 });
 
+// Admin override: mark a ride as complete on behalf of a driver
+app.post('/api/admin/complete-ride', async (req, res) => {
+  try {
+    const { adminId, rideId } = req.body;
+    if (!adminId || !rideId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: ride, error: rideError } = await supabase.from('rides').select('*').eq('id', rideId).single();
+    if (rideError || !ride) return res.status(404).json({ error: 'Ride not found' });
+    if (ride.status !== 'upcoming') return res.status(400).json({ error: 'Only upcoming rides can be marked as complete' });
+    if (new Date(ride.date_time) > new Date()) return res.status(400).json({ error: 'Cannot complete a ride before its departure time' });
+
+    await supabase.from('rides').update({ status: 'completed', completed_by: 'admin' }).eq('id', rideId);
+
+    const { data: completedBookings } = await supabase
+      .from('bookings')
+      .select('*, passenger:profiles!bookings_passenger_id_fkey(name)')
+      .eq('ride_id', rideId)
+      .eq('status', 'confirmed');
+
+    await supabase.from('bookings')
+      .update({ status: 'completed', completed_at: new Date().toISOString() })
+      .eq('ride_id', rideId)
+      .eq('status', 'confirmed');
+
+    try {
+      const { sendPassengerReviewReminder, sendDriverReviewReminder } = await import('./emails.js');
+      const passengerIds = [];
+      for (const booking of (completedBookings || [])) {
+        sendPassengerReviewReminder(booking, ride).catch(err => console.error('Passenger review email error:', err));
+        if (booking.passenger_id) passengerIds.push(booking.passenger_id);
+      }
+      if (passengerIds.length > 0) {
+        sendDriverReviewReminder(ride, passengerIds).catch(err => console.error('Driver review email error:', err));
+      }
+    } catch {}
+
+    console.log(`✓ Admin completed ride: ${rideId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin complete ride error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // NEW USER NOTIFICATION
 // ============================================================
@@ -1398,6 +1446,137 @@ app.get('/api/admin/payouts', async (req, res) => {
 });
 
 // Get all users (for admin management)
+app.get('/api/admin/phone-bookings', async (req, res) => {
+  try {
+    const { adminId } = req.query;
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data, error } = await supabase
+      .from('bookings')
+      .select('id, created_at, seats_booked, total_paid, status, passenger:profiles(name, phone, email), ride:rides(departure_location, arrival_location, date_time)')
+      .eq('is_phone_booking', true)
+      .order('created_at', { ascending: false })
+      .limit(50);
+
+    if (error) throw error;
+    res.json({ success: true, bookings: data || [] });
+  } catch (error) {
+    console.error('Phone bookings error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Look up approved drivers by name, phone, or email
+app.get('/api/admin/lookup-driver', async (req, res) => {
+  try {
+    const { adminId, query, searchBy } = req.query;
+    if (!adminId || !query) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    let qb = supabase
+      .from('profiles')
+      .select('id, name, phone, email, gender, city, profile_photo_url')
+      .eq('is_approved_driver', true);
+
+    if (searchBy === 'phone') {
+      qb = qb.ilike('phone', `%${query}%`);
+    } else if (searchBy === 'email') {
+      qb = qb.ilike('email', `%${query}%`);
+    } else {
+      qb = qb.ilike('name', `%${query}%`);
+    }
+
+    const { data, error } = await qb.limit(10);
+    if (error) throw error;
+    res.json({ success: true, drivers: data || [] });
+  } catch (error) {
+    console.error('Lookup driver error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Post a ride on behalf of an approved driver (phone ride)
+app.post('/api/admin/manual-ride', async (req, res) => {
+  try {
+    const {
+      adminId, driverId,
+      from, to, dateTime,
+      carMake, carModel,
+      seats, price,
+      luggageSize, luggageCount,
+      existingOccupants,
+    } = req.body;
+
+    if (!adminId || !driverId || !from || !to || !dateTime || !seats || !price) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Confirm driver exists and is approved
+    const { data: driver } = await supabase
+      .from('profiles')
+      .select('id, name, email, is_approved_driver')
+      .eq('id', driverId)
+      .single();
+    if (!driver) return res.status(404).json({ error: 'Driver not found' });
+    if (!driver.is_approved_driver) return res.status(400).json({ error: 'This user is not an approved driver' });
+
+    const seatsNum = parseInt(seats, 10);
+    const priceNum = parseFloat(price);
+    if (seatsNum < 1 || seatsNum > 8) return res.status(400).json({ error: 'Seats must be between 1 and 8' });
+    if (priceNum <= 0) return res.status(400).json({ error: 'Price must be greater than 0' });
+    if (new Date(dateTime) < new Date()) return res.status(400).json({ error: 'Ride date cannot be in the past' });
+
+    const { data: ride, error: rideError } = await supabase
+      .from('rides')
+      .insert([{
+        driver_id: driverId,
+        departure_location: from,
+        arrival_location: to,
+        date_time: dateTime,
+        seats_available: seatsNum,
+        seats_total: seatsNum,
+        price_per_seat: priceNum,
+        vehicle_make: carMake || null,
+        vehicle_model: carModel || null,
+        luggage_size: luggageSize || 'none',
+        luggage_count: luggageSize !== 'none' ? (parseInt(luggageCount, 10) || 0) : 0,
+        existing_occupants: existingOccupants || { males: 0, females: 0, couples: 0 },
+        status: 'upcoming',
+      }])
+      .select()
+      .single();
+
+    if (rideError) throw rideError;
+
+    // Check wish matches and send confirmation email (non-blocking)
+    const rideId = ride.id;
+    Promise.all([
+      fetch(`${API_URL}/api/check-wish-matches`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ride_id: rideId }),
+      }).catch(() => {}),
+      import('./emails.js').then(({ sendRidePostedEmail }) =>
+        sendRidePostedEmail(ride).catch(err => console.error('Ride posted email error:', err))
+      ).catch(() => {}),
+    ]);
+
+    console.log(`✓ Manual ride posted: ${rideId} | Driver: ${driver.name} | ${from} → ${to}`);
+    res.json({ success: true, rideId });
+  } catch (error) {
+    console.error('Manual ride error:', error);
+    res.status(500).json({ error: error.message || 'Failed to post ride' });
+  }
+});
+
 app.get('/api/admin/users', async (req, res) => {
   try {
     const { adminId } = req.query;
@@ -1583,6 +1762,182 @@ app.post('/api/reviews/submit', async (req, res) => {
   } catch (error) {
     console.error('Review error:', error);
     res.status(500).json({ error: error.message });
+  }
+});
+
+// ============================================================
+// ADMIN MANUAL (PHONE) BOOKING
+// ============================================================
+
+app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
+  try {
+    const {
+      adminId, sourceId, verificationToken,
+      passengerName, passengerPhone, passengerEmail,
+      passengerGender, passengerAgeGroup,
+      rideId, seatsToBook,
+    } = req.body;
+
+    if (!adminId || !sourceId || !passengerName || !passengerPhone || !rideId) {
+      return res.status(400).json({ error: 'Missing required fields' });
+    }
+
+    // Verify admin
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Get ride
+    const { data: ride } = await supabase
+      .from('rides')
+      .select('*, driver:profiles(id, name, email)')
+      .eq('id', rideId)
+      .single();
+    if (!ride || ride.status !== 'upcoming') {
+      return res.status(400).json({ error: 'Ride not available' });
+    }
+
+    const seats = parseInt(seatsToBook, 10) || 1;
+    if (seats < 1 || seats > ride.seats_available) {
+      return res.status(400).json({ error: `Only ${ride.seats_available} seat(s) available on this ride` });
+    }
+
+    const amount = ride.price_per_seat * seats;
+
+    // Find or create passenger profile
+    const cleanPhone = passengerPhone.replace(/\s+/g, '');
+    const { data: existingProfiles } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('phone', cleanPhone)
+      .limit(1);
+
+    let passengerId;
+    const isNewPassenger = !existingProfiles || existingProfiles.length === 0;
+
+    if (!isNewPassenger) {
+      passengerId = existingProfiles[0].id;
+    } else {
+      // Create Supabase auth user with placeholder email (service role bypasses confirmation)
+      const placeholderEmail = passengerEmail || `manual_${cleanPhone.replace(/\D/g, '')}_${Date.now()}@chaparide.internal`;
+      const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+        email: placeholderEmail,
+        password: crypto.randomBytes(16).toString('hex'),
+        email_confirm: true,
+        user_metadata: { name: passengerName },
+      });
+      if (createError) {
+        console.error('Create user error:', createError);
+        return res.status(500).json({ error: 'Failed to create passenger account' });
+      }
+
+      const { error: profileError } = await supabase.from('profiles').insert({
+        id: newUser.user.id,
+        user_id: newUser.user.id,
+        email: placeholderEmail,
+        name: passengerName,
+        phone: cleanPhone,
+        gender: passengerGender || null,
+        age_group: passengerAgeGroup || null,
+        travel_status: 'solo',
+        is_verified: false,
+        is_admin: false,
+        is_approved_driver: false,
+        is_banned: false,
+        driver_tier: 'regular',
+        total_reviews: 0,
+      });
+      if (profileError) {
+        console.error('Profile insert error:', profileError);
+        return res.status(500).json({ error: 'Failed to create passenger profile' });
+      }
+
+      passengerId = newUser.user.id;
+    }
+
+    // Process Square MOTO payment (delayed capture)
+    const totalAmountCents = BigInt(Math.round(amount * 100));
+    const result = await squareClient.payments.create({
+      sourceId,
+      ...(verificationToken ? { verificationToken } : {}),
+      idempotencyKey: crypto.randomUUID(),
+      amountMoney: { amount: totalAmountCents, currency: 'GBP' },
+      autocomplete: false, // delayed capture — hold only
+      referenceId: rideId,
+      note: `ChapaRide manual booking: ${ride.departure_location} → ${ride.arrival_location} (${seats} seat${seats !== 1 ? 's' : ''}) — ${passengerName}`,
+    });
+
+    const paymentId = result.payment.id;
+    const commissionAmount = amount * COMMISSION_RATE;
+    const driverPayout = amount * DRIVER_RATE;
+
+    // Create booking
+    const { data: booking, error: bookingError } = await supabase
+      .from('bookings')
+      .insert([{
+        ride_id: rideId,
+        passenger_id: passengerId,
+        seats_booked: seats,
+        total_paid: amount,
+        commission_amount: commissionAmount,
+        driver_payout_amount: driverPayout,
+        square_payment_id: paymentId,
+        status: 'pending_driver',
+        is_phone_booking: true,
+      }])
+      .select()
+      .single();
+
+    if (bookingError) {
+      console.error('Booking error:', bookingError);
+      try { await squareClient.payments.cancel({ paymentId }); } catch {}
+      throw bookingError;
+    }
+
+    await recalculateSeats(rideId);
+
+    // Notify driver
+    try {
+      const { sendBookingRequestEmail, sendPhoneBookingAdminEmail } = await import('./emails.js');
+      sendBookingRequestEmail(booking).catch(err => console.error('Email error:', err));
+      sendPhoneBookingAdminEmail({
+        bookingId: booking.id,
+        passengerName,
+        passengerPhone: passengerPhone.trim(),
+        passengerEmail: passengerEmail || null,
+        ride,
+        seats,
+        amount,
+      }).catch(err => console.error('Admin email error:', err));
+    } catch {}
+
+    console.log(`✓ Manual booking: ${booking.id} | Payment: ${paymentId} | Passenger: ${passengerName} (${isNewPassenger ? 'new' : 'existing'})`);
+
+    res.json({
+      success: true,
+      bookingId: booking.id,
+      paymentId,
+      passengerId,
+      amount,
+      isNewPassenger,
+    });
+  } catch (error) {
+    console.error('Manual booking error:', error);
+    const squareErrors = error.errors || [];
+    const hasCode = (code) => squareErrors.some(e => e.code === code);
+    if (hasCode('CARD_DECLINED') || hasCode('GENERIC_DECLINE')) {
+      return res.status(402).json({ error: 'Card was declined. Please check the card details with the passenger and try again.' });
+    }
+    if (hasCode('INSUFFICIENT_FUNDS')) {
+      return res.status(402).json({ error: 'Card has insufficient funds. Please ask the passenger for an alternative card.' });
+    }
+    if (hasCode('CVV_FAILURE')) {
+      return res.status(402).json({ error: 'CVV did not match. Please re-confirm the security code with the passenger.' });
+    }
+    if (hasCode('EXPIRY_FAILURE')) {
+      return res.status(402).json({ error: 'Card expiry date is invalid. Please re-confirm with the passenger.' });
+    }
+    res.status(500).json({ error: error.message || 'Manual booking failed' });
   }
 });
 
@@ -1816,13 +2171,6 @@ app.post('/api/rides/notify-posted', notifyLimiter, async (req, res) => {
 
     const { data: ride, error } = await supabase.from('rides').select('*').eq('id', ride_id).single();
     if (error || !ride) return res.status(404).json({ error: 'Ride not found' });
-
-    // HMRC price cap enforcement — silently correct overpriced rides
-    const cap = await getHMRCPriceCap(ride.departure_location, ride.arrival_location, ride.seats_total);
-    if (cap !== null && parseFloat(ride.price_per_seat) > cap) {
-      console.warn(`⚠ Ride ${ride_id} price £${ride.price_per_seat} exceeds HMRC cap £${cap} — correcting`);
-      await supabase.from('rides').update({ price_per_seat: cap }).eq('id', ride_id);
-    }
 
     const { sendRidePostedEmail } = await import('./emails.js');
     sendRidePostedEmail(ride).catch(err => console.error('Ride posted email error:', err));
@@ -2285,7 +2633,7 @@ async function checkFlexibleDateMatches() {
           .eq('arrival_location', wish.arrival_location)
           .eq('status', 'upcoming')
           .gt('seats_available', 0)
-          .gte('date_time', `${rangeStart}T00:00:00`)
+          .gte('date_time', now.toISOString()) // never suggest rides in the past
           .lte('date_time', `${rangeEnd}T23:59:59`)
           .neq('date_time', `${wish.desired_date}`) // exclude exact date
           .order('date_time', { ascending: true });

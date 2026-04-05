@@ -3,6 +3,8 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase, DriverApplication, Profile, DriverPayout, getRideRef, getUserRef, getDriverAlias, getPassengerAlias } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
+import AdminManualBookingForm from '../components/AdminManualBookingForm';
+import AdminManualRideForm from '../components/AdminManualRideForm';
 import { useIsMobile } from '../hooks/useIsMobile';
 import type { NavigateFn } from '../lib/types';
 import toast from 'react-hot-toast';
@@ -60,7 +62,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const isMobile = useIsMobile();
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts'>('applications');
+  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts' | 'phone'>('applications');
+  const [phoneSubTab, setPhoneSubTab] = useState<'booking' | 'ride'>('booking');
   const [alertWishes, setAlertWishes] = useState<any[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
   const [alertFilter, setAlertFilter] = useState<'all' | 'active' | 'fulfilled' | 'expired'>('all');
@@ -411,6 +414,25 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error(err.message || 'Failed to resend email');
     } finally {
       setResendLoading(null);
+    }
+  };
+
+  const handleAdminCompleteRide = async (rideId: string) => {
+    if (!user) return;
+    if (!window.confirm('Mark this ride as complete? Review reminder emails will be sent to the driver and passengers.')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/complete-ride`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id, rideId }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Ride marked as complete');
+      setRidesOverview(prev => prev.map(r => r.id === rideId ? { ...r, status: 'completed', completed_by: 'admin' } : r));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to complete ride');
     }
   };
 
@@ -802,6 +824,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             { key: 'finances' as const, label: 'Rides & Finances' },
             { key: 'lookup' as const, label: '🔍 Search' },
             { key: 'users' as const, label: 'All Users' },
+            { key: 'phone' as const, label: '📞 Phone' },
           ]).map(t => (
             <button
               key={t.key}
@@ -1413,6 +1436,14 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                             ? `Completed by ${ride.completed_by || 'unknown'}`
                                             : ride.status}
                                         </span>
+                                      )}
+                                      {ride.status === 'upcoming' && new Date(ride.date_time) < new Date() && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); handleAdminCompleteRide(ride.id); }}
+                                          style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#1e40af', color: 'white', whiteSpace: 'nowrap' }}
+                                        >
+                                          Mark Complete
+                                        </button>
                                       )}
                                     </div>
                                     <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
@@ -2761,6 +2792,36 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 );
               })()}
             </div>
+          </>
+        )}
+
+        {/* ==================== PHONE TAB ==================== */}
+        {tab === 'phone' && user && (
+          <>
+            {/* Sub-tabs */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '28px' }}>
+              {([
+                { key: 'booking' as const, label: '📋 Phone Booking' },
+                { key: 'ride' as const, label: '🚗 Phone Ride' },
+              ]).map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setPhoneSubTab(t.key)}
+                  style={{
+                    padding: '10px 22px', fontWeight: '700', fontSize: '14px', borderRadius: '50px',
+                    border: '2px solid', cursor: 'pointer', whiteSpace: 'nowrap',
+                    borderColor: phoneSubTab === t.key ? '#fcd03a' : '#E5E7EB',
+                    backgroundColor: phoneSubTab === t.key ? '#fef9e0' : 'white',
+                    color: phoneSubTab === t.key ? '#1F2937' : '#6B7280',
+                  }}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            {phoneSubTab === 'booking' && <AdminManualBookingForm adminId={user.id} />}
+            {phoneSubTab === 'ride' && <AdminManualRideForm adminId={user.id} />}
           </>
         )}
 

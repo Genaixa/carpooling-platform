@@ -101,6 +101,23 @@ export default function Home({ onNavigate }: HomeProps) {
     loadRides();
   }, [profile]);
 
+  // Realtime: update seat counts as bookings come in
+  useEffect(() => {
+    const channel = supabase
+      .channel('rides-seats')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'rides' }, (payload) => {
+        const updated = payload.new as { id: string; seats_available: number; status: string };
+        setAllRides(prev => {
+          if (updated.status !== 'upcoming') {
+            return prev.filter(r => r.id !== updated.id);
+          }
+          return prev.map(r => r.id === updated.id ? { ...r, seats_available: updated.seats_available } : r);
+        });
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, []);
+
   // Seat selection helper functions
   const handleSeatChange = (rideId: string, value: number) => {
     setSelectedSeats(prev => ({
@@ -125,7 +142,6 @@ export default function Home({ onNavigate }: HomeProps) {
           driver:profiles(id, name, gender, age_group, marital_status, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier)
         `)
         .eq('status', 'upcoming')
-        .gt('seats_available', 0)
         .gte('date_time', new Date().toISOString())
         .order('date_time', { ascending: true });
 
@@ -164,16 +180,19 @@ export default function Home({ onNavigate }: HomeProps) {
         incompatibilityReason = 'Driver information unavailable';
       } else if (profile || bookingFor === 'someone-else') {
         const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
+        const seatsRequested = parseInt(heroPassengers) || 1;
         compatible = checkRideCompatibility(
           effectiveGender,
           ride.driver.gender,
-          occupants
+          occupants,
+          seatsRequested
         );
         if (!compatible) {
           incompatibilityReason = getIncompatibilityReason(
             effectiveGender,
             ride.driver.gender,
-            occupants
+            occupants,
+            seatsRequested
           );
         }
       }
@@ -229,11 +248,11 @@ export default function Home({ onNavigate }: HomeProps) {
       }
     }
 
-    // Filter by seats needed - only if set
+    // Filter by seats needed — fully booked rides always show (greyed out), others filtered normally
     if (seatsNeeded) {
       const seats = parseInt(seatsNeeded);
       if (!isNaN(seats)) {
-        filtered = filtered.filter((ride) => ride.seats_available >= seats);
+        filtered = filtered.filter((ride) => ride.seats_available === 0 || ride.seats_available >= seats);
       }
     }
 
@@ -242,8 +261,11 @@ export default function Home({ onNavigate }: HomeProps) {
       filtered = filtered.filter((ride) => ride.departure_location === cityFilter);
     }
 
-    // Sort rides
+    // Sort rides — fully booked always sink to the bottom
     filtered.sort((a, b) => {
+      const aFull = a.seats_available === 0 ? 1 : 0;
+      const bFull = b.seats_available === 0 ? 1 : 0;
+      if (aFull !== bFull) return aFull - bFull;
       switch (sortBy) {
         case 'date-asc':
           return new Date(a.date_time).getTime() - new Date(b.date_time).getTime();
@@ -261,7 +283,9 @@ export default function Home({ onNavigate }: HomeProps) {
     });
 
     return filtered;
-  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy, effectiveGender, bookingFor, bookingForGender, profile, cityFilter, user]);
+  }, [allRides, searchFrom, searchTo, dateMin, dateMax, priceMin, priceMax, seatsNeeded, sortBy, effectiveGender, bookingFor, bookingForGender, profile, cityFilter, user, heroPassengers]);
+
+  const hasIncompatibleRides = rides.some(r => !r.compatible && r.incompatibilityReason);
 
   // Group rides by destination, sorted chronologically within groups,
   // groups split into UK and European destinations, sorted alphabetically
@@ -543,11 +567,11 @@ export default function Home({ onNavigate }: HomeProps) {
                 borderBottom: rideIdx < destRides.length - 1 ? '1px solid #F3F4F6' : 'none',
                 borderLeft: isGold ? '4px solid #fcd03a' : '4px solid transparent',
                 backgroundColor: isGold ? '#fffef5' : 'transparent',
-                opacity: ride.compatible ? 1 : 0.5,
+                opacity: (ride.compatible && ride.seats_available > 0) ? 1 : 0.5,
                 position: 'relative',
                 transition: 'background-color 0.2s',
               }}
-              onMouseOver={(e) => { if (ride.compatible) e.currentTarget.style.backgroundColor = isGold ? '#fff9d6' : '#FAFBFC'; }}
+              onMouseOver={(e) => { if (ride.compatible && ride.seats_available > 0) e.currentTarget.style.backgroundColor = isGold ? '#fff9d6' : '#FAFBFC'; }}
               onMouseOut={(e) => { e.currentTarget.style.backgroundColor = isGold ? '#fffef5' : 'transparent'; }}
             >
               {/* Gold corner ribbon */}
@@ -567,6 +591,18 @@ export default function Home({ onNavigate }: HomeProps) {
                   }}>
                     GOLD
                   </div>
+                </div>
+              )}
+
+              {/* Fully booked notice */}
+              {ride.seats_available === 0 && (
+                <div style={{
+                  display: 'flex', alignItems: 'center', gap: '6px',
+                  marginBottom: '10px', padding: '6px 12px',
+                  backgroundColor: '#F3F4F6', borderRadius: '8px',
+                  width: 'fit-content',
+                }}>
+                  <span style={{ fontSize: '12px', color: '#6B7280', fontWeight: '600' }}>Fully Booked</span>
                 </div>
               )}
 
@@ -608,15 +644,24 @@ export default function Home({ onNavigate }: HomeProps) {
                           <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                           {' · '}
                           <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
-                          {' · '}{ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''} available
+                          {ride.seats_available === 0
+                            ? <span style={{ color: '#9CA3AF' }}> · Fully booked</span>
+                            : <>{' · '}{ride.seats_available}{ride.seats_total > ride.seats_available ? ` of ${ride.seats_total}` : ''} seat{ride.seats_available !== 1 ? 's' : ''} available</>
+                          }
                         </td>
                       </tr>
                       {ride.driver && (() => {
                         const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
                         const males = (occupants?.males || 0) + (occupants?.couples || 0);
                         const females = (occupants?.females || 0) + (occupants?.couples || 0);
-                        const totalPassengers = males + females;
-                        const passengerParts = [...(males > 0 ? [`Male: ${males}`] : []), ...(females > 0 ? [`Female: ${females}`] : [])];
+                        const declaredTotal = males + females;
+                        const bookedSeats = (ride.seats_total || 0) - (ride.seats_available || 0);
+                        const passengerParts = [
+                          ...(males > 0 ? [`Male: ${males}`] : []),
+                          ...(females > 0 ? [`Female: ${females}`] : []),
+                          ...(bookedSeats > 0 ? [`${bookedSeats} booked`] : []),
+                        ];
+                        const totalInVehicle = 1 + declaredTotal + bookedSeats;
                         return (
                           <>
                             <tr>
@@ -632,7 +677,7 @@ export default function Home({ onNavigate }: HomeProps) {
                             </tr>
                             <tr>
                               <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
-                                Passengers: {passengerParts.length > 0 ? passengerParts.join(', ') : 'None yet'} · Total in vehicle: {1 + totalPassengers}
+                                Passengers: {passengerParts.length > 0 ? passengerParts.join(', ') : 'None yet'} · Total in vehicle: {totalInVehicle}
                               </td>
                             </tr>
                           </>
@@ -675,27 +720,39 @@ export default function Home({ onNavigate }: HomeProps) {
                           </td>
                         </tr>
                       )}
-                      <tr>
-                        <td colSpan={2} style={{ padding: '8px 0 4px' }}>
-                          <button
-                            onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
-                            disabled={bookingRide === ride.id || !ride.compatible}
-                            style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: 'none', fontWeight: '700', fontSize: '13px', cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer', background: !ride.compatible ? '#D1D5DB' : '#000000', color: !ride.compatible ? '#9CA3AF' : '#fcd03a', boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)', whiteSpace: 'nowrap', textAlign: 'center' }}
-                          >
-                            {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
-                          </button>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td colSpan={2} style={{ padding: '4px 0 0' }}>
-                          <button
-                            onClick={() => onNavigate('ride-details', ride.id)}
-                            style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: '1px solid #E5E7EB', background: 'none', fontSize: '13px', color: '#6B7280', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' }}
-                          >
-                            Booking for Someone Else
-                          </button>
-                        </td>
-                      </tr>
+                      {ride.seats_available === 0 ? (
+                        <tr>
+                          <td colSpan={2} style={{ padding: '8px 0 4px' }}>
+                            <div style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', background: '#F3F4F6', fontWeight: '700', fontSize: '13px', color: '#9CA3AF', whiteSpace: 'nowrap', textAlign: 'center' }}>
+                              Fully Booked
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        <>
+                          <tr>
+                            <td colSpan={2} style={{ padding: '8px 0 4px' }}>
+                              <button
+                                onClick={() => user ? handleBookRide(ride.id, ride.seats_available, getSelectedSeats(ride.id)) : onNavigate('login')}
+                                disabled={bookingRide === ride.id || !ride.compatible}
+                                style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: 'none', fontWeight: '700', fontSize: '13px', cursor: (bookingRide === ride.id || !ride.compatible) ? 'not-allowed' : 'pointer', background: !ride.compatible ? '#D1D5DB' : '#000000', color: !ride.compatible ? '#9CA3AF' : '#fcd03a', boxShadow: !ride.compatible ? 'none' : '0 3px 10px rgba(252,208,58,0.3)', whiteSpace: 'nowrap', textAlign: 'center' }}
+                              >
+                                {!ride.compatible ? 'Not Available' : bookingRide === ride.id ? 'Booking...' : user ? `Book ${getSelectedSeats(ride.id)} Seat${getSelectedSeats(ride.id) !== 1 ? 's' : ''}` : 'Login'}
+                              </button>
+                            </td>
+                          </tr>
+                          <tr>
+                            <td colSpan={2} style={{ padding: '4px 0 0' }}>
+                              <button
+                                onClick={() => onNavigate('ride-details', ride.id)}
+                                style={{ display: 'block', width: '100%', padding: '8px 16px', borderRadius: '50px', border: !ride.compatible ? '2px solid #fcd03a' : '1px solid #E5E7EB', background: !ride.compatible ? '#000000' : 'none', fontSize: '13px', color: !ride.compatible ? '#fcd03a' : '#6B7280', fontWeight: '600', cursor: 'pointer', whiteSpace: 'nowrap', textAlign: 'center' }}
+                              >
+                                Booking for Someone Else
+                              </button>
+                            </td>
+                          </tr>
+                        </>
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -891,6 +948,7 @@ export default function Home({ onNavigate }: HomeProps) {
 
                 {/* Booking For Someone Else */}
                 {user && profile && (
+                  <div>
                   <div style={{ display: 'grid', gridTemplateColumns: bookingFor === 'someone-else' && !isMobile ? '1fr 1fr' : '1fr', gap: '16px' }}>
                     <div>
                       <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>
@@ -946,6 +1004,7 @@ export default function Home({ onNavigate }: HomeProps) {
                         </select>
                       </div>
                     )}
+                  </div>
                   </div>
                 )}
                 {bookingFor === 'someone-else' && user && profile && (
@@ -1316,7 +1375,7 @@ export default function Home({ onNavigate }: HomeProps) {
           </h2>
           <p style={{ fontSize: '15px', color: '#6B7280' }}>
             {rides.length} {rides.length === 1 ? 'ride' : 'rides'} found
-            {profile && <span> &middot; Incompatible rides are greyed out</span>}
+            {profile && <span> &middot; Incompatible or fully booked rides are greyed out</span>}
           </p>
 
           {/* City filter — logged-in users only */}
@@ -1495,10 +1554,6 @@ export default function Home({ onNavigate }: HomeProps) {
             )}
             {groupedRides.europe.length > 0 && (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginTop: groupedRides.uk.length > 0 ? '8px' : 0 }}>
-                  <h2 style={{ fontSize: isMobile ? '18px' : '22px', fontWeight: '800', color: '#1F2937', margin: 0 }}>European Destinations</h2>
-                  <div style={{ flex: 1, height: '1px', backgroundColor: '#E5E7EB' }} />
-                </div>
                 {renderDestGroup(groupedRides.europe)}
               </>
             )}

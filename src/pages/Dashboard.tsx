@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, Booking, RideWish, isContactVisible, getCarLabel, checkRideCompatibility, getRideRef } from '../lib/supabase';
+import { supabase, Ride, Booking, RideWish, isContactVisible, getCarLabel, checkRideCompatibility, getRideRef, getPassengerAlias } from '../lib/supabase';
 import { LUGGAGE_OPTIONS, COMMISSION_RATE } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -431,6 +431,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                 {(booking as any).third_party_passenger.special_needs && (
                                   <p style={{ margin: '2px 0 0', fontSize: '11px', color: '#6B7280' }}>⚠ {(booking as any).third_party_passenger.special_needs}</p>
                                 )}
+                              </div>
+                            )}
+                            {(booking as any).group_description && (
+                              <div style={{ marginTop: '4px', padding: '6px 8px', backgroundColor: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '6px' }}>
+                                <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: '700', color: '#166534' }}>Group:</p>
+                                <p style={{ margin: 0, fontSize: '11px', color: '#1F2937' }}>{(booking as any).group_description}</p>
                               </div>
                             )}
                           </td>
@@ -979,7 +985,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                           <tbody>
                                             {bookingsForRide.map(b => (
                                               <tr key={b.id}>
-                                                <td style={{ padding: '8px 12px', fontSize: '13px', color: '#1F2937', fontWeight: '500', borderTop: '1px solid #F3F4F6' }}>{(b.passenger as any)?.name}</td>
+                                                <td style={{ padding: '8px 12px', fontSize: '13px', fontWeight: '500', borderTop: '1px solid #F3F4F6' }}>
+                                                  <button onClick={() => onNavigate('public-profile', undefined, b.passenger_id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#fcd03a', fontWeight: '700', fontSize: '13px' }}>
+                                                    {getPassengerAlias(b.passenger_id)}
+                                                  </button>
+                                                </td>
                                                 <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'center', borderTop: '1px solid #F3F4F6' }}>{b.seats_booked}</td>
                                                 <td style={{ padding: '8px 12px', fontSize: '13px', color: '#4B5563', textAlign: 'right', fontWeight: '600', borderTop: '1px solid #F3F4F6' }}>£{b.total_paid?.toFixed(2)}</td>
                                                 <td style={{ padding: '8px 12px', fontSize: '12px', borderTop: '1px solid #F3F4F6' }}>

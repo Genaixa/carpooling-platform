@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Booking, isContactVisible, getDriverAlias, getRideRef } from '../lib/supabase';
+import { supabase, Booking, Review, isContactVisible, getDriverAlias, getRideRef } from '../lib/supabase';
+import ReviewCard from '../components/ReviewCard';
+import StarRating from '../components/StarRating';
 import { REFUND_POLICY, LUGGAGE_OPTIONS } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -31,6 +33,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const [reviewingBooking, setReviewingBooking] = useState<Booking | null>(null);
   const [expandedPastId, setExpandedPastId] = useState<string | null>(null);
   const [reviewedBookingIds, setReviewedBookingIds] = useState<Set<string>>(new Set());
+  const [receivedReviews, setReceivedReviews] = useState<Review[]>([]);
 
   // Financial Report state
   const [bookingsView, setBookingsView] = useState<'bookings' | 'financials'>('bookings');
@@ -103,6 +106,14 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
         .eq('reviewer_id', user.id)
         .eq('type', 'passenger-to-driver');
       setReviewedBookingIds(new Set((myReviews || []).map((r: any) => r.booking_id)));
+
+      // Load reviews received by this passenger
+      const { data: received } = await supabase
+        .from('reviews')
+        .select('*, reviewer:profiles!reviews_reviewer_id_fkey(*)')
+        .eq('reviewee_id', user.id)
+        .order('created_at', { ascending: false });
+      setReceivedReviews((received || []) as Review[]);
     } catch (error: any) {
       console.error('Error loading bookings:', error);
       setError('Failed to load bookings');
@@ -959,6 +970,29 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
             )}
           </div>
         )}
+        {/* Reviews received */}
+        <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '32px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginTop: '32px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', flexWrap: 'wrap' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: 0 }}>Reviews I've Received</h3>
+            {receivedReviews.length > 0 && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <StarRating rating={receivedReviews.reduce((s, r) => s + r.rating, 0) / receivedReviews.length} size="sm" />
+                <span style={{ fontSize: '13px', color: '#6B7280' }}>
+                  {(receivedReviews.reduce((s, r) => s + r.rating, 0) / receivedReviews.length).toFixed(1)} · {receivedReviews.length} review{receivedReviews.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+            )}
+          </div>
+          {receivedReviews.length === 0 ? (
+            <p style={{ color: '#9CA3AF', fontSize: '14px', margin: 0 }}>No reviews yet — reviews from drivers will appear here after completed rides.</p>
+          ) : (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {receivedReviews.map(review => (
+                <ReviewCard key={review.id} review={review} onViewProfile={(uid) => onNavigate('public-profile', undefined, uid)} />
+              ))}
+            </div>
+          )}
+        </div>
       </main>
 
       <style>{`button:hover:not(:disabled) { transform: translateY(-2px); }`}</style>
