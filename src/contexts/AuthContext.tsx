@@ -61,17 +61,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    // On mobile, browsers (especially iOS Safari) can clear localStorage when
-    // the tab is backgrounded, causing silent logouts. When the user returns to
-    // the app, attempt a session refresh before treating them as logged out.
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        supabase.auth.getSession().then(({ data: { session } }) => {
-          if (session?.user) {
-            setUser(session.user);
-            loadProfile(session.user.id);
-          }
-        });
+    // On mobile, the OS pauses JavaScript timers when the app is backgrounded,
+    // so Supabase's proactive token refresh never fires. When the user returns,
+    // explicitly refresh the session using the stored refresh token (valid 60
+    // days) so the access token is renewed — same effect as desktop where the
+    // timer keeps running. Falls back to getSession if there's nothing to refresh.
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState !== 'visible') return;
+      const { data: { session: refreshed } } = await supabase.auth.refreshSession();
+      if (refreshed?.user) {
+        setUser(refreshed.user);
+        loadProfile(refreshed.user.id);
+      } else {
+        // Nothing to refresh (e.g. user was logged out) — check plain session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session?.user) {
+          setUser(session.user);
+          loadProfile(session.user.id);
+        }
       }
     };
     document.addEventListener('visibilitychange', handleVisibilityChange);
