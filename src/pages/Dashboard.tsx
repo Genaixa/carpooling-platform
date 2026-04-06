@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, Booking, RideWish, isContactVisible, getCarLabel, checkRideCompatibility, getRideRef, getPassengerAlias } from '../lib/supabase';
+import { supabase, isAuthError, Ride, Booking, RideWish, isContactVisible, getCarLabel, checkRideCompatibility, getRideRef, getPassengerAlias } from '../lib/supabase';
 import { LUGGAGE_OPTIONS, COMMISSION_RATE } from '../lib/constants';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
@@ -185,6 +185,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         }
       }
     } catch (error: any) {
+      if (isAuthError(error)) return;
       console.error('Error loading data:', error);
       setError('Failed to load dashboard data');
     } finally {

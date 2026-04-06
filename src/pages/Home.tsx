@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Ride, checkRideCompatibility, getIncompatibilityReason, getCarLabel, getDriverAlias } from '../lib/supabase';
+import { supabase, isAuthError, Ride, checkRideCompatibility, getIncompatibilityReason, getCarLabel, getDriverAlias } from '../lib/supabase';
 import { NavigateFn } from '../lib/types';
 import { ROUTE_LOCATIONS } from '../lib/constants';
 
@@ -159,6 +159,7 @@ export default function Home({ onNavigate }: HomeProps) {
       })));
 
     } catch (error) {
+      if (isAuthError(error)) return; // Session expired — auth state change handles redirect
       console.error('Error loading rides:', error);
       toast.error('Failed to load rides');
     } finally {

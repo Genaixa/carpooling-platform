@@ -12,6 +12,22 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   },
 });
 
+// Returns true if an error is caused by an expired/missing session rather than
+// a real application error. Used to suppress confusing toasts when the auth
+// state change handler is already redirecting the user to login.
+export function isAuthError(error: any): boolean {
+  if (!error) return false;
+  const msg = String(error.message || error.msg || '').toLowerCase();
+  return (
+    error.status === 401 ||
+    error.code === 'PGRST301' ||
+    msg.includes('jwt') ||
+    msg.includes('not authenticated') ||
+    msg.includes('invalid claim') ||
+    msg.includes('unauthorized')
+  );
+}
+
 export interface Profile {
   id: string;
   email: string;

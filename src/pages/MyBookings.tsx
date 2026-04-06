@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, Booking, Review, isContactVisible, getDriverAlias, getRideRef } from '../lib/supabase';
+import { supabase, isAuthError, Booking, Review, isContactVisible, getDriverAlias, getRideRef } from '../lib/supabase';
 import ReviewCard from '../components/ReviewCard';
 import StarRating from '../components/StarRating';
 import { REFUND_POLICY, LUGGAGE_OPTIONS } from '../lib/constants';
@@ -115,6 +115,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
         .order('created_at', { ascending: false });
       setReceivedReviews((received || []) as Review[]);
     } catch (error: any) {
+      if (isAuthError(error)) return;
       console.error('Error loading bookings:', error);
       setError('Failed to load bookings');
     } finally {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase, DriverApplication, Profile, DriverPayout, getRideRef, getUserRef, getDriverAlias, getPassengerAlias } from '../lib/supabase';
+import { supabase, isAuthError, DriverApplication, Profile, DriverPayout, getRideRef, getUserRef, getDriverAlias, getPassengerAlias } from '../lib/supabase';
 import Loading from '../components/Loading';
 import Avatar from '../components/Avatar';
 import AdminManualBookingForm from '../components/AdminManualBookingForm';
@@ -146,6 +146,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (error) throw error;
       setAllLicences(data || []);
     } catch (err: any) {
+      if (isAuthError(err)) return;
       console.error('Error loading licences:', err);
       toast.error('Failed to load licences');
     } finally {
@@ -245,6 +246,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       }));
       setUsersData(enriched);
     } catch (err: any) {
+      if (isAuthError(err)) return;
       toast.error('Failed to load users');
     } finally {
       setUsersLoading(false);
@@ -278,6 +280,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       });
       setAlertWishes(enriched);
     } catch (err: any) {
+      if (isAuthError(err)) return;
       toast.error('Failed to load alerts');
     } finally {
       setAlertsLoading(false);
@@ -502,7 +505,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     try {
       setLoading(true);
       const { data: { session } } = await supabase.auth.getSession();
-      const authHeader = { 'Authorization': `Bearer ${session?.access_token}` };
+      if (!session?.access_token) return; // Session expired — auth state change handles redirect
+      const authHeader = { 'Authorization': `Bearer ${session.access_token}` };
 
       // Fetch rides overview
       const ridesRes = await fetch(`${API_URL}/api/admin/rides-overview?adminId=${user.id}`, { headers: authHeader });
@@ -519,6 +523,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       // Build driver summaries from rides data
       buildDriverSummaries(ridesData.rides || [], payoutsData.payouts || []);
     } catch (err: any) {
+      if (isAuthError(err)) return;
       console.error('Error loading financial data:', err);
       toast.error('Failed to load financial data');
     } finally {
