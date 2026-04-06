@@ -61,7 +61,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     });
 
-    return () => subscription.unsubscribe();
+    // On mobile, browsers (especially iOS Safari) can clear localStorage when
+    // the tab is backgrounded, causing silent logouts. When the user returns to
+    // the app, attempt a session refresh before treating them as logged out.
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          if (session?.user) {
+            setUser(session.user);
+            loadProfile(session.user.id);
+          }
+        });
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      subscription.unsubscribe();
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
   }, []);
 
   const loadProfile = async (userId: string) => {
