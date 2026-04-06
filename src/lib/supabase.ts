@@ -101,6 +101,7 @@ export interface Booking {
   driver_action_at: string | null;
   cancellation_refund_amount: number | null;
   cancelled_at: string | null;
+  cancelled_by: 'driver' | 'passenger' | null;
   contact_email_sent?: boolean;
   completed_at: string | null;
   is_phone_booking: boolean | null;

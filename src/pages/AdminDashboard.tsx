@@ -25,6 +25,7 @@ interface RideOverview {
   seats_total: number;
   seats_available: number;
   price_per_seat: number;
+  existing_occupants: { males: number; females: number; couples: number } | null;
   status: string;
   cancelled_by: string | null;
   completed_by: string | null;
@@ -37,6 +38,7 @@ interface RideOverview {
     commission_amount: number;
     driver_payout_amount: number;
     status: string;
+    cancelled_by: string | null;
     passenger: { id: string; name: string; email: string; phone: string | null; gender: string | null; age_group: string | null; address_line1: string | null; address_line2: string | null; city: string | null; postcode: string | null } | null;
   }>;
   totalRevenue: number;
@@ -83,6 +85,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [expandedRide, setExpandedRide] = useState<string | null>(null);
   const [expandedApp, setExpandedApp] = useState<string | null>(null);
   const [payoutModal, setPayoutModal] = useState<{ driverId: string; driverName: string; balance: number } | null>(null);
+  const [cancelRideModal, setCancelRideModal] = useState<{ rideId: string; driverName: string; route: string } | null>(null);
+  const [cancelRideBy, setCancelRideBy] = useState<'driver' | 'passenger'>('driver');
+  const [cancelRideLoading, setCancelRideLoading] = useState(false);
+  const [bookingActionModal, setBookingActionModal] = useState<{ bookingId: string; passengerName: string; route: string; action: 'accept' | 'reject' } | null>(null);
+  const [bookingActionBy, setBookingActionBy] = useState<'driver' | 'passenger'>('driver');
+  const [bookingActionLoading, setBookingActionLoading] = useState(false);
+  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_total: number; seats_available: number; price_per_seat: number; existing_occupants: { males: number; females: number; couples: number } | null } | null>(null);
+  const [editRideLoading, setEditRideLoading] = useState(false);
+  const [editingPassengerGender, setEditingPassengerGender] = useState<Record<string, string>>({});
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutNotes, setPayoutNotes] = useState('');
   const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
@@ -436,6 +447,116 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       setRidesOverview(prev => prev.map(r => r.id === rideId ? { ...r, status: 'completed', completed_by: 'admin' } : r));
     } catch (err: any) {
       toast.error(err.message || 'Failed to complete ride');
+    }
+  };
+
+  const handleAdminCancelRide = async () => {
+    if (!user || !cancelRideModal) return;
+    setCancelRideLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/cancel-ride`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id, rideId: cancelRideModal.rideId, cancelledBy: cancelRideBy }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Ride cancelled and passengers refunded');
+      setRidesOverview(prev => prev.map(r => r.id === cancelRideModal.rideId
+        ? { ...r, status: 'cancelled', cancelled_by: `admin (on behalf of ${cancelRideBy})` }
+        : r
+      ));
+      setCancelRideModal(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to cancel ride');
+    } finally {
+      setCancelRideLoading(false);
+    }
+  };
+
+  const handleAdminEditRide = async () => {
+    if (!user || !editRideModal) return;
+    setEditRideLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/edit-ride`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({
+          adminId: user.id,
+          rideId: editRideModal.rideId,
+          updates: {
+            seats_total: editRideModal.seats_total,
+            price_per_seat: editRideModal.price_per_seat,
+            existing_occupants: editRideModal.existing_occupants,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Ride updated');
+      setRidesOverview(prev => prev.map(r => r.id === editRideModal.rideId
+        ? { ...r, seats_total: editRideModal.seats_total, seats_available: data.updates.seats_available ?? r.seats_available, price_per_seat: editRideModal.price_per_seat, existing_occupants: editRideModal.existing_occupants }
+        : r
+      ));
+      setEditRideModal(null);
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update ride');
+    } finally {
+      setEditRideLoading(false);
+    }
+  };
+
+  const handleUpdatePassengerGender = async (passengerId: string, rideId: string, gender: string) => {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/update-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user!.id, userId: passengerId, updates: { gender } }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Passenger gender updated');
+      setRidesOverview(prev => prev.map(ride => ({
+        ...ride,
+        bookings: ride.bookings.map(b =>
+          b.passenger_id === passengerId ? { ...b, passenger: b.passenger ? { ...b.passenger, gender } : b.passenger } : b
+        ),
+      })));
+      setEditingPassengerGender(prev => { const n = { ...prev }; delete n[passengerId + rideId]; return n; });
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update gender');
+    }
+  };
+
+  const handleAdminBookingAction = async () => {
+    if (!user || !bookingActionModal) return;
+    setBookingActionLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const endpoint = bookingActionModal.action === 'accept' ? '/api/admin/accept-booking' : '/api/admin/reject-booking';
+      const res = await fetch(`${API_URL}${endpoint}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id, bookingId: bookingActionModal.bookingId, onBehalfOf: bookingActionBy }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success(`Booking ${bookingActionModal.action === 'accept' ? 'accepted' : 'rejected'} successfully`);
+      const newStatus = bookingActionModal.action === 'accept' ? 'confirmed' : 'rejected';
+      setRidesOverview(prev => prev.map(ride => ({
+        ...ride,
+        bookings: ride.bookings.map(b =>
+          b.id === bookingActionModal.bookingId ? { ...b, status: newStatus } : b
+        ),
+      })));
+      setBookingActionModal(null);
+    } catch (err: any) {
+      toast.error(err.message || `Failed to ${bookingActionModal.action} booking`);
+    } finally {
+      setBookingActionLoading(false);
     }
   };
 
@@ -1450,6 +1571,22 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                           Mark Complete
                                         </button>
                                       )}
+                                      {ride.status === 'upcoming' && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_total: ride.seats_total, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 } }); }}
+                                          style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#6366f1', color: 'white', whiteSpace: 'nowrap' }}
+                                        >
+                                          Edit Ride
+                                        </button>
+                                      )}
+                                      {ride.status === 'upcoming' && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); setCancelRideBy('driver'); setCancelRideModal({ rideId: ride.id, driverName: ride.driver?.name || 'Unknown', route: `${ride.departure_location} → ${ride.arrival_location}` }); }}
+                                          style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#ef4444', color: 'white', whiteSpace: 'nowrap' }}
+                                        >
+                                          Cancel Ride
+                                        </button>
+                                      )}
                                     </div>
                                     <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>
                                       Driver: {ride.driver?.name || 'Unknown'} | {new Date(ride.date_time).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
@@ -1524,6 +1661,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                               <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Paid</th>
                                               <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Commission</th>
                                               <th style={{ textAlign: 'right', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Driver</th>
+                                              <th style={{ textAlign: 'center', padding: '8px 12px', fontWeight: '600', color: '#374151' }}>Actions</th>
                                             </tr>
                                           </thead>
                                           <tbody>
@@ -1541,8 +1679,26 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                                     <span style={{ display: 'block', color: '#6B7280' }}>{p?.phone || '—'}</span>
                                                   </td>
                                                   <td style={{ padding: '10px 12px', color: '#374151' }}>
-                                                    <span style={{ display: 'block' }}>{p?.gender || '—'}</span>
-                                                    <span style={{ display: 'block', color: '#6B7280' }}>{p?.age_group || '—'}</span>
+                                                    {p && editingPassengerGender[p.id + ride.id] !== undefined ? (
+                                                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                        <select
+                                                          value={editingPassengerGender[p.id + ride.id]}
+                                                          onChange={e => setEditingPassengerGender(prev => ({ ...prev, [p.id + ride.id]: e.target.value }))}
+                                                          style={{ fontSize: '12px', padding: '3px 6px', borderRadius: '6px', border: '1px solid #D1D5DB' }}
+                                                        >
+                                                          <option value="Male">Male</option>
+                                                          <option value="Female">Female</option>
+                                                        </select>
+                                                        <button onClick={() => handleUpdatePassengerGender(p.id, ride.id, editingPassengerGender[p.id + ride.id])} style={{ fontSize: '11px', padding: '3px 7px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: '#16a34a', color: 'white', fontWeight: '700' }}>✓</button>
+                                                        <button onClick={() => setEditingPassengerGender(prev => { const n = { ...prev }; delete n[p.id + ride.id]; return n; })} style={{ fontSize: '11px', padding: '3px 7px', borderRadius: '6px', border: 'none', cursor: 'pointer', backgroundColor: '#6B7280', color: 'white', fontWeight: '700' }}>✕</button>
+                                                      </div>
+                                                    ) : (
+                                                      <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                                                        <span>{p?.gender || '—'}</span>
+                                                        {p && <button onClick={() => setEditingPassengerGender(prev => ({ ...prev, [p.id + ride.id]: p.gender || 'Male' }))} style={{ fontSize: '10px', padding: '2px 6px', borderRadius: '6px', border: '1px solid #D1D5DB', cursor: 'pointer', backgroundColor: 'white', color: '#6B7280' }}>edit</button>}
+                                                      </div>
+                                                    )}
+                                                    <span style={{ display: 'block', color: '#6B7280', fontSize: '12px' }}>{p?.age_group || '—'}</span>
                                                   </td>
                                                   <td style={{ padding: '10px 12px', color: '#6B7280', maxWidth: '180px' }}>{address || '—'}</td>
                                                   <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{booking.seats_booked}</td>
@@ -1553,10 +1709,33 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                                     }}>
                                                       {booking.status.replace('_', ' ')}
                                                     </span>
+                                                    {(booking.status === 'cancelled' || booking.status === 'refunded') && booking.cancelled_by && (
+                                                      <span style={{ display: 'block', fontSize: '10px', color: '#6B7280', marginTop: '2px' }}>
+                                                        by {booking.cancelled_by}
+                                                      </span>
+                                                    )}
                                                   </td>
                                                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1F2937', fontWeight: '600' }}>£{(parseFloat(booking.total_paid as any) || 0).toFixed(2)}</td>
                                                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#fcd03a', fontWeight: '600' }}>£{(parseFloat(booking.commission_amount as any) || 0).toFixed(2)}</td>
                                                   <td style={{ padding: '10px 12px', textAlign: 'right', color: '#1e40af', fontWeight: '600' }}>£{(parseFloat(booking.driver_payout_amount as any) || 0).toFixed(2)}</td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                                    {booking.status === 'pending_driver' && (
+                                                      <div style={{ display: 'flex', gap: '6px', justifyContent: 'center' }}>
+                                                        <button
+                                                          onClick={() => { setBookingActionBy('driver'); setBookingActionModal({ bookingId: booking.id, passengerName: p?.name || 'Unknown', route: `${ride.departure_location} → ${ride.arrival_location}`, action: 'accept' }); }}
+                                                          style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#16a34a', color: 'white', whiteSpace: 'nowrap' }}
+                                                        >
+                                                          Accept
+                                                        </button>
+                                                        <button
+                                                          onClick={() => { setBookingActionBy('driver'); setBookingActionModal({ bookingId: booking.id, passengerName: p?.name || 'Unknown', route: `${ride.departure_location} → ${ride.arrival_location}`, action: 'reject' }); }}
+                                                          style={{ padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#ef4444', color: 'white', whiteSpace: 'nowrap' }}
+                                                        >
+                                                          Reject
+                                                        </button>
+                                                      </div>
+                                                    )}
+                                                  </td>
                                                 </tr>
                                               );
                                             })}
@@ -2844,7 +3023,194 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
         </div>
       )}
 
+      {/* ==================== EDIT RIDE MODAL ==================== */}
+      {editRideModal && (
+        <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, padding: '20px' }}>
+          <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '32px', maxWidth: '460px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>Edit Ride</h3>
+            <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 24px 0' }}>{editRideModal.route}</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Total Seats</label>
+                <input
+                  type="number" min="1" max="8"
+                  value={editRideModal.seats_total}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, seats_total: parseInt(e.target.value) || prev.seats_total } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Price per Seat (£)</label>
+                <input
+                  type="number" min="0" step="0.01"
+                  value={editRideModal.price_per_seat}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, price_per_seat: parseFloat(e.target.value) || prev.price_per_seat } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
+
+            <p style={{ fontSize: '13px', fontWeight: '600', color: '#374151', margin: '0 0 10px 0' }}>Existing Occupants (affects compatibility)</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px', marginBottom: '24px' }}>
+              {(['males', 'females', 'couples'] as const).map(field => (
+                <div key={field}>
+                  <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#6B7280', marginBottom: '6px', textTransform: 'capitalize' }}>{field}</label>
+                  <input
+                    type="number" min="0" max="7"
+                    value={editRideModal.existing_occupants?.[field] ?? 0}
+                    onChange={e => setEditRideModal(prev => prev ? { ...prev, existing_occupants: { ...prev.existing_occupants ?? { males: 0, females: 0, couples: 0 }, [field]: parseInt(e.target.value) || 0 } } : prev)}
+                    style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button onClick={() => setEditRideModal(null)} disabled={editRideLoading} style={{ padding: '12px', backgroundColor: '#F3F4F6', color: '#374151', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}>
+                Cancel
+              </button>
+              <button onClick={handleAdminEditRide} disabled={editRideLoading} style={{ padding: '12px', backgroundColor: '#6366f1', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: editRideLoading ? 'not-allowed' : 'pointer', opacity: editRideLoading ? 0.7 : 1 }}>
+                {editRideLoading ? 'Saving...' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== BOOKING ACTION MODAL ==================== */}
+      {bookingActionModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '20px',
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+            maxWidth: '440px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 8px 0' }}>
+              {bookingActionModal.action === 'accept' ? 'Accept Booking' : 'Reject Booking'}
+            </h3>
+            <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 24px 0' }}>
+              <strong>{bookingActionModal.route}</strong><br />
+              Passenger: {bookingActionModal.passengerName}<br /><br />
+              {bookingActionModal.action === 'accept'
+                ? 'The payment hold will be captured and the passenger will be notified.'
+                : 'The payment hold will be released and the passenger will be notified.'}
+            </p>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '10px' }}>
+                Acting on behalf of:
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {(['driver', 'passenger'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => setBookingActionBy(opt)}
+                    style={{
+                      flex: 1, padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+                      cursor: 'pointer', textTransform: 'capitalize',
+                      border: bookingActionBy === opt ? `2px solid ${bookingActionModal.action === 'accept' ? '#16a34a' : '#ef4444'}` : '2px solid #E8EBED',
+                      backgroundColor: bookingActionBy === opt ? (bookingActionModal.action === 'accept' ? '#dcfce7' : '#fee2e2') : 'white',
+                      color: bookingActionBy === opt ? (bookingActionModal.action === 'accept' ? '#15803d' : '#991b1b') : '#374151',
+                    }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                onClick={() => setBookingActionModal(null)}
+                disabled={bookingActionLoading}
+                style={{ padding: '12px', backgroundColor: '#F3F4F6', color: '#374151', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleAdminBookingAction}
+                disabled={bookingActionLoading}
+                style={{
+                  padding: '12px', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+                  cursor: bookingActionLoading ? 'not-allowed' : 'pointer', opacity: bookingActionLoading ? 0.7 : 1,
+                  backgroundColor: bookingActionModal.action === 'accept' ? '#16a34a' : '#ef4444',
+                  color: 'white',
+                }}
+              >
+                {bookingActionLoading
+                  ? (bookingActionModal.action === 'accept' ? 'Accepting...' : 'Rejecting...')
+                  : (bookingActionModal.action === 'accept' ? 'Confirm Accept' : 'Confirm Reject')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ==================== PAYOUT MODAL ==================== */}
+      {cancelRideModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, padding: '20px',
+        }}>
+          <div style={{
+            backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+            maxWidth: '440px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)',
+          }}>
+            <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 8px 0' }}>Cancel Ride</h3>
+            <p style={{ fontSize: '14px', color: '#6B7280', margin: '0 0 24px 0' }}>
+              <strong>{cancelRideModal.route}</strong><br />
+              Driver: {cancelRideModal.driverName}<br /><br />
+              All passengers will be fully refunded. This cannot be undone.
+            </p>
+
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '10px' }}>
+                Cancelling on behalf of:
+              </label>
+              <div style={{ display: 'flex', gap: '12px' }}>
+                {(['driver', 'passenger'] as const).map(opt => (
+                  <button
+                    key={opt}
+                    onClick={() => setCancelRideBy(opt)}
+                    style={{
+                      flex: 1, padding: '12px', borderRadius: '10px', fontSize: '14px', fontWeight: '600',
+                      cursor: 'pointer', textTransform: 'capitalize',
+                      border: cancelRideBy === opt ? '2px solid #ef4444' : '2px solid #E8EBED',
+                      backgroundColor: cancelRideBy === opt ? '#fee2e2' : 'white',
+                      color: cancelRideBy === opt ? '#991b1b' : '#374151',
+                    }}
+                  >
+                    {opt}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+              <button
+                onClick={() => setCancelRideModal(null)}
+                disabled={cancelRideLoading}
+                style={{ padding: '12px', backgroundColor: '#F3F4F6', color: '#374151', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer' }}
+              >
+                Go Back
+              </button>
+              <button
+                onClick={handleAdminCancelRide}
+                disabled={cancelRideLoading}
+                style={{ padding: '12px', backgroundColor: '#ef4444', color: 'white', border: 'none', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: cancelRideLoading ? 'not-allowed' : 'pointer', opacity: cancelRideLoading ? 0.7 : 1 }}
+              >
+                {cancelRideLoading ? 'Cancelling...' : 'Confirm Cancel'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {payoutModal && (
         <div style={{
           position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,

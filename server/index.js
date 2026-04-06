@@ -804,6 +804,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
         status: 'cancelled',
         cancelled_at: new Date().toISOString(),
         cancellation_refund_amount: 0,
+        cancelled_by: 'passenger',
       }).eq('id', bookingId);
 
       await recalculateSeats(booking.ride_id);
@@ -847,6 +848,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
       status: refundAmount > 0 ? 'refunded' : 'cancelled',
       cancelled_at: new Date().toISOString(),
       cancellation_refund_amount: refundAmount,
+      cancelled_by: 'passenger',
     }).eq('id', bookingId);
 
     await recalculateSeats(booking.ride_id);
@@ -900,6 +902,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
             status: 'cancelled',
             cancelled_at: new Date().toISOString(),
             cancellation_refund_amount: 0,
+            cancelled_by: 'driver',
           }).eq('id', booking.id);
           refundResults.push({ bookingId: booking.id, refund: 0, method: 'hold_cancelled' });
         } else if (booking.status === 'confirmed' && booking.square_payment_id) {
@@ -914,6 +917,7 @@ app.post('/api/driver/cancel-ride', async (req, res) => {
             status: 'refunded',
             cancelled_at: new Date().toISOString(),
             cancellation_refund_amount: booking.total_paid,
+            cancelled_by: 'driver',
           }).eq('id', booking.id);
           refundResults.push({ bookingId: booking.id, refund: booking.total_paid, method: 'full_refund' });
         }
@@ -1047,6 +1051,217 @@ app.post('/api/admin/complete-ride', async (req, res) => {
     res.json({ success: true });
   } catch (error) {
     console.error('Admin complete ride error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin cancels a ride on behalf of driver or passenger
+// Admin accepts a booking on behalf of the driver
+// Admin edits a ride (seats, occupants, price)
+app.post('/api/admin/edit-ride', async (req, res) => {
+  try {
+    const { adminId, rideId, updates } = req.body;
+    if (!adminId || !rideId || !updates) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', rideId).single();
+    if (!ride) return res.status(404).json({ error: 'Ride not found' });
+
+    const rideUpdates = {};
+
+    if (updates.existing_occupants !== undefined) {
+      rideUpdates.existing_occupants = updates.existing_occupants;
+    }
+
+    if (updates.price_per_seat !== undefined) {
+      const price = parseFloat(updates.price_per_seat);
+      if (isNaN(price) || price < 0) return res.status(400).json({ error: 'Invalid price' });
+      rideUpdates.price_per_seat = price;
+    }
+
+    if (updates.seats_total !== undefined) {
+      const newTotal = parseInt(updates.seats_total);
+      if (isNaN(newTotal) || newTotal < 1) return res.status(400).json({ error: 'Invalid seat count' });
+
+      // Count currently confirmed seats
+      const { data: confirmedBookings } = await supabase
+        .from('bookings')
+        .select('seats_booked')
+        .eq('ride_id', rideId)
+        .in('status', ['confirmed', 'pending_driver']);
+      const confirmedSeats = (confirmedBookings || []).reduce((sum, b) => sum + b.seats_booked, 0);
+
+      if (newTotal < confirmedSeats) {
+        return res.status(400).json({ error: `Cannot reduce seats below ${confirmedSeats} (already confirmed)` });
+      }
+
+      rideUpdates.seats_total = newTotal;
+      rideUpdates.seats_available = newTotal - confirmedSeats;
+    }
+
+    if (Object.keys(rideUpdates).length === 0) return res.status(400).json({ error: 'No valid updates provided' });
+
+    const { error } = await supabase.from('rides').update(rideUpdates).eq('id', rideId);
+    if (error) throw error;
+
+    console.log(`✓ Admin edited ride: ${rideId}`, rideUpdates);
+    res.json({ success: true, updates: rideUpdates });
+  } catch (error) {
+    console.error('Admin edit ride error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/accept-booking', async (req, res) => {
+  try {
+    const { adminId, bookingId, onBehalfOf } = req.body;
+    if (!adminId || !bookingId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: booking, error: bookingError } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+    if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.status !== 'pending_driver') return res.status(400).json({ error: 'Booking is not pending driver action' });
+
+    const { data: ride } = await supabase.from('rides').select('*').eq('id', booking.ride_id).single();
+    if (!ride) return res.status(404).json({ error: 'Ride not found' });
+
+    if (booking.square_payment_id) {
+      await squareClient.payments.complete({ paymentId: booking.square_payment_id });
+    }
+
+    await supabase.from('bookings').update({
+      status: 'confirmed',
+      driver_action: `accepted by admin (on behalf of ${onBehalfOf || 'driver'})`,
+      driver_action_at: new Date().toISOString(),
+    }).eq('id', bookingId);
+
+    await recalculateSeats(booking.ride_id);
+
+    try {
+      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
+      sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+      sendDriverBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Admin accepted booking: ${bookingId} on behalf of ${onBehalfOf || 'driver'}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin accept booking error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Admin rejects a booking on behalf of the driver
+app.post('/api/admin/reject-booking', async (req, res) => {
+  try {
+    const { adminId, bookingId, onBehalfOf } = req.body;
+    if (!adminId || !bookingId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: booking, error: bookingError } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
+    if (bookingError || !booking) return res.status(404).json({ error: 'Booking not found' });
+    if (booking.status !== 'pending_driver') return res.status(400).json({ error: 'Booking is not pending driver action' });
+
+    if (booking.square_payment_id) {
+      await squareClient.payments.cancel({ paymentId: booking.square_payment_id });
+    }
+
+    await supabase.from('bookings').update({
+      status: 'rejected',
+      driver_action: `rejected by admin (on behalf of ${onBehalfOf || 'driver'})`,
+      driver_action_at: new Date().toISOString(),
+    }).eq('id', bookingId);
+
+    try {
+      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
+      sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+      sendDriverBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+    } catch {}
+
+    console.log(`✓ Admin rejected booking: ${bookingId} on behalf of ${onBehalfOf || 'driver'}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Admin reject booking error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/cancel-ride', async (req, res) => {
+  try {
+    const { adminId, rideId, cancelledBy } = req.body;
+    if (!adminId || !rideId || !cancelledBy) return res.status(400).json({ error: 'Missing required fields' });
+    if (!['driver', 'passenger'].includes(cancelledBy)) return res.status(400).json({ error: 'cancelledBy must be driver or passenger' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: ride, error: rideError } = await supabase.from('rides').select('*').eq('id', rideId).single();
+    if (rideError || !ride) return res.status(404).json({ error: 'Ride not found' });
+    if (ride.status !== 'upcoming') return res.status(400).json({ error: 'Only upcoming rides can be cancelled' });
+
+    const { data: bookings } = await supabase
+      .from('bookings')
+      .select('*')
+      .eq('ride_id', rideId)
+      .in('status', ['confirmed', 'pending_driver']);
+
+    const refundResults = [];
+
+    for (const booking of (bookings || [])) {
+      try {
+        if (booking.status === 'pending_driver' && booking.square_payment_id) {
+          await squareClient.payments.cancel({ paymentId: booking.square_payment_id });
+          await supabase.from('bookings').update({
+            status: 'cancelled',
+            cancelled_at: new Date().toISOString(),
+            cancellation_refund_amount: 0,
+            cancelled_by: cancelledBy,
+          }).eq('id', booking.id);
+          refundResults.push({ bookingId: booking.id, refund: 0, method: 'hold_cancelled' });
+        } else if (booking.status === 'confirmed' && booking.square_payment_id) {
+          const refundCents = BigInt(Math.round(booking.total_paid * 100));
+          await squareClient.refunds.refundPayment({
+            idempotencyKey: crypto.randomUUID(),
+            paymentId: booking.square_payment_id,
+            amountMoney: { amount: refundCents, currency: 'GBP' },
+          });
+          await supabase.from('bookings').update({
+            status: 'refunded',
+            cancelled_at: new Date().toISOString(),
+            cancellation_refund_amount: booking.total_paid,
+            cancelled_by: cancelledBy,
+          }).eq('id', booking.id);
+          refundResults.push({ bookingId: booking.id, refund: booking.total_paid, method: 'full_refund' });
+        }
+      } catch (refundError) {
+        console.error(`Refund error for booking ${booking.id}:`, refundError);
+        refundResults.push({ bookingId: booking.id, error: refundError.message });
+      }
+    }
+
+    await supabase.from('rides').update({ status: 'cancelled', cancelled_by: `admin (on behalf of ${cancelledBy})` }).eq('id', rideId);
+
+    try {
+      const { sendDriverCancellationEmail } = await import('./emails.js');
+      for (const booking of (bookings || [])) {
+        sendDriverCancellationEmail(booking, ride).catch(err => console.error('Email error:', err));
+      }
+    } catch {}
+
+    console.log(`✓ Admin cancelled ride: ${rideId} on behalf of ${cancelledBy}, ${refundResults.length} bookings processed`);
+    res.json({ success: true, refundResults });
+  } catch (error) {
+    console.error('Admin cancel ride error:', error);
     res.status(500).json({ error: error.message });
   }
 });

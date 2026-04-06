@@ -293,13 +293,16 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
   const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', year: 'numeric' });
   const formatTime = (dateString: string) => new Date(dateString).toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true });
 
-  const getStatusLabel = (status: string, driverAction: string | null) => {
+  const getStatusLabel = (status: string, driverAction: string | null, cancelledBy?: string | null) => {
     if (status === 'pending_driver') return 'Awaiting driver approval';
     if (status === 'cancelled' && driverAction === 'rejected') return 'Driver declined';
     if (status === 'confirmed') return 'Confirmed';
     if (status === 'completed') return 'Completed';
-    if (status === 'cancelled') return 'Cancelled';
-    if (status === 'refunded') return 'Refunded';
+    if (status === 'cancelled' || status === 'refunded') {
+      if (cancelledBy === 'driver') return status === 'refunded' ? 'Refunded (driver cancelled)' : 'Cancelled by driver';
+      if (cancelledBy === 'passenger') return status === 'refunded' ? 'Refunded (you cancelled)' : 'Cancelled by you';
+      return status === 'refunded' ? 'Refunded' : 'Cancelled';
+    }
     return status;
   };
 
@@ -604,7 +607,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                           </td>
                           <td style={{ padding: '14px 16px' }}>
                             <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                              {getStatusLabel(booking.status, booking.driver_action)}
+                              {getStatusLabel(booking.status, booking.driver_action, booking.cancelled_by)}
                             </span>
                           </td>
                         </tr>
@@ -656,7 +659,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 <div style={{ fontSize: '12px', color: '#6B7280' }}>{formatDate(booking.ride.date_time)} at {formatTime(booking.ride.date_time)}</div>
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, marginLeft: '10px' }}>
-                                <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>{getStatusLabel(booking.status, booking.driver_action)}</span>
+                                <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>{getStatusLabel(booking.status, booking.driver_action, booking.cancelled_by)}</span>
                                 <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                               </div>
                             </div>
@@ -758,7 +761,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 <td style={{ padding: '12px 16px', fontSize: '13px', fontWeight: '600', color: '#4B5563', textAlign: 'right', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED' }}>£{booking.total_paid?.toFixed(2)}</td>
                                 <td style={{ padding: '12px 16px', textAlign: 'center', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED' }}>
                                   <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                                    {getStatusLabel(booking.status, booking.driver_action)}
+                                    {getStatusLabel(booking.status, booking.driver_action, booking.cancelled_by)}
                                   </span>
                                 </td>
                                 <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -841,7 +844,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                               </div>
                               <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
                                 <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                                  {getStatusLabel(booking.status, booking.driver_action)}
+                                  {getStatusLabel(booking.status, booking.driver_action, booking.cancelled_by)}
                                 </span>
                                 <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
                               </div>
@@ -925,7 +928,7 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                                 </td>
                                 <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
                                   <span style={{ display: 'inline-block', padding: '4px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', ...getStatusStyle(booking.status, booking.driver_action) }}>
-                                    {getStatusLabel(booking.status, booking.driver_action)}
+                                    {getStatusLabel(booking.status, booking.driver_action, booking.cancelled_by)}
                                   </span>
                                 </td>
                                 <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
