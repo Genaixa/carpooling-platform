@@ -87,7 +87,7 @@ export default function PublicProfile({ onNavigate, userId }: PublicProfileProps
         {/* Profile Header */}
         <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: isMobile ? '24px' : '40px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px', textAlign: 'center' }}>
           <div style={{ marginBottom: '16px' }}>
-            <Avatar photoUrl={profile.profile_photo_url} name={getDriverAlias(profile.id)} size="lg" />
+            <Avatar photoUrl={user?.id === profile.id ? profile.profile_photo_url : null} name={getDriverAlias(profile.id)} size="lg" />
           </div>
           <h2 style={{ fontSize: '28px', fontWeight: 'bold', color: '#1F2937', marginBottom: '12px' }}>
             {getDriverAlias(profile.id)}
