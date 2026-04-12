@@ -347,7 +347,13 @@ export default function EditRide({ onNavigate, rideId }: EditRideProps) {
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
                 <div>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Available Seats *</label>
-                  <input name="availableSeats" type="number" min="1" max="8" value={formData.availableSeats} onChange={handleChange} required placeholder="1-8" style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.availableSeats ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }} />
+                  <select name="availableSeats" value={formData.availableSeats} onChange={handleChange} required style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.availableSeats ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s', backgroundColor: 'white' }}>
+                    <option value="">Select seats</option>
+                    {[1,2,3,4,5,6,7,8].map(n => {
+                      const bookedSeats = ride ? ride.seats_total - ride.seats_available : 0;
+                      return <option key={n} value={n} disabled={n < bookedSeats}>{n}{n < bookedSeats ? ' (below booked)' : ''}</option>;
+                    })}
+                  </select>
                   {hasBookings && ride && <p style={{ marginTop: '4px', fontSize: '12px', color: '#4B5563' }}>{ride.seats_total - ride.seats_available} seat(s) already booked</p>}
                   {errors.availableSeats && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.availableSeats}</p>}
                 </div>

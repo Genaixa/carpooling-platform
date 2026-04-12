@@ -92,7 +92,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [bookingActionModal, setBookingActionModal] = useState<{ bookingId: string; passengerName: string; route: string; action: 'accept' | 'reject' } | null>(null);
   const [bookingActionBy, setBookingActionBy] = useState<'driver' | 'passenger'>('driver');
   const [bookingActionLoading, setBookingActionLoading] = useState(false);
-  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_total: number; seats_available: number; price_per_seat: number; existing_occupants: { males: number; females: number; couples: number } | null } | null>(null);
+  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number; existing_occupants: { males: number; females: number; couples: number } | null } | null>(null);
   const [editRideLoading, setEditRideLoading] = useState(false);
   const [editingPassengerGender, setEditingPassengerGender] = useState<Record<string, string>>({});
   const [payoutAmount, setPayoutAmount] = useState('');
@@ -488,7 +488,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           adminId: user.id,
           rideId: editRideModal.rideId,
           updates: {
-            seats_total: editRideModal.seats_total,
+            seats_total: editRideModal.seats_available + editRideModal.seats_booked,
             price_per_seat: editRideModal.price_per_seat,
             existing_occupants: editRideModal.existing_occupants,
           },
@@ -498,7 +498,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (data.error) throw new Error(data.error);
       toast.success('Ride updated');
       setRidesOverview(prev => prev.map(r => r.id === editRideModal.rideId
-        ? { ...r, seats_total: editRideModal.seats_total, seats_available: data.updates.seats_available ?? r.seats_available, price_per_seat: editRideModal.price_per_seat, existing_occupants: editRideModal.existing_occupants }
+        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: editRideModal.price_per_seat, existing_occupants: editRideModal.existing_occupants }
         : r
       ));
       setEditRideModal(null);
@@ -1596,7 +1596,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       )}
                                       {ride.status === 'upcoming' && (
                                         <button
-                                          onClick={e => { e.stopPropagation(); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_total: ride.seats_total, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 } }); }}
+                                          onClick={e => { e.stopPropagation(); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_booked: ride.seats_total - ride.seats_available, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 } }); }}
                                           style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#6366f1', color: 'white', whiteSpace: 'nowrap' }}
                                         >
                                           Edit Ride
@@ -3103,13 +3103,19 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
               <div>
-                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Total Seats</label>
-                <input
-                  type="number" min="1" max="8"
-                  value={editRideModal.seats_total}
-                  onChange={e => setEditRideModal(prev => prev ? { ...prev, seats_total: parseInt(e.target.value) || prev.seats_total } : prev)}
-                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
-                />
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Available Seats</label>
+                <select
+                  value={editRideModal.seats_available}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, seats_available: parseInt(e.target.value) } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box', backgroundColor: 'white' }}
+                >
+                  {[1,2,3,4,5,6,7,8].map(n => (
+                    <option key={n} value={n}>{n}</option>
+                  ))}
+                </select>
+                {editRideModal.seats_booked > 0 && (
+                  <p style={{ margin: '4px 0 0 0', fontSize: '11px', color: '#6B7280' }}>{editRideModal.seats_booked} seat(s) already confirmed</p>
+                )}
               </div>
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Price per Seat (£)</label>
