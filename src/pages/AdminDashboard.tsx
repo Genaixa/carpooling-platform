@@ -76,6 +76,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [confirmRevoke, setConfirmRevoke] = useState<string | null>(null);
   const [banReason, setBanReason] = useState<Record<string, string>>({});
   const [confirmBan, setConfirmBan] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Finances state
   const [financeSubTab, setFinanceSubTab] = useState<'rides' | 'payouts' | 'alerts'>('rides');
@@ -794,6 +795,28 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       loadUsersData();
     } catch (err: any) {
       toast.error(err.message || 'Failed to update ban status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!user) return;
+    setActionLoading(`delete-${userId}`);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const response = await fetch(`${API_URL}/api/admin/delete-user`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ userId, adminId: user.id }),
+      });
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('User account deleted');
+      setConfirmDelete(null);
+      loadUsersData();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to delete user');
     } finally {
       setActionLoading(null);
     }
@@ -2190,14 +2213,30 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                             <a href={`#public-profile/${selectedLookupItem.data.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline' }}>View reviews ↗</a>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                           {selectedLookupItem.data.is_approved_driver && (
                             <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '5px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' }}>Driver</span>
+                          )}
+                          {selectedLookupItem.data.driver_tier === 'gold' && (
+                            <span style={{ backgroundColor: '#fef9e0', color: '#92400e', padding: '5px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600', border: '1px solid #fcd03a' }}>Gold</span>
                           )}
                           {selectedLookupItem.data.average_rating && (
                             <span style={{ backgroundColor: '#FEF3C7', color: '#92400e', padding: '5px 14px', borderRadius: '20px', fontSize: '13px', fontWeight: '600' }}>
                               {Number(selectedLookupItem.data.average_rating).toFixed(1)} ★ ({selectedLookupItem.data.total_reviews} reviews)
                             </span>
+                          )}
+                          {selectedLookupItem.data.is_approved_driver && selectedLookupItem.data.driver_tier !== 'gold' && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm(`Grant Gold status to ${selectedLookupItem.data.name}? This verifies them as a Gold driver without requiring a licence photo upload.`)) {
+                                  handleApproveLicence(selectedLookupItem.data.id);
+                                }
+                              }}
+                              disabled={actionLoading === selectedLookupItem.data.id}
+                              style={{ backgroundColor: '#fcd03a', color: '#1F2937', border: 'none', borderRadius: '20px', padding: '5px 14px', fontSize: '13px', fontWeight: '700', cursor: 'pointer' }}
+                            >
+                              {actionLoading === selectedLookupItem.data.id ? 'Granting...' : 'Grant Gold'}
+                            </button>
                           )}
                         </div>
                       </div>
@@ -2788,6 +2827,38 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', backgroundColor: '#FEE2E2', color: '#7F1D1D' }}
                                     >
                                       🚫 Ban User
+                                    </button>
+                                  )
+                                )}
+                                {/* Delete user */}
+                                {u.id !== user?.id && (
+                                  confirmDelete === u.id ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                      <div style={{ fontSize: '11px', color: '#7F1D1D', fontWeight: '600', padding: '4px 6px', backgroundColor: '#FEF2F2', borderRadius: '6px', border: '1px solid #FCA5A5' }}>
+                                        Permanently delete all data?
+                                      </div>
+                                      <div style={{ display: 'flex', gap: '4px' }}>
+                                        <button
+                                          onClick={() => handleDeleteUser(u.id)}
+                                          disabled={actionLoading === `delete-${u.id}`}
+                                          style={{ flex: 1, fontSize: '11px', padding: '4px', borderRadius: '6px', border: 'none', backgroundColor: '#450a0a', color: 'white', cursor: 'pointer', fontWeight: '600' }}
+                                        >
+                                          {actionLoading === `delete-${u.id}` ? '...' : 'Yes, Delete'}
+                                        </button>
+                                        <button
+                                          onClick={() => setConfirmDelete(null)}
+                                          style={{ flex: 1, fontSize: '11px', padding: '4px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: 'white', cursor: 'pointer' }}
+                                        >
+                                          Cancel
+                                        </button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <button
+                                      onClick={() => setConfirmDelete(u.id)}
+                                      style={{ fontSize: '12px', padding: '4px 10px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontWeight: '600', backgroundColor: '#450a0a', color: 'white' }}
+                                    >
+                                      🗑 Delete User
                                     </button>
                                   )
                                 )}

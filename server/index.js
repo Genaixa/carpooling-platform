@@ -1548,6 +1548,44 @@ app.post('/api/admin/ban-user', async (req, res) => {
   }
 });
 
+// Delete a user account and all associated data (GDPR right to erasure)
+app.post('/api/admin/delete-user', async (req, res) => {
+  try {
+    const { userId, adminId } = req.body;
+    if (!userId || !adminId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    // Prevent self-deletion
+    if (userId === adminId) return res.status(400).json({ error: 'Cannot delete your own account' });
+
+    // 1. Remove profile photo from storage
+    const { data: profileFiles } = await supabase.storage.from('profile-photos').list('', { search: userId });
+    if (profileFiles && profileFiles.length > 0) {
+      await supabase.storage.from('profile-photos').remove(profileFiles.map(f => f.name));
+    }
+
+    // 2. Remove licence photo from storage
+    const { data: licenceFiles } = await supabase.storage.from('licence-photos').list('', { search: userId });
+    if (licenceFiles && licenceFiles.length > 0) {
+      await supabase.storage.from('licence-photos').remove(licenceFiles.map(f => f.name));
+    }
+
+    // 3. Delete the Supabase Auth user — relies on DB cascade to clean up
+    //    profiles, bookings, rides, driver_applications, reviews, ride_wishes, driver_payouts
+    const { error: deleteError } = await supabase.auth.admin.deleteUser(userId);
+    if (deleteError) throw deleteError;
+
+    console.log(`✓ User deleted by admin ${adminId}: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // ADMIN FINANCIAL ENDPOINTS
 // ============================================================
