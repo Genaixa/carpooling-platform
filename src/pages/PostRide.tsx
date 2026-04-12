@@ -23,7 +23,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
     carMake: '',
     carModel: '',
     availableSeats: '',
-    pricePerSeat: '',
+    pricePerSeat: '10',
     luggageSize: 'none',
     luggageCount: '0',
     occupantMales: '0',
@@ -223,7 +223,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
       newErrors.pricePerSeat = 'Price per seat is required';
     } else {
       const price = parseFloat(formData.pricePerSeat);
-      if (isNaN(price) || price <= 0) newErrors.pricePerSeat = 'Price per seat must be greater than 0';
+      if (isNaN(price) || price < 10) newErrors.pricePerSeat = 'Minimum price per seat is £10';
     }
 
     setErrors(newErrors);
@@ -444,7 +444,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                         <input
                           name="pricePerSeat"
                           type="number"
-                          min="0"
+                          min="10"
                           step="0.01"
                           value={formData.pricePerSeat}
                           onChange={(e) => {
@@ -452,7 +452,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                             if (errors.pricePerSeat) setErrors(prev => { const n = { ...prev }; delete n.pricePerSeat; return n; });
                           }}
                           required
-                          placeholder="0.00"
+                          placeholder="10.00"
                           style={{ width: '100%', padding: '14px', fontSize: '16px', border: errors.pricePerSeat ? '2px solid #ef4444' : '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }}
                         />
                         {dynamicMilesLoading && (
@@ -466,6 +466,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                       </>
                     );
                   })()}
+                  <p style={{ fontSize: '13px', color: '#6B7280', marginTop: '4px' }}>Minimum charge is £10 per seat.</p>
                   {errors.pricePerSeat && <p style={{ color: '#ef4444', fontSize: '14px', marginTop: '4px' }}>{errors.pricePerSeat}</p>}
                   {parseFloat(formData.pricePerSeat) > 0 ? (
                     <p style={{ fontSize: '13px', color: '#000000', marginTop: '6px', fontWeight: '600' }}>
