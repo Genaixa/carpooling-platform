@@ -2217,12 +2217,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                               </p>
                             )}
                             {(lookupDetail?.bankDetails?.bank_account_name || lookupDetail?.bankDetails?.bank_account_number || lookupDetail?.bankDetails?.bank_sort_code) && (
-                              <div style={{ margin: '6px 0 6px 0', padding: '8px 12px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB', display: 'inline-block' }}>
-                                <p style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', margin: '0 0 4px 0', letterSpacing: '0.05em' }}>Bank Details</p>
-                                {lookupDetail.bankDetails.bank_account_name && <p style={{ fontSize: '13px', color: '#1F2937', margin: '0 0 2px 0' }}>{lookupDetail.bankDetails.bank_account_name}</p>}
-                                {lookupDetail.bankDetails.bank_account_number && <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 2px 0' }}>Acc: {lookupDetail.bankDetails.bank_account_number}</p>}
-                                {lookupDetail.bankDetails.bank_sort_code && <p style={{ fontSize: '13px', color: '#4B5563', margin: '0' }}>Sort: {lookupDetail.bankDetails.bank_sort_code}</p>}
-                              </div>
+                              <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 4px 0' }}>
+                                🏦 {[lookupDetail.bankDetails.bank_account_name, lookupDetail.bankDetails.bank_account_number ? `Acc: ${lookupDetail.bankDetails.bank_account_number}` : null, lookupDetail.bankDetails.bank_sort_code ? `Sort: ${lookupDetail.bankDetails.bank_sort_code}` : null].filter(Boolean).join(' · ')}
+                              </p>
                             )}
                             <a href={`#public-profile/${selectedLookupItem.data.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline', display: 'block', marginTop: '4px' }}>View reviews ↗</a>
                           </div>
