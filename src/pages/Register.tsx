@@ -60,7 +60,7 @@ export default function Register({ onNavigate, intent }: RegisterProps) {
       return;
     }
 
-    if (/\d{5,}/.test(formData.email) || /^[\d\s\+\-\(\)]+$/.test(formData.email)) {
+    if (/^[\d\s\+\-\(\)]+$/.test(formData.email)) {
       setError('Please enter an email address, not a phone number, in the Email field');
       return;
     }
