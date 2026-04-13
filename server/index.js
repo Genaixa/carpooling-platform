@@ -2138,6 +2138,7 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
       autocomplete: false, // delayed capture — hold only
       referenceId: rideId,
       note: `ChapaRide manual booking: ${ride.departure_location} → ${ride.arrival_location} (${seats} seat${seats !== 1 ? 's' : ''}) — ${passengerName}`,
+      ...(passengerEmail ? { buyerEmailAddress: passengerEmail } : {}),
     });
 
     const paymentId = result.payment.id;
@@ -2199,6 +2200,10 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
     console.error('Manual booking error:', error);
     const squareErrors = error.errors || [];
     const hasCode = (code) => squareErrors.some(e => e.code === code);
+    if (hasCode('CARD_DECLINED_VERIFICATION_REQUIRED')) {
+      sendTelegramAlert(`⚠️ *Phone booking — 3DS required*\nPassenger: ${req.body?.passengerName} (${req.body?.passengerPhone})\nRide: ${req.body?.rideId}\nThis card requires online bank verification (SCA) which cannot be completed over the phone.`);
+      return res.status(402).json({ error: "This card requires online bank verification (3D Secure) which cannot be completed over the phone. Please ask the customer to book online at chaparide.com instead, or ask them to use a different card." });
+    }
     if (hasCode('CARD_DECLINED') || hasCode('GENERIC_DECLINE')) {
       sendTelegramAlert(`⚠️ *Phone booking — card declined*\nPassenger: ${req.body?.passengerName} (${req.body?.passengerPhone})\nRide: ${req.body?.rideId}`);
       return res.status(402).json({ error: 'Card was declined. Please check the card details with the passenger and try again.' });
