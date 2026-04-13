@@ -92,7 +92,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [bookingActionModal, setBookingActionModal] = useState<{ bookingId: string; passengerName: string; route: string; action: 'accept' | 'reject' } | null>(null);
   const [bookingActionBy, setBookingActionBy] = useState<'driver' | 'passenger'>('driver');
   const [bookingActionLoading, setBookingActionLoading] = useState(false);
-  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number; existing_occupants: { males: number; females: number; couples: number } | null } | null>(null);
+  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number | string; existing_occupants: { males: number; females: number; couples: number } | null } | null>(null);
   const [editRideLoading, setEditRideLoading] = useState(false);
   const [editingPassengerGender, setEditingPassengerGender] = useState<Record<string, string>>({});
   const [payoutAmount, setPayoutAmount] = useState('');
@@ -478,6 +478,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   const handleAdminEditRide = async () => {
     if (!user || !editRideModal) return;
+    const parsedPrice = parseFloat(String(editRideModal.price_per_seat));
+    if (isNaN(parsedPrice) || parsedPrice < 10) {
+      toast.error('Price must be at least £10');
+      return;
+    }
     setEditRideLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -489,7 +494,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           rideId: editRideModal.rideId,
           updates: {
             seats_total: editRideModal.seats_available + editRideModal.seats_booked,
-            price_per_seat: editRideModal.price_per_seat,
+            price_per_seat: parseFloat(String(editRideModal.price_per_seat)),
             existing_occupants: editRideModal.existing_occupants,
           },
         }),
@@ -498,7 +503,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (data.error) throw new Error(data.error);
       toast.success('Ride updated');
       setRidesOverview(prev => prev.map(r => r.id === editRideModal.rideId
-        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: editRideModal.price_per_seat, existing_occupants: editRideModal.existing_occupants }
+        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: parseFloat(String(editRideModal.price_per_seat)), existing_occupants: editRideModal.existing_occupants }
         : r
       ));
       setEditRideModal(null);
@@ -3120,9 +3125,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               <div>
                 <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Price per Seat (£)</label>
                 <input
-                  type="number" min="0" step="0.01"
+                  type="number" min="10" step="0.01"
                   value={editRideModal.price_per_seat}
-                  onChange={e => setEditRideModal(prev => prev ? { ...prev, price_per_seat: parseFloat(e.target.value) || prev.price_per_seat } : prev)}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, price_per_seat: e.target.value } : prev)}
                   style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
                 />
               </div>
