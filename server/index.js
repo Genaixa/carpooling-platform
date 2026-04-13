@@ -2129,16 +2129,21 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
     }
 
     // Process Square MOTO payment (delayed capture)
+    // sellerKeyedIn: true flags this as Mail Order / Telephone Order (MOTO),
+    // signalling to card networks that SCA/3DS exemption applies under PSD2.
     const totalAmountCents = BigInt(Math.round(amount * 100));
     const result = await squareClient.payments.create({
       sourceId,
-      ...(verificationToken ? { verificationToken } : {}),
       idempotencyKey: crypto.randomUUID(),
       amountMoney: { amount: totalAmountCents, currency: 'GBP' },
       autocomplete: false, // delayed capture — hold only
       referenceId: rideId,
       note: `ChapaRide manual booking: ${ride.departure_location} → ${ride.arrival_location} (${seats} seat${seats !== 1 ? 's' : ''}) — ${passengerName}`,
       ...(passengerEmail ? { buyerEmailAddress: passengerEmail } : {}),
+      customerDetails: {
+        customerInitiated: true,
+        sellerKeyedIn: true,
+      },
     });
 
     const paymentId = result.payment.id;
