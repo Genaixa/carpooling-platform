@@ -365,13 +365,14 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           supabase.from('bookings').select('*, ride:rides(*)').eq('passenger_id', item.id).order('created_at', { ascending: false }),
           supabase.from('rides').select('*, bookings(*)').eq('driver_id', item.id).order('date_time', { ascending: false }),
           supabase.from('profiles').select('address_line1, address_line2, city, postcode').eq('id', item.id).single(),
-          supabase.from('driver_applications').select('emergency_contact_name, emergency_contact_phone').eq('user_id', item.id).order('created_at', { ascending: false }).limit(1),
+          supabase.from('driver_applications').select('emergency_contact_name, emergency_contact_phone, bank_account_name, bank_account_number, bank_sort_code').eq('user_id', item.id).order('created_at', { ascending: false }).limit(1),
         ]);
         setLookupDetail({
           bookingsAsPassenger: bookingsResult.data || [],
           ridesAsDriver: ridesResult.data || [],
           address: profileResult.data || null,
           emergencyContact: appResult.data?.[0] || null,
+          bankDetails: appResult.data?.[0] || null,
         });
       } else {
         const { data } = await supabase
@@ -2215,7 +2216,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 🆘 Emergency: {lookupDetail.emergencyContact.emergency_contact_name}{lookupDetail.emergencyContact.emergency_contact_phone ? ` · ${lookupDetail.emergencyContact.emergency_contact_phone}` : ''}
                               </p>
                             )}
-                            <a href={`#public-profile/${selectedLookupItem.data.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline' }}>View reviews ↗</a>
+                            {(lookupDetail?.bankDetails?.bank_account_name || lookupDetail?.bankDetails?.bank_account_number || lookupDetail?.bankDetails?.bank_sort_code) && (
+                              <div style={{ margin: '6px 0 6px 0', padding: '8px 12px', backgroundColor: '#F9FAFB', borderRadius: '8px', border: '1px solid #E5E7EB', display: 'inline-block' }}>
+                                <p style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', margin: '0 0 4px 0', letterSpacing: '0.05em' }}>Bank Details</p>
+                                {lookupDetail.bankDetails.bank_account_name && <p style={{ fontSize: '13px', color: '#1F2937', margin: '0 0 2px 0' }}>{lookupDetail.bankDetails.bank_account_name}</p>}
+                                {lookupDetail.bankDetails.bank_account_number && <p style={{ fontSize: '13px', color: '#4B5563', margin: '0 0 2px 0' }}>Acc: {lookupDetail.bankDetails.bank_account_number}</p>}
+                                {lookupDetail.bankDetails.bank_sort_code && <p style={{ fontSize: '13px', color: '#4B5563', margin: '0' }}>Sort: {lookupDetail.bankDetails.bank_sort_code}</p>}
+                              </div>
+                            )}
+                            <a href={`#public-profile/${selectedLookupItem.data.id}`} target="_blank" rel="noopener noreferrer" style={{ fontSize: '13px', color: '#2563EB', textDecoration: 'underline', display: 'block', marginTop: '4px' }}>View reviews ↗</a>
                           </div>
                         </div>
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
