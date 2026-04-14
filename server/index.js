@@ -652,6 +652,8 @@ app.get('/api/driver/reject-booking', async (req, res) => {
       driver_action_at: new Date().toISOString(),
     }).eq('id', bookingId);
 
+    await recalculateSeats(booking.ride_id);
+
     try {
       const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
       sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
