@@ -39,6 +39,7 @@ interface RideOverview {
     driver_payout_amount: number;
     status: string;
     cancelled_by: string | null;
+    group_description: string | null;
     passenger: { id: string; name: string; email: string; phone: string | null; gender: string | null; age_group: string | null; address_line1: string | null; address_line2: string | null; city: string | null; postcode: string | null } | null;
   }>;
   totalRevenue: number;
@@ -1730,7 +1731,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                                     <span style={{ display: 'block', color: '#6B7280', fontSize: '12px' }}>{p?.age_group || '—'}</span>
                                                   </td>
                                                   <td style={{ padding: '10px 12px', color: '#6B7280', maxWidth: '180px' }}>{address || '—'}</td>
-                                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>{booking.seats_booked}</td>
+                                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: '#1F2937' }}>
+                                                    {booking.seats_booked}
+                                                    {booking.group_description && (
+                                                      <span style={{ display: 'block', fontSize: '11px', color: '#6B7280', marginTop: '2px' }}>{booking.group_description}</span>
+                                                    )}
+                                                  </td>
                                                   <td style={{ padding: '10px 12px', textAlign: 'center' }}>
                                                     <span style={{
                                                       padding: '3px 10px', borderRadius: '10px', fontSize: '11px', fontWeight: '600',
