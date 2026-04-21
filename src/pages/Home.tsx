@@ -183,11 +183,12 @@ export default function Home({ onNavigate }: HomeProps) {
       } else if (profile || bookingFor === 'someone-else') {
         const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
         const seatsRequested = parseInt(heroPassengers) || 1;
-        // Check if any booked passenger is female — use actual gender data from bookings
+        // Check if any active booked passenger is female — filter to confirmed/pending only
         // Also count Couple bookings as having a female (couple = 1 male + 1 female)
-        const bookings = (ride as any).bookings as Array<{ group_description: string | null; passenger: { gender: string } | null }> | null;
-        const hasBookedFemale = bookings?.some(b => b.passenger?.gender === 'Female' || b.group_description === 'Couple') ?? false;
-        const hasBookedMale = bookings?.some(b => b.passenger?.gender === 'Male' || b.group_description === 'Couple') ?? false;
+        const allBookings = (ride as any).bookings as Array<{ status: string; group_description: string | null; passenger: { gender: string } | null }> | null;
+        const activeBookingsForCompat = (allBookings ?? []).filter(b => b.status === 'confirmed' || b.status === 'pending_driver');
+        const hasBookedFemale = activeBookingsForCompat.some(b => b.passenger?.gender === 'Female' || b.group_description === 'Couple');
+        const hasBookedMale = activeBookingsForCompat.some(b => b.passenger?.gender === 'Male' || b.group_description === 'Couple');
         compatible = checkRideCompatibility(
           effectiveGender,
           ride.driver.gender,
