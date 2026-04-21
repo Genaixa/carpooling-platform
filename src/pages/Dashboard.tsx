@@ -512,11 +512,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             )}
 
             {/* Two-column layout: My Rides (left/top) + Passengers (right/bottom) */}
-            <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '32px', alignItems: 'flex-start' }}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '32px', alignItems: 'flex-start' }}>
 
             {/* Passengers Looking for Rides */}
             {profile?.is_approved_driver && passengerWishes.length > 0 && (
-              <div style={{ marginBottom: '40px', order: 2, flex: '1 1 380px', minWidth: 0 }}>
+              <div style={{ marginBottom: '40px', order: 2, flex: '1 1 340px', minWidth: '340px', maxWidth: isMobile ? '100%' : '440px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
                     Passengers Looking for Rides
@@ -732,7 +732,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             )}
 
             {/* My Rides + Cost-Sharing column */}
-            <div style={{ order: 1, flex: '2 1 600px', minWidth: 0 }}>
+            <div style={{ order: 1, flex: '1 1 700px', minWidth: isMobile ? '100%' : '700px' }}>
             {/* View Toggle */}
             <div style={{ display: 'flex', gap: '0', marginBottom: '24px', backgroundColor: '#E8EBED', borderRadius: '12px', padding: '4px', maxWidth: '360px' }}>
               <button
