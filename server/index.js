@@ -533,14 +533,14 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
     console.log(`✓ Payment authorized: ${paymentId}, Booking: ${bookingData.id}`);
 
     // Update available seats and check for overbooking (race condition guard)
-    await recalculateSeats(rideId);
+    await recalculateSeats(rideId); await recalculateComposition(rideId);
     const { data: rideAfter } = await supabase.from('rides').select('seats_total').eq('id', rideId).single();
     const { data: activeBookings } = await supabase.from('bookings').select('seats_booked').eq('ride_id', rideId).in('status', ['confirmed', 'pending_driver']);
     const totalBooked = (activeBookings || []).reduce((sum, b) => sum + b.seats_booked, 0);
     if (rideAfter && totalBooked > rideAfter.seats_total) {
       // Overbooked — cancel this booking and refund the hold
       await supabase.from('bookings').delete().eq('id', bookingData.id);
-      await recalculateSeats(rideId);
+      await recalculateSeats(rideId); await recalculateComposition(rideId);
       try { await squareClient.payments.cancel({ paymentId }); } catch {}
       return res.status(409).json({ error: 'Sorry, these seats were just taken. Please try again.' });
     }
@@ -607,7 +607,7 @@ app.get('/api/driver/accept-booking', async (req, res) => {
       driver_action_at: new Date().toISOString(),
     }).eq('id', bookingId);
 
-    await recalculateSeats(booking.ride_id);
+    await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     try {
       const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
@@ -652,7 +652,7 @@ app.get('/api/driver/reject-booking', async (req, res) => {
       driver_action_at: new Date().toISOString(),
     }).eq('id', bookingId);
 
-    await recalculateSeats(booking.ride_id);
+    await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     try {
       const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
@@ -706,7 +706,7 @@ app.post('/api/driver/accept-booking', async (req, res) => {
     if (updateError) throw updateError;
 
     // Update seat count
-    await recalculateSeats(booking.ride_id);
+    await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     // Send emails to passenger and driver
     try {
@@ -809,7 +809,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
         cancelled_by: 'passenger',
       }).eq('id', bookingId);
 
-      await recalculateSeats(booking.ride_id);
+      await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
       return res.json({ success: true, refundAmount: 0, message: 'Booking cancelled, no charge.' });
     }
 
@@ -853,7 +853,7 @@ app.post('/api/passenger/cancel-booking', async (req, res) => {
       cancelled_by: 'passenger',
     }).eq('id', bookingId);
 
-    await recalculateSeats(booking.ride_id);
+    await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     // Send email
     try {
@@ -1143,7 +1143,7 @@ app.post('/api/admin/accept-booking', async (req, res) => {
       driver_action_at: new Date().toISOString(),
     }).eq('id', bookingId);
 
-    await recalculateSeats(booking.ride_id);
+    await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     try {
       const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
@@ -2176,7 +2176,7 @@ app.post('/api/admin/manual-booking', paymentLimiter, async (req, res) => {
       throw bookingError;
     }
 
-    await recalculateSeats(rideId);
+    await recalculateSeats(rideId); await recalculateComposition(rideId);
 
     // Notify driver
     try {
@@ -2248,6 +2248,34 @@ async function recalculateSeats(rideId) {
   const available = Math.max(0, rideData.seats_total - totalBooked);
 
   await supabase.from('rides').update({ seats_available: available }).eq('id', rideId);
+}
+
+// Recomputes the booked gender composition on the ride record so all passengers
+// can see car composition without being blocked by RLS on the bookings table.
+async function recalculateComposition(rideId) {
+  const { data: bookings } = await supabase
+    .from('bookings')
+    .select('group_description, seats_booked, passenger:profiles!bookings_passenger_id_fkey(gender)')
+    .eq('ride_id', rideId)
+    .in('status', ['confirmed', 'pending_driver']);
+
+  let booked_males = 0, booked_females = 0, booked_couples = 0;
+  for (const b of (bookings || [])) {
+    if (b.group_description === 'Couple') {
+      booked_couples += 1;
+    } else if (b.passenger?.gender === 'Female') {
+      booked_females += (b.seats_booked || 1);
+    } else if (b.passenger?.gender === 'Male') {
+      booked_males += (b.seats_booked || 1);
+    }
+  }
+
+  const { data: ride } = await supabase.from('rides').select('existing_occupants').eq('id', rideId).single();
+  if (!ride) return;
+  const existing = ride.existing_occupants || { males: 0, females: 0, couples: 0 };
+  await supabase.from('rides').update({
+    existing_occupants: { ...existing, booked_males, booked_females, booked_couples }
+  }).eq('id', rideId);
 }
 
 /// Admin: resend a specific email for a booking
@@ -2376,7 +2404,7 @@ app.post('/api/fix-all-seats', async (req, res) => {
     const { data: rides } = await supabase.from('rides').select('id, seats_total').eq('status', 'upcoming');
     let fixed = 0;
     for (const ride of (rides || [])) {
-      await recalculateSeats(ride.id);
+      await recalculateSeats(ride.id); await recalculateComposition(ride.id);
       fixed++;
     }
     res.json({ success: true, fixed });

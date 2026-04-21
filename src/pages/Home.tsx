@@ -663,25 +663,29 @@ export default function Home({ onNavigate }: HomeProps) {
                         </td>
                       </tr>
                       {ride.driver && (() => {
-                        const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
+                        const occupants = ride.existing_occupants as { males: number; females: number; couples: number; booked_males?: number; booked_females?: number; booked_couples?: number } | null;
                         const declaredMales = (occupants?.males || 0) + (occupants?.couples || 0);
                         const declaredFemales = (occupants?.females || 0) + (occupants?.couples || 0);
                         type RideBookingEntry = { status: string; seats_booked: number; group_description: string | null; passenger: { gender: string } | null };
                         const activeBookings = ((ride as any).bookings || []).filter(
                           (b: RideBookingEntry) => b.status === 'confirmed' || b.status === 'pending_driver'
                         ) as RideBookingEntry[];
+                        // Use live bookings if RLS exposes them, otherwise fall back to server-cached booked_* fields
+                        const hasLiveBookings = activeBookings.length > 0;
                         let bookedMales = 0;
                         let bookedFemales = 0;
-                        for (const b of activeBookings) {
-                          const seats = b.seats_booked || 1;
-                          if (b.group_description === 'Couple') {
-                            bookedMales += 1;
-                            bookedFemales += 1;
-                          } else if (b.passenger?.gender === 'Female') {
-                            bookedFemales += seats;
-                          } else if (b.passenger?.gender === 'Male') {
-                            bookedMales += seats;
+                        let bookedCouples = 0;
+                        if (hasLiveBookings) {
+                          for (const b of activeBookings) {
+                            const seats = b.seats_booked || 1;
+                            if (b.group_description === 'Couple') { bookedMales += 1; bookedFemales += 1; bookedCouples += 1; }
+                            else if (b.passenger?.gender === 'Female') bookedFemales += seats;
+                            else if (b.passenger?.gender === 'Male') bookedMales += seats;
                           }
+                        } else {
+                          bookedMales = (occupants?.booked_males || 0) + (occupants?.booked_couples || 0);
+                          bookedFemales = (occupants?.booked_females || 0) + (occupants?.booked_couples || 0);
+                          bookedCouples = occupants?.booked_couples || 0;
                         }
                         const driverMale = ride.driver?.gender === 'Male' ? 1 : 0;
                         const driverFemale = ride.driver?.gender === 'Female' ? 1 : 0;
@@ -698,11 +702,17 @@ export default function Home({ onNavigate }: HomeProps) {
                         for (let i = 0; i < (occupants?.males || 0); i++) dots.push('male');
                         for (let i = 0; i < (occupants?.females || 0); i++) dots.push('female');
                         for (let i = 0; i < (occupants?.couples || 0); i++) { dots.push('male'); dots.push('female'); }
-                        for (const b of activeBookings) {
-                          const seats = b.seats_booked || 1;
-                          if (b.group_description === 'Couple') { dots.push('male'); dots.push('female'); }
-                          else if (b.passenger?.gender === 'Female') for (let i = 0; i < seats; i++) dots.push('female');
-                          else for (let i = 0; i < seats; i++) dots.push('male');
+                        if (hasLiveBookings) {
+                          for (const b of activeBookings) {
+                            const seats = b.seats_booked || 1;
+                            if (b.group_description === 'Couple') { dots.push('male'); dots.push('female'); }
+                            else if (b.passenger?.gender === 'Female') for (let i = 0; i < seats; i++) dots.push('female');
+                            else for (let i = 0; i < seats; i++) dots.push('male');
+                          }
+                        } else {
+                          for (let i = 0; i < (occupants?.booked_males || 0); i++) dots.push('male');
+                          for (let i = 0; i < (occupants?.booked_females || 0); i++) dots.push('female');
+                          for (let i = 0; i < (occupants?.booked_couples || 0); i++) { dots.push('male'); dots.push('female'); }
                         }
                         for (let i = 0; i < (ride.seats_available || 0); i++) dots.push('empty');
                         return (

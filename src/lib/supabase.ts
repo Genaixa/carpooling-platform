@@ -185,7 +185,7 @@ export interface Review {
  */
 export function getCarComposition(
   driverGender: string | null,
-  existingOccupants: { males: number; females: number; couples: number } | null
+  existingOccupants: { males: number; females: number; couples: number; booked_males?: number; booked_females?: number; booked_couples?: number } | null
 ): { males: number; females: number; couples: number } {
   let males = existingOccupants?.males || 0;
   let females = existingOccupants?.females || 0;
@@ -194,6 +194,10 @@ export function getCarComposition(
   // Each couple is 1 man + 1 woman
   males += couples;
   females += couples;
+
+  // Add server-computed booked passengers (bypasses RLS — stored on the ride record)
+  males += (existingOccupants?.booked_males || 0) + (existingOccupants?.booked_couples || 0);
+  females += (existingOccupants?.booked_females || 0) + (existingOccupants?.booked_couples || 0);
 
   if (driverGender === 'Male') {
     males += 1;
