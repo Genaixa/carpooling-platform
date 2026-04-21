@@ -511,228 +511,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             )}
 
-            {/* Grid: explicit row placement so My Rides (row 1) appears above Passengers (row 2) */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr' }}>
-
-            {/* Passengers Looking for Rides */}
-            {profile?.is_approved_driver && passengerWishes.length > 0 && (
-              <div style={{ marginBottom: '40px', gridRow: 2 }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
-                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
-                    Passengers Looking for Rides
-                  </h2>
-                  {/* Driver alert notification toggle — hidden while feature is paused
-                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: '#1F2937', backgroundColor: '#fef9e0', border: '2px solid #fcd03a', borderRadius: '12px', padding: '12px 18px', boxShadow: '0 2px 8px rgba(252,208,58,0.2)' }}>
-                    <input
-                      type="checkbox"
-                      checked={notifyDriverAlerts}
-                      onChange={(e) => handleToggleNotifyAlerts(e.target.checked)}
-                      style={{ width: '20px', height: '20px', accentColor: '#fcd03a', cursor: 'pointer', flexShrink: 0 }}
-                    />
-                    Email me when passengers in my city create alerts
-                  </label>
-                  */}
-                </div>
-                <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
-                  These passengers are looking for rides. Would you offer them a ride?
-                </p>
-                <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                  {isMobile ? (
-                    /* Mobile: expandable list */
-                    <div>
-                      {passengerWishes.map((wish) => {
-                        const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
-                        const isCompatible = checkRideCompatibility(passengerGender, profile?.gender || null, null);
-                        const matchInfo = wishMatchingRides[wish.id];
-                        const isExpanded = expandedWishId === wish.id;
-
-                        return (
-                          <div key={wish.id} style={{ borderBottom: '1px solid #E8EBED', opacity: isCompatible ? 1 : 0.6 }}>
-                            <div
-                              onClick={() => setExpandedWishId(isExpanded ? null : wish.id)}
-                              style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}
-                            >
-                              <div style={{ flex: 1, minWidth: 0 }}>
-                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {wish.departure_location} → {wish.arrival_location}
-                                </div>
-                                <div style={{ fontSize: '12px', color: '#6B7280' }}>
-                                  {new Date(wish.desired_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
-                                  {wish.desired_time ? ` at ${wish.desired_time}` : ''} · {wish.passengers_count} passenger{wish.passengers_count > 1 ? 's' : ''}
-                                  {(wish as any).booking_for === 'someone-else' && ` · For someone else${(wish as any).third_party_gender || (wish as any).third_party_age_group ? ` (${[(wish as any).third_party_gender, (wish as any).third_party_age_group].filter(Boolean).join(', ')})` : ''}`}
-                                </div>
-                              </div>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
-                                {wish.user?.gender && (
-                                  <span style={{
-                                    fontSize: '11px', padding: '3px 8px', borderRadius: '12px', fontWeight: '700',
-                                    backgroundColor: wish.user.gender === 'Female' ? '#fdf2f8' : '#eff6ff',
-                                    color: wish.user.gender === 'Female' ? '#be185d' : '#1e40af',
-                                  }}>{wish.user.gender}</span>
-                                )}
-                                {matchInfo?.mine ? (
-                                  <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>Posted</span>
-                                ) : null}
-                                <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
-                              </div>
-                            </div>
-                            {isExpanded && (
-                              <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
-                                {wish.user && (
-                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
-                                    {wish.user.age_group && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>Age {wish.user.age_group}</span>}
-                                    {(wish.user as any).marital_status && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}>{(wish.user as any).marital_status}</span>}
-                                    <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>{wish.user.travel_status === 'couple' ? 'Couple' : 'Solo'}</span>
-                                    {wish.user.city && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe' }}>{wish.user.city}</span>}
-                                    {wish.user.average_rating && wish.user.total_reviews > 0 && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a' }}>{wish.user.average_rating.toFixed(1)} ({wish.user.total_reviews})</span>}
-                                    {wish.user.is_verified && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' }}>Verified</span>}
-                                  </div>
-                                )}
-                                {matchInfo && (matchInfo.mine > 0 || matchInfo.others > 0) && (
-                                  <div style={{ marginBottom: '10px' }}>
-                                    {matchInfo.mine > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#fef9e0', borderRadius: '6px', border: '1px solid #fcd03a', marginBottom: '4px' }}><p style={{ margin: 0, fontSize: '12px', color: '#000000', fontWeight: '600' }}>You've already posted a ride for this</p></div>}
-                                    {matchInfo.others > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#fff7ed', borderRadius: '6px', border: '1px solid #fed7aa' }}><p style={{ margin: 0, fontSize: '12px', color: '#9a3412', fontWeight: '600' }}>{matchInfo.others} other driver{matchInfo.others > 1 ? 's' : ''} already posted</p></div>}
-                                  </div>
-                                )}
-                                {isCompatible ? (
-                                  <button
-                                    onClick={() => { sessionStorage.setItem('prefill-ride', JSON.stringify({ from: wish.departure_location, to: wish.arrival_location, date: wish.desired_date, time: wish.desired_time || '', passengers: wish.passengers_count })); onNavigate('post-ride'); }}
-                                    style={{ width: '100%', padding: '10px', background: matchInfo?.mine ? '#E8EBED' : '#000000', color: matchInfo?.mine ? '#4B5563' : '#fcd03a', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
-                                  >{matchInfo?.mine ? 'Post Another Ride' : 'Post This Ride'}</button>
-                                ) : (
-                                  <p style={{ margin: 0, fontSize: '12px', color: '#6B7280', fontWeight: '500', padding: '8px', backgroundColor: '#f3f4f6', borderRadius: '6px', textAlign: 'center' }}>
-                                    Gender incompatible — {wish.user?.gender === 'Female' ? 'female passengers require a woman in the car' : 'male passengers require a man in the car'}
-                                  </p>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    /* Desktop: table */
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                      <thead>
-                        <tr style={{ backgroundColor: '#F8FAFB' }}>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Date & Time</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Passengers</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Gender</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Booking For</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Status</th>
-                          <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Action</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {passengerWishes.map((wish) => {
-                          const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
-                          const isCompatible = checkRideCompatibility(passengerGender, profile?.gender || null, null);
-                          const matchInfo = wishMatchingRides[wish.id];
-                          const isExpanded = expandedWishId === wish.id;
-                          const borderColor = isCompatible ? '#fcd03a' : '#d1d5db';
-
-                          return (
-                            <React.Fragment key={wish.id}>
-                              <tr
-                                onClick={() => setExpandedWishId(isExpanded ? null : wish.id)}
-                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${borderColor}`, opacity: isCompatible ? 1 : 0.6 }}
-                                onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
-                                onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
-                              >
-                                <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                  {wish.departure_location} → {wish.arrival_location}
-                                </td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
-                                  {new Date(wish.desired_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
-                                  {wish.desired_time && <><br /><span style={{ color: '#9CA3AF', fontSize: '12px' }}>{wish.desired_time}</span></>}
-                                </td>
-                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
-                                  {wish.passengers_count}
-                                </td>
-                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
-                                  {wish.user?.gender && (
-                                    <span style={{
-                                      display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '700',
-                                      backgroundColor: wish.user.gender === 'Female' ? '#fdf2f8' : '#eff6ff',
-                                      color: wish.user.gender === 'Female' ? '#be185d' : '#1e40af',
-                                    }}>{wish.user.gender}</span>
-                                  )}
-                                </td>
-                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
-                                  {(wish as any).booking_for === 'someone-else' ? (
-                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
-                                      <span style={{ display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '700', backgroundColor: '#fef3c7', color: '#92400e' }}>
-                                        Someone else
-                                      </span>
-                                      <span style={{ fontSize: '11px', color: '#6B7280' }}>
-                                        {[(wish as any).third_party_gender, (wish as any).third_party_age_group].filter(Boolean).join(', ') || ''}
-                                      </span>
-                                    </div>
-                                  ) : (
-                                    <span style={{ display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#4B5563' }}>Themselves</span>
-                                  )}
-                                </td>
-                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
-                                  {matchInfo?.mine ? (
-                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>Posted</span>
-                                  ) : matchInfo?.others ? (
-                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fff7ed', color: '#9a3412' }}>{matchInfo.others} other{matchInfo.others > 1 ? 's' : ''}</span>
-                                  ) : !isCompatible ? (
-                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#6B7280' }}>Incompatible</span>
-                                  ) : (
-                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef3c7', color: '#92400e' }}>Needed</span>
-                                  )}
-                                </td>
-                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
-                                  {isCompatible && (
-                                    <button
-                                      onClick={() => { sessionStorage.setItem('prefill-ride', JSON.stringify({ from: wish.departure_location, to: wish.arrival_location, date: wish.desired_date, time: wish.desired_time || '', passengers: wish.passengers_count })); onNavigate('post-ride'); }}
-                                      style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', background: matchInfo?.mine ? '#E8EBED' : '#000000', color: matchInfo?.mine ? '#4B5563' : '#fcd03a', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
-                                    >{matchInfo?.mine ? 'Post Another' : 'Post Ride'}</button>
-                                  )}
-                                </td>
-                              </tr>
-                              {isExpanded && (
-                                <tr>
-                                  <td colSpan={7} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
-                                    {wish.user && (
-                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 0 6px' }}>
-                                        {wish.user.age_group && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>Age {wish.user.age_group}</span>}
-                                        {(wish.user as any).marital_status && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}>{(wish.user as any).marital_status}</span>}
-                                        <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>{wish.user.travel_status === 'couple' ? 'Couple' : 'Solo'}</span>
-                                        {wish.user.city && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe' }}>{wish.user.city}</span>}
-                                        {wish.user.average_rating && wish.user.total_reviews > 0 && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a' }}>{wish.user.average_rating.toFixed(1)} ({wish.user.total_reviews} {wish.user.total_reviews === 1 ? 'review' : 'reviews'})</span>}
-                                        {wish.user.is_verified && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' }}>Verified</span>}
-                                        <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Member since {new Date(wish.user.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>
-                                      </div>
-                                    )}
-                                    {matchInfo && (matchInfo.mine > 0 || matchInfo.others > 0) && (
-                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
-                                        {matchInfo.mine > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid #fcd03a' }}><p style={{ margin: 0, fontSize: '12px', color: '#000000', fontWeight: '600' }}>You've already posted a ride for this route and date</p></div>}
-                                        {matchInfo.others > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}><p style={{ margin: 0, fontSize: '12px', color: '#9a3412', fontWeight: '600' }}>{matchInfo.others} other driver{matchInfo.others > 1 ? 's have' : ' has'} already posted a ride for this</p></div>}
-                                      </div>
-                                    )}
-                                    {!isCompatible && (
-                                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>
-                                        Gender incompatible — {wish.user?.gender === 'Female' ? 'female passengers require at least one woman in the car' : 'male passengers require at least one man in the car'}
-                                      </p>
-                                    )}
-                                  </td>
-                                </tr>
-                              )}
-                            </React.Fragment>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* My Rides + Cost-Sharing */}
-            <div style={{ gridRow: 1 }}>
             {/* View Toggle */}
             <div style={{ display: 'flex', gap: '0', marginBottom: '24px', backgroundColor: '#E8EBED', borderRadius: '12px', padding: '4px', maxWidth: '360px' }}>
               <button
@@ -1275,8 +1053,223 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 </>
               );
             })()}
-            </div>{/* end My Rides column */}
-            </div>{/* end two-column flex */}
+
+            {/* Passengers Looking for Rides */}
+            {profile?.is_approved_driver && passengerWishes.length > 0 && (
+              <div style={{ marginTop: '40px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                  <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
+                    Passengers Looking for Rides
+                  </h2>
+                  {/* Driver alert notification toggle — hidden while feature is paused
+                  <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '15px', fontWeight: '700', color: '#1F2937', backgroundColor: '#fef9e0', border: '2px solid #fcd03a', borderRadius: '12px', padding: '12px 18px', boxShadow: '0 2px 8px rgba(252,208,58,0.2)' }}>
+                    <input
+                      type="checkbox"
+                      checked={notifyDriverAlerts}
+                      onChange={(e) => handleToggleNotifyAlerts(e.target.checked)}
+                      style={{ width: '20px', height: '20px', accentColor: '#fcd03a', cursor: 'pointer', flexShrink: 0 }}
+                    />
+                    Email me when passengers in my city create alerts
+                  </label>
+                  */}
+                </div>
+                <p style={{ color: '#6B7280', fontSize: '14px', marginBottom: '16px' }}>
+                  These passengers are looking for rides. Would you offer them a ride?
+                </p>
+                <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
+                  {isMobile ? (
+                    /* Mobile: expandable list */
+                    <div>
+                      {passengerWishes.map((wish) => {
+                        const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
+                        const isCompatible = checkRideCompatibility(passengerGender, profile?.gender || null, null);
+                        const matchInfo = wishMatchingRides[wish.id];
+                        const isExpanded = expandedWishId === wish.id;
+
+                        return (
+                          <div key={wish.id} style={{ borderBottom: '1px solid #E8EBED', opacity: isCompatible ? 1 : 0.6 }}>
+                            <div
+                              onClick={() => setExpandedWishId(isExpanded ? null : wish.id)}
+                              style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}
+                            >
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {wish.departure_location} → {wish.arrival_location}
+                                </div>
+                                <div style={{ fontSize: '12px', color: '#6B7280' }}>
+                                  {new Date(wish.desired_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                  {wish.desired_time ? ` at ${wish.desired_time}` : ''} · {wish.passengers_count} passenger{wish.passengers_count > 1 ? 's' : ''}
+                                  {(wish as any).booking_for === 'someone-else' && ` · For someone else${(wish as any).third_party_gender || (wish as any).third_party_age_group ? ` (${[(wish as any).third_party_gender, (wish as any).third_party_age_group].filter(Boolean).join(', ')})` : ''}`}
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0, marginLeft: '10px' }}>
+                                {wish.user?.gender && (
+                                  <span style={{
+                                    fontSize: '11px', padding: '3px 8px', borderRadius: '12px', fontWeight: '700',
+                                    backgroundColor: wish.user.gender === 'Female' ? '#fdf2f8' : '#eff6ff',
+                                    color: wish.user.gender === 'Female' ? '#be185d' : '#1e40af',
+                                  }}>{wish.user.gender}</span>
+                                )}
+                                {matchInfo?.mine ? (
+                                  <span style={{ padding: '3px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>Posted</span>
+                                ) : null}
+                                <span style={{ fontSize: '16px', color: '#9CA3AF', transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }}>▼</span>
+                              </div>
+                            </div>
+                            {isExpanded && (
+                              <div style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB' }}>
+                                {wish.user && (
+                                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginBottom: '10px' }}>
+                                    {wish.user.age_group && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>Age {wish.user.age_group}</span>}
+                                    {(wish.user as any).marital_status && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}>{(wish.user as any).marital_status}</span>}
+                                    <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>{wish.user.travel_status === 'couple' ? 'Couple' : 'Solo'}</span>
+                                    {wish.user.city && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe' }}>{wish.user.city}</span>}
+                                    {wish.user.average_rating && wish.user.total_reviews > 0 && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a' }}>{wish.user.average_rating.toFixed(1)} ({wish.user.total_reviews})</span>}
+                                    {wish.user.is_verified && <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' }}>Verified</span>}
+                                  </div>
+                                )}
+                                {matchInfo && (matchInfo.mine > 0 || matchInfo.others > 0) && (
+                                  <div style={{ marginBottom: '10px' }}>
+                                    {matchInfo.mine > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#fef9e0', borderRadius: '6px', border: '1px solid #fcd03a', marginBottom: '4px' }}><p style={{ margin: 0, fontSize: '12px', color: '#000000', fontWeight: '600' }}>You've already posted a ride for this</p></div>}
+                                    {matchInfo.others > 0 && <div style={{ padding: '6px 10px', backgroundColor: '#fff7ed', borderRadius: '6px', border: '1px solid #fed7aa' }}><p style={{ margin: 0, fontSize: '12px', color: '#9a3412', fontWeight: '600' }}>{matchInfo.others} other driver{matchInfo.others > 1 ? 's' : ''} already posted</p></div>}
+                                  </div>
+                                )}
+                                {isCompatible ? (
+                                  <button
+                                    onClick={() => { sessionStorage.setItem('prefill-ride', JSON.stringify({ from: wish.departure_location, to: wish.arrival_location, date: wish.desired_date, time: wish.desired_time || '', passengers: wish.passengers_count })); onNavigate('post-ride'); }}
+                                    style={{ width: '100%', padding: '10px', background: matchInfo?.mine ? '#E8EBED' : '#000000', color: matchInfo?.mine ? '#4B5563' : '#fcd03a', border: 'none', borderRadius: '8px', fontSize: '13px', fontWeight: '600', cursor: 'pointer' }}
+                                  >{matchInfo?.mine ? 'Post Another Ride' : 'Post This Ride'}</button>
+                                ) : (
+                                  <p style={{ margin: 0, fontSize: '12px', color: '#6B7280', fontWeight: '500', padding: '8px', backgroundColor: '#f3f4f6', borderRadius: '6px', textAlign: 'center' }}>
+                                    Gender incompatible — {wish.user?.gender === 'Female' ? 'female passengers require a woman in the car' : 'male passengers require a man in the car'}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    /* Desktop: table */
+                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                      <thead>
+                        <tr style={{ backgroundColor: '#F8FAFB' }}>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Route</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED', whiteSpace: 'nowrap' }}>Date & Time</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Passengers</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Gender</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Booking For</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'center', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Status</th>
+                          <th style={{ padding: '12px 16px', textAlign: 'right', fontSize: '13px', fontWeight: '600', color: '#1F2937', borderBottom: '2px solid #E8EBED' }}>Action</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {passengerWishes.map((wish) => {
+                          const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
+                          const isCompatible = checkRideCompatibility(passengerGender, profile?.gender || null, null);
+                          const matchInfo = wishMatchingRides[wish.id];
+                          const isExpanded = expandedWishId === wish.id;
+                          const borderColor = isCompatible ? '#fcd03a' : '#d1d5db';
+
+                          return (
+                            <React.Fragment key={wish.id}>
+                              <tr
+                                onClick={() => setExpandedWishId(isExpanded ? null : wish.id)}
+                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${borderColor}`, opacity: isCompatible ? 1 : 0.6 }}
+                                onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
+                                onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+                              >
+                                <td style={{ padding: '12px 16px', fontSize: '14px', fontWeight: '600', color: '#1F2937', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', maxWidth: '260px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                  {wish.departure_location} → {wish.arrival_location}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap' }}>
+                                  {new Date(wish.desired_date + 'T00:00:00').toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' })}
+                                  {wish.desired_time && <><br /><span style={{ color: '#9CA3AF', fontSize: '12px' }}>{wish.desired_time}</span></>}
+                                </td>
+                                <td style={{ padding: '12px 16px', fontSize: '13px', color: '#4B5563', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  {wish.passengers_count}
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  {wish.user?.gender && (
+                                    <span style={{
+                                      display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '700',
+                                      backgroundColor: wish.user.gender === 'Female' ? '#fdf2f8' : '#eff6ff',
+                                      color: wish.user.gender === 'Female' ? '#be185d' : '#1e40af',
+                                    }}>{wish.user.gender}</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  {(wish as any).booking_for === 'someone-else' ? (
+                                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px' }}>
+                                      <span style={{ display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '700', backgroundColor: '#fef3c7', color: '#92400e' }}>
+                                        Someone else
+                                      </span>
+                                      <span style={{ fontSize: '11px', color: '#6B7280' }}>
+                                        {[(wish as any).third_party_gender, (wish as any).third_party_age_group].filter(Boolean).join(', ') || ''}
+                                      </span>
+                                    </div>
+                                  ) : (
+                                    <span style={{ display: 'inline-block', fontSize: '11px', padding: '3px 10px', borderRadius: '12px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#4B5563' }}>Themselves</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'center' }}>
+                                  {matchInfo?.mine ? (
+                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef9e0', color: '#000000' }}>Posted</span>
+                                  ) : matchInfo?.others ? (
+                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fff7ed', color: '#9a3412' }}>{matchInfo.others} other{matchInfo.others > 1 ? 's' : ''}</span>
+                                  ) : !isCompatible ? (
+                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#f3f4f6', color: '#6B7280' }}>Incompatible</span>
+                                  ) : (
+                                    <span style={{ display: 'inline-block', padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '600', backgroundColor: '#fef3c7', color: '#92400e' }}>Needed</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '12px 16px', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', textAlign: 'right' }} onClick={(e) => e.stopPropagation()}>
+                                  {isCompatible && (
+                                    <button
+                                      onClick={() => { sessionStorage.setItem('prefill-ride', JSON.stringify({ from: wish.departure_location, to: wish.arrival_location, date: wish.desired_date, time: wish.desired_time || '', passengers: wish.passengers_count })); onNavigate('post-ride'); }}
+                                      style={{ padding: '6px 12px', fontSize: '12px', fontWeight: '600', background: matchInfo?.mine ? '#E8EBED' : '#000000', color: matchInfo?.mine ? '#4B5563' : '#fcd03a', border: 'none', borderRadius: '6px', cursor: 'pointer' }}
+                                    >{matchInfo?.mine ? 'Post Another' : 'Post Ride'}</button>
+                                  )}
+                                </td>
+                              </tr>
+                              {isExpanded && (
+                                <tr>
+                                  <td colSpan={7} style={{ padding: '0 16px 16px', backgroundColor: '#F8FAFB', borderBottom: '1px solid #E8EBED' }}>
+                                    {wish.user && (
+                                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', padding: '8px 0 6px' }}>
+                                        {wish.user.age_group && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fff7ed', color: '#9a3412', border: '1px solid #fed7aa' }}>Age {wish.user.age_group}</span>}
+                                        {(wish.user as any).marital_status && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fdf4ff', color: '#7e22ce', border: '1px solid #e9d5ff' }}>{(wish.user as any).marital_status}</span>}
+                                        <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#eff6ff', color: '#1e40af', border: '1px solid #bfdbfe' }}>{wish.user.travel_status === 'couple' ? 'Couple' : 'Solo'}</span>
+                                        {wish.user.city && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#f5f3ff', color: '#5b21b6', border: '1px solid #ddd6fe' }}>{wish.user.city}</span>}
+                                        {wish.user.average_rating && wish.user.total_reviews > 0 && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a' }}>{wish.user.average_rating.toFixed(1)} ({wish.user.total_reviews} {wish.user.total_reviews === 1 ? 'review' : 'reviews'})</span>}
+                                        {wish.user.is_verified && <span style={{ fontSize: '12px', padding: '3px 8px', borderRadius: '12px', backgroundColor: '#fef9e0', color: '#000000', border: '1px solid #fcd03a' }}>Verified</span>}
+                                        <span style={{ fontSize: '12px', color: '#9CA3AF' }}>Member since {new Date(wish.user.created_at).toLocaleDateString('en-GB', { month: 'short', year: 'numeric' })}</span>
+                                      </div>
+                                    )}
+                                    {matchInfo && (matchInfo.mine > 0 || matchInfo.others > 0) && (
+                                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '6px' }}>
+                                        {matchInfo.mine > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#fef9e0', borderRadius: '8px', border: '1px solid #fcd03a' }}><p style={{ margin: 0, fontSize: '12px', color: '#000000', fontWeight: '600' }}>You've already posted a ride for this route and date</p></div>}
+                                        {matchInfo.others > 0 && <div style={{ padding: '6px 12px', backgroundColor: '#fff7ed', borderRadius: '8px', border: '1px solid #fed7aa' }}><p style={{ margin: 0, fontSize: '12px', color: '#9a3412', fontWeight: '600' }}>{matchInfo.others} other driver{matchInfo.others > 1 ? 's have' : ' has'} already posted a ride for this</p></div>}
+                                      </div>
+                                    )}
+                                    {!isCompatible && (
+                                      <p style={{ margin: '4px 0 0', fontSize: '12px', color: '#6B7280', fontWeight: '500' }}>
+                                        Gender incompatible — {wish.user?.gender === 'Female' ? 'female passengers require at least one woman in the car' : 'male passengers require at least one man in the car'}
+                                      </p>
+                                    )}
+                                  </td>
+                                </tr>
+                              )}
+                            </React.Fragment>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+              </div>
+            )}
           </>
         )}
       </main>
