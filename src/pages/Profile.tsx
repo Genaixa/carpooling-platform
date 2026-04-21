@@ -3,6 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 
 import Avatar from '../components/Avatar';
+import StarRating from '../components/StarRating';
 import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
 
@@ -33,6 +34,18 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [loading, setLoading] = useState(false);
   const [licenceUploading, setLicenceUploading] = useState(false);
   const [notifyDriverAlerts, setNotifyDriverAlerts] = useState(true);
+  const [myReviews, setMyReviews] = useState<Array<{ id: string; rating: number; comment: string | null; type: string; created_at: string }>>([]);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('reviews')
+        .select('id, rating, comment, type, created_at')
+        .eq('reviewee_id', user.id)
+        .order('created_at', { ascending: false })
+        .then(({ data }) => setMyReviews(data || []));
+    }
+  }, [user]);
 
   useEffect(() => {
     if (profile) {
@@ -731,6 +744,53 @@ export default function Profile({ onNavigate }: ProfileProps) {
           </div>
         )}
         */}
+
+        {/* My Reviews */}
+        <div style={{
+          backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+          boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px',
+        }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1F2937', marginBottom: '16px' }}>
+            My Reviews
+          </h3>
+          {myReviews.length === 0 ? (
+            <p style={{ fontSize: '14px', color: '#9CA3AF', margin: 0 }}>No reviews received yet.</p>
+          ) : (
+            <>
+              {/* Summary */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px', padding: '16px 20px', backgroundColor: '#fef9e0', border: '2px solid #fcd03a', borderRadius: '12px' }}>
+                <StarRating rating={profile?.average_rating || 0} size="lg" />
+                <span style={{ fontSize: '24px', fontWeight: '800', color: '#1F2937' }}>
+                  {profile?.average_rating?.toFixed(1) || '—'}
+                </span>
+                <span style={{ fontSize: '14px', color: '#6B7280' }}>
+                  from {myReviews.length} review{myReviews.length !== 1 ? 's' : ''}
+                </span>
+              </div>
+              {/* Individual reviews */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                {myReviews.map((review) => (
+                  <div key={review.id} style={{ padding: '14px 16px', backgroundColor: '#F8FAFB', borderRadius: '12px', borderLeft: '4px solid #fcd03a' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: review.comment ? '8px' : '0' }}>
+                      <StarRating rating={review.rating} size="sm" />
+                      <span style={{ fontSize: '12px', fontWeight: '600', color: '#6B7280', textTransform: 'capitalize' }}>
+                        {review.type === 'driver-to-passenger' ? 'Review as passenger' : 'Review as driver'}
+                      </span>
+                      <span style={{ fontSize: '12px', color: '#9CA3AF', marginLeft: 'auto' }}>
+                        {new Date(review.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                      </span>
+                    </div>
+                    {review.comment && (
+                      <p style={{ margin: 0, fontSize: '14px', color: '#4B5563', fontStyle: 'italic' }}>
+                        "{review.comment}"
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         {/* Safety Info Card */}
         <div style={{
