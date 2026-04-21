@@ -140,7 +140,7 @@ export default function Home({ onNavigate }: HomeProps) {
         .select(`
           *,
           driver:profiles(id, name, gender, age_group, marital_status, city, profile_photo_url, average_rating, total_reviews, is_approved_driver, driver_tier),
-          bookings(group_description, passenger:profiles!bookings_passenger_id_fkey(gender))
+          bookings(status, seats_booked, group_description, passenger:profiles!bookings_passenger_id_fkey(gender))
         `)
         .eq('status', 'upcoming')
         .gte('date_time', new Date().toISOString())
@@ -657,22 +657,53 @@ export default function Home({ onNavigate }: HomeProps) {
                           <span style={{ fontWeight: '600' }}>{new Date(ride.date_time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</span>
                           {ride.seats_available === 0
                             ? <span style={{ color: '#9CA3AF' }}> · Fully booked</span>
-                            : <>{' · '}{ride.seats_available}{ride.seats_total > ride.seats_available ? ` of ${ride.seats_total}` : ''} seat{ride.seats_available !== 1 ? 's' : ''} available</>
+                            : <>{' · '}{ride.seats_available} seat{ride.seats_available !== 1 ? 's' : ''} available{ride.seats_total > ride.seats_available ? ` (out of ${ride.seats_total})` : ''}</>
                           }
                         </td>
                       </tr>
                       {ride.driver && (() => {
                         const occupants = ride.existing_occupants as { males: number; females: number; couples: number } | null;
-                        const males = (occupants?.males || 0) + (occupants?.couples || 0);
-                        const females = (occupants?.females || 0) + (occupants?.couples || 0);
-                        const declaredTotal = males + females;
-                        const bookedSeats = (ride.seats_total || 0) - (ride.seats_available || 0);
+                        const declaredMales = (occupants?.males || 0) + (occupants?.couples || 0);
+                        const declaredFemales = (occupants?.females || 0) + (occupants?.couples || 0);
+                        type RideBookingEntry = { status: string; seats_booked: number; group_description: string | null; passenger: { gender: string } | null };
+                        const activeBookings = ((ride as any).bookings || []).filter(
+                          (b: RideBookingEntry) => b.status === 'confirmed' || b.status === 'pending_driver'
+                        ) as RideBookingEntry[];
+                        let bookedMales = 0;
+                        let bookedFemales = 0;
+                        for (const b of activeBookings) {
+                          const seats = b.seats_booked || 1;
+                          if (b.group_description === 'Couple') {
+                            bookedMales += 1;
+                            bookedFemales += 1;
+                          } else if (b.passenger?.gender === 'Female') {
+                            bookedFemales += seats;
+                          } else if (b.passenger?.gender === 'Male') {
+                            bookedMales += seats;
+                          }
+                        }
+                        const driverMale = ride.driver?.gender === 'Male' ? 1 : 0;
+                        const driverFemale = ride.driver?.gender === 'Female' ? 1 : 0;
+                        const totalMales = driverMale + declaredMales + bookedMales;
+                        const totalFemales = driverFemale + declaredFemales + bookedFemales;
                         const passengerParts = [
-                          ...(males > 0 ? [`Male: ${males}`] : []),
-                          ...(females > 0 ? [`Female: ${females}`] : []),
-                          ...(bookedSeats > 0 ? [`${bookedSeats} booked`] : []),
+                          ...(totalMales > 0 ? [`${totalMales} Male${totalMales !== 1 ? 's' : ''}`] : []),
+                          ...(totalFemales > 0 ? [`${totalFemales} Female${totalFemales !== 1 ? 's' : ''}`] : []),
                         ];
-                        const totalInVehicle = 1 + declaredTotal + bookedSeats;
+                        // Build dot map: driver + declared occupants + booked passengers + empty seats
+                        const dots: string[] = [];
+                        if (ride.driver?.gender === 'Male') dots.push('male');
+                        else if (ride.driver?.gender === 'Female') dots.push('female');
+                        for (let i = 0; i < (occupants?.males || 0); i++) dots.push('male');
+                        for (let i = 0; i < (occupants?.females || 0); i++) dots.push('female');
+                        for (let i = 0; i < (occupants?.couples || 0); i++) { dots.push('male'); dots.push('female'); }
+                        for (const b of activeBookings) {
+                          const seats = b.seats_booked || 1;
+                          if (b.group_description === 'Couple') { dots.push('male'); dots.push('female'); }
+                          else if (b.passenger?.gender === 'Female') for (let i = 0; i < seats; i++) dots.push('female');
+                          else for (let i = 0; i < seats; i++) dots.push('male');
+                        }
+                        for (let i = 0; i < (ride.seats_available || 0); i++) dots.push('empty');
                         return (
                           <>
                             <tr>
@@ -688,7 +719,11 @@ export default function Home({ onNavigate }: HomeProps) {
                             </tr>
                             <tr>
                               <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
-                                Passengers: {passengerParts.length > 0 ? passengerParts.join(', ') : 'None yet'} · Total in vehicle: {totalInVehicle}
+                                <span>In car (inc. driver): {passengerParts.length > 0 ? passengerParts.join(' and ') : 'Driver only'}</span>
+                                <span style={{ marginLeft: '8px' }}>🚗</span>
+                                {dots.map((type, i) => (
+                                  <span key={i} title={type === 'empty' ? 'Available seat' : type === 'male' ? 'Male' : 'Female'} style={{ display: 'inline-block', width: '10px', height: '10px', borderRadius: '50%', marginRight: '3px', verticalAlign: 'middle', backgroundColor: type === 'male' ? '#3B82F6' : type === 'female' ? '#EC4899' : '#D1D5DB' }} />
+                                ))}
                               </td>
                             </tr>
                           </>
