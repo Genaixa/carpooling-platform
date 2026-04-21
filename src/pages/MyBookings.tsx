@@ -650,8 +650,8 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                         const contactVisible = isContactVisible(booking.ride.date_time);
                         const isExpanded = expandedPastId === booking.id;
                         return (
-                          <div key={booking.id} style={{ borderBottom: '1px solid #E8EBED', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#fcd03a'}` }}>
-                            <div onClick={() => setExpandedPastId(isExpanded ? null : booking.id)} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}>
+                          <div key={booking.id} style={{ borderBottom: '1px solid #E8EBED', borderLeft: '6px solid #0d9488' }}>
+                            <div onClick={() => setExpandedPastId(isExpanded ? null : booking.id)} style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#ccfbf1' : '#f0fdfa' }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                   {booking.ride.departure_location} → {booking.ride.arrival_location}
@@ -739,9 +739,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
                             <React.Fragment key={booking.id}>
                               <tr
                                 onClick={() => setExpandedPastId(isExpanded ? null : booking.id)}
-                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${booking.status === 'pending_driver' ? '#f59e0b' : '#fcd03a'}` }}
-                                onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
-                                onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+                                style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#ccfbf1' : '#f0fdfa', borderLeft: '6px solid #0d9488' }}
+                                onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#ccfbf1'; }}
+                                onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#f0fdfa'; }}
                               >
                                 <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '600', color: '#6B7280', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
                                   {getRideRef(booking.ride_id)}
