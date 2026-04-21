@@ -434,7 +434,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
 
               {/* Price and Max Luggage Items */}
               <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : formData.luggageSize !== 'none' ? '1fr 1fr' : '1fr', gap: '20px', marginBottom: '20px' }}>
-                <div>
+                <div style={{ order: isMobile ? 2 : 1 }}>
                   <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Price per Seat (£) *</label>
                   {(() => {
                     const miles = dynamicMiles ?? getRouteMiles(formData.from, formData.to);
@@ -488,7 +488,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   )}
                 </div>
                 {formData.luggageSize !== 'none' && (
-                  <div>
+                  <div style={{ order: isMobile ? 1 : 2 }}>
                     <label style={{ display: 'block', fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '8px' }}>Max Luggage Items</label>
                     <input name="luggageCount" type="number" min="1" max="10" value={formData.luggageCount} onChange={handleChange} placeholder="e.g., 3" style={{ width: '100%', padding: '14px', fontSize: '16px', border: '2px solid #E8EBED', borderRadius: '12px', transition: 'border-color 0.3s' }} />
                   </div>
