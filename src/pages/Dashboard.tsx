@@ -511,12 +511,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             )}
 
-            {/* Stacked layout: My Rides first, Passengers second */}
-            <div style={{ display: 'flex', flexDirection: 'column' }}>
+            {/* column-reverse: DOM order is Passengers then My Rides, visually My Rides appears on top */}
+            <div style={{ display: 'flex', flexDirection: 'column-reverse' }}>
 
             {/* Passengers Looking for Rides */}
             {profile?.is_approved_driver && passengerWishes.length > 0 && (
-              <div style={{ marginBottom: '40px', order: 2 }}>
+              <div style={{ marginBottom: '40px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
                     Passengers Looking for Rides
@@ -732,7 +732,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             )}
 
             {/* My Rides + Cost-Sharing */}
-            <div style={{ order: 1 }}>
+            <div>
             {/* View Toggle */}
             <div style={{ display: 'flex', gap: '0', marginBottom: '24px', backgroundColor: '#E8EBED', borderRadius: '12px', padding: '4px', maxWidth: '360px' }}>
               <button
