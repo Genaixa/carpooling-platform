@@ -1055,7 +1055,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             })()}
 
             {/* Passengers Looking for Rides */}
-            {profile?.is_approved_driver && passengerWishes.length > 0 && (
+            {profile?.is_approved_driver && (
               <div style={{ marginTop: '40px' }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
                   <h2 style={{ fontSize: '24px', fontWeight: 'bold', color: '#1F2937', margin: 0 }}>
@@ -1077,7 +1077,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   These passengers are looking for rides. Would you offer them a ride?
                 </p>
                 <div style={{ backgroundColor: 'white', borderRadius: '20px', boxShadow: '0 4px 20px rgba(0,0,0,0.06)', overflow: 'hidden' }}>
-                  {isMobile ? (
+                  {passengerWishes.length === 0 ? (
+                    <div style={{ padding: '40px 24px', textAlign: 'center', color: '#9CA3AF', fontSize: '15px' }}>
+                      No passengers are currently looking for rides.
+                    </div>
+                  ) : isMobile ? (
                     /* Mobile: expandable list */
                     <div>
                       {passengerWishes.map((wish) => {
