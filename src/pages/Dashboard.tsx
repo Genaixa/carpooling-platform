@@ -587,10 +587,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           const isPastDeparture = new Date(ride.date_time) < new Date();
 
                           return (
-                            <div key={ride.id} style={{ borderBottom: '1px solid #E8EBED' }}>
+                            <div key={ride.id} style={{ borderBottom: '1px solid #E8EBED', borderLeft: `${ride.status === 'upcoming' && !isPastDeparture ? '6px' : '4px'} solid ${ride.status === 'cancelled' ? '#d1d5db' : ride.status === 'completed' ? '#3b82f6' : '#fcd03a'}` }}>
                               <div
                                 onClick={() => setExpandedRideId(isExpanded ? null : ride.id)}
-                                style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : 'white' }}
+                                style={{ padding: '14px 16px', cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center', backgroundColor: isExpanded ? '#F8FAFB' : (ride.status === 'upcoming' && !isPastDeparture ? '#fffef5' : 'white') }}
                               >
                                 <div style={{ flex: 1, minWidth: 0 }}>
                                   <div style={{ fontSize: '14px', fontWeight: '600', color: '#1F2937', marginBottom: '4px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -686,9 +686,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               <React.Fragment key={ride.id}>
                                 <tr
                                   onClick={() => setExpandedRideId(isExpanded ? null : ride.id)}
-                                  style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : 'white', borderLeft: `4px solid ${ride.status === 'cancelled' ? '#ef4444' : ride.status === 'completed' ? '#3b82f6' : '#fcd03a'}` }}
-                                  onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = '#FAFBFC'; }}
-                                  onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = 'white'; }}
+                                  style={{ cursor: 'pointer', backgroundColor: isExpanded ? '#F8FAFB' : (ride.status === 'upcoming' && !isPastDeparture ? '#fffef5' : 'white'), borderLeft: `${ride.status === 'upcoming' && !isPastDeparture ? '6px' : '4px'} solid ${ride.status === 'cancelled' ? '#d1d5db' : ride.status === 'completed' ? '#3b82f6' : '#fcd03a'}` }}
+                                  onMouseEnter={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = ride.status === 'upcoming' && !isPastDeparture ? '#fffce0' : '#FAFBFC'; }}
+                                  onMouseLeave={(e) => { if (!isExpanded) e.currentTarget.style.backgroundColor = ride.status === 'upcoming' && !isPastDeparture ? '#fffef5' : 'white'; }}
                                 >
                                   <td style={{ padding: '12px 16px', fontSize: '12px', fontWeight: '500', color: '#9CA3AF', borderBottom: isExpanded ? 'none' : '1px solid #E8EBED', whiteSpace: 'nowrap', fontFamily: 'monospace' }}>
                                     {getRideRef(ride.id)}
