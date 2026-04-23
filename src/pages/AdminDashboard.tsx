@@ -65,7 +65,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const isMobile = useIsMobile();
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts' | 'phone'>('applications');
+  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts' | 'phone' | 'activity'>('applications');
   const [phoneSubTab, setPhoneSubTab] = useState<'booking' | 'ride'>('booking');
   const [alertWishes, setAlertWishes] = useState<any[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -99,6 +99,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [payoutAmount, setPayoutAmount] = useState('');
   const [payoutNotes, setPayoutNotes] = useState('');
   const [rideStatusFilter, setRideStatusFilter] = useState<'all' | 'upcoming' | 'completed' | 'cancelled'>('all');
+
+  // Activity tab state
+  const [activityData, setActivityData] = useState<any[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+  const [activityPeriod, setActivityPeriod] = useState<7 | 30 | 90 | 0>(30);
 
   // Users tab state
   const [usersData, setUsersData] = useState<any[]>([]);
@@ -143,6 +148,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       else if (tab === 'licence-reviews') loadPendingLicences();
       else if (tab === 'finances') loadFinancialData();
       else if (tab === 'users') loadUsersData();
+      else if (tab === 'activity') loadActivityData();
     }
   }, [user, profile, filter, tab]);
 
@@ -219,6 +225,24 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error(err.message || 'Failed to reject licence');
     } finally {
       setActionLoading(null);
+    }
+  };
+
+  const loadActivityData = async () => {
+    setActivityLoading(true);
+    try {
+      const { data: rides, error } = await supabase
+        .from('rides')
+        .select('id, departure_location, arrival_location, date_time, created_at, driver_id, status, bookings(id, created_at, status, driver_action_at, passenger_id)')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      setActivityData(rides || []);
+    } catch (err: any) {
+      if (isAuthError(err)) return;
+      console.error('Activity load error:', err);
+    } finally {
+      setActivityLoading(false);
     }
   };
 
@@ -981,6 +1005,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             { key: 'lookup' as const, label: '🔍 Search' },
             { key: 'users' as const, label: 'All Users' },
             { key: 'phone' as const, label: '📞 Phone' },
+            { key: 'activity' as const, label: '📊 Activity' },
           ]).map(t => (
             <button
               key={t.key}
@@ -3382,6 +3407,194 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           </div>
         </div>
       )}
+
+        {/* ==================== ACTIVITY TAB ==================== */}
+        {tab === 'activity' && (() => {
+          const fmtDiff = (ms: number) => {
+            if (ms < 0) return '—';
+            const mins = Math.round(ms / 60000);
+            if (mins < 60) return `${mins}m`;
+            const hrs = Math.floor(mins / 60);
+            const rem = mins % 60;
+            if (hrs < 24) return rem > 0 ? `${hrs}h ${rem}m` : `${hrs}h`;
+            const days = Math.floor(hrs / 24);
+            const remHrs = hrs % 24;
+            return remHrs > 0 ? `${days}d ${remHrs}h` : `${days}d`;
+          };
+
+          const now = new Date();
+          const cutoff = activityPeriod === 0 ? null : new Date(now.getTime() - activityPeriod * 86400000);
+
+          const filtered = activityData.filter(r => !cutoff || new Date(r.created_at) >= cutoff);
+
+          // Enrich each ride with timing stats
+          const enriched = filtered.map(ride => {
+            const bookings: any[] = ride.bookings || [];
+            const activeBookings = bookings.filter((b: any) => b.status !== 'cancelled');
+            const sorted = [...activeBookings].sort((a: any, b: any) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+            const firstBooking = sorted[0] ?? null;
+            const timeToFirst = firstBooking ? new Date(firstBooking.created_at).getTime() - new Date(ride.created_at).getTime() : null;
+            const responseTimes = activeBookings.filter((b: any) => b.driver_action_at).map((b: any) => new Date(b.driver_action_at).getTime() - new Date(b.created_at).getTime());
+            const avgDriverResponse = responseTimes.length > 0 ? responseTimes.reduce((a: number, b: number) => a + b, 0) / responseTimes.length : null;
+            return { ...ride, activeBookings, firstBooking, timeToFirst, avgDriverResponse };
+          });
+
+          const ridesWithBooking = enriched.filter(r => r.timeToFirst !== null);
+          const avgTimeToFirst = ridesWithBooking.length > 0
+            ? ridesWithBooking.reduce((s, r) => s + r.timeToFirst!, 0) / ridesWithBooking.length : null;
+          const ridesWithDriverResp = enriched.filter(r => r.avgDriverResponse !== null);
+          const avgDriverResp = ridesWithDriverResp.length > 0
+            ? ridesWithDriverResp.reduce((s, r) => s + r.avgDriverResponse!, 0) / ridesWithDriverResp.length : null;
+          const totalBookings = enriched.reduce((s, r) => s + r.activeBookings.length, 0);
+          const pctBooked = enriched.length > 0 ? Math.round((ridesWithBooking.length / enriched.length) * 100) : 0;
+
+          // Chart data: rides posted per day (last 30 days buckets or chosen period)
+          const chartDays = activityPeriod === 0 ? 60 : Math.min(activityPeriod, 60);
+          const dayBuckets: { label: string; rides: number; bookings: number }[] = [];
+          for (let i = chartDays - 1; i >= 0; i--) {
+            const d = new Date(now);
+            d.setHours(0, 0, 0, 0);
+            d.setDate(d.getDate() - i);
+            const next = new Date(d);
+            next.setDate(next.getDate() + 1);
+            const label = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            const dayRides = activityData.filter(r => { const t = new Date(r.created_at); return t >= d && t < next; });
+            const dayBookings = dayRides.reduce((s, r) => s + (r.bookings?.filter((b: any) => b.status !== 'cancelled').length ?? 0), 0);
+            dayBuckets.push({ label, rides: dayRides.length, bookings: dayBookings });
+          }
+          const maxBar = Math.max(...dayBuckets.map(d => Math.max(d.rides, d.bookings)), 1);
+          const barWidth = Math.max(6, Math.floor(680 / chartDays) - 3);
+
+          const statCard = (label: string, value: string, sub?: string) => (
+            <div style={{ backgroundColor: 'white', borderRadius: '16px', padding: '20px 24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', flex: '1 1 160px', minWidth: '140px' }}>
+              <p style={{ margin: '0 0 4px 0', fontSize: '12px', fontWeight: '700', color: '#9CA3AF', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
+              <p style={{ margin: '0 0 2px 0', fontSize: '28px', fontWeight: '800', color: '#111827' }}>{value}</p>
+              {sub && <p style={{ margin: 0, fontSize: '12px', color: '#6B7280' }}>{sub}</p>}
+            </div>
+          );
+
+          return (
+            <>
+              {/* Period filter */}
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '24px', flexWrap: 'wrap' }}>
+                {([{ v: 7, l: 'Last 7 days' }, { v: 30, l: 'Last 30 days' }, { v: 90, l: 'Last 90 days' }, { v: 0, l: 'All time' }] as const).map(({ v, l }) => (
+                  <button key={v} onClick={() => setActivityPeriod(v)} style={{
+                    padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
+                    border: 'none', cursor: 'pointer',
+                    backgroundColor: activityPeriod === v ? '#fcd03a' : '#F3F4F6',
+                    color: activityPeriod === v ? 'white' : '#374151',
+                  }}>{l}</button>
+                ))}
+              </div>
+
+              {activityLoading ? (
+                <div style={{ textAlign: 'center', padding: '60px' }}><Loading /></div>
+              ) : (
+                <>
+                  {/* Summary cards */}
+                  <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', marginBottom: '28px' }}>
+                    {statCard('Rides Posted', String(enriched.length))}
+                    {statCard('Bookings Made', String(totalBookings))}
+                    {statCard('Rides Booked', `${pctBooked}%`, `${ridesWithBooking.length} of ${enriched.length} rides`)}
+                    {statCard('Avg Time to 1st Booking', avgTimeToFirst !== null ? fmtDiff(avgTimeToFirst) : '—', 'from ride posted')}
+                    {statCard('Avg Driver Response', avgDriverResp !== null ? fmtDiff(avgDriverResp) : '—', 'booking → accept/reject')}
+                  </div>
+
+                  {/* Bar chart */}
+                  <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginBottom: '28px' }}>
+                    <h3 style={{ margin: '0 0 4px 0', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Daily Activity</h3>
+                    <div style={{ display: 'flex', gap: '16px', marginBottom: '16px' }}>
+                      <span style={{ fontSize: '12px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#fcd03a', borderRadius: '3px' }} />Rides posted</span>
+                      <span style={{ fontSize: '12px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#6EE7B7', borderRadius: '3px' }} />Bookings made</span>
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                      <svg viewBox={`0 0 ${Math.max(chartDays * (barWidth + 3), 400)} 140`} style={{ width: '100%', minWidth: '300px', height: '140px' }}>
+                        {dayBuckets.map((d, i) => {
+                          const x = i * (barWidth + 3);
+                          const rideH = Math.round((d.rides / maxBar) * 100);
+                          const bookH = Math.round((d.bookings / maxBar) * 100);
+                          const half = Math.floor(barWidth / 2) - 1;
+                          return (
+                            <g key={i}>
+                              {d.rides > 0 && <rect x={x} y={110 - rideH} width={half} height={rideH} fill="#fcd03a" rx="2"><title>{d.label}: {d.rides} ride{d.rides !== 1 ? 's' : ''}</title></rect>}
+                              {d.bookings > 0 && <rect x={x + half + 2} y={110 - bookH} width={half} height={bookH} fill="#6EE7B7" rx="2"><title>{d.label}: {d.bookings} booking{d.bookings !== 1 ? 's' : ''}</title></rect>}
+                              {chartDays <= 30 && (
+                                <text x={x + barWidth / 2} y={130} textAnchor="middle" fontSize="8" fill="#9CA3AF">
+                                  {d.label.split(' ')[0]}
+                                </text>
+                              )}
+                            </g>
+                          );
+                        })}
+                      </svg>
+                    </div>
+                  </div>
+
+                  {/* Table */}
+                  <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
+                    <h3 style={{ margin: '0 0 16px 0', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Ride-by-Ride Breakdown</h3>
+                    <div style={{ overflowX: 'auto' }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                        <thead>
+                          <tr style={{ backgroundColor: '#F9FAFB' }}>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Route</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Ride Date</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Posted At</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Bookings</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>First Booking At</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Time to Book</th>
+                            <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Driver Response</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {enriched.length === 0 ? (
+                            <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#9CA3AF' }}>No rides in this period.</td></tr>
+                          ) : enriched.map(r => (
+                            <tr key={r.id} style={{ borderBottom: '1px solid #F3F4F6' }}
+                              onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F9FAFB')}
+                              onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'transparent')}
+                            >
+                              <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937' }}>
+                                {r.departure_location} → {r.arrival_location}
+                              </td>
+                              <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                {new Date(r.date_time).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </td>
+                              <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                {new Date(r.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}{' '}
+                                {new Date(r.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                              </td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                {r.activeBookings.length > 0
+                                  ? <span style={{ backgroundColor: '#DEF7EC', color: '#03543F', padding: '2px 10px', borderRadius: '20px', fontWeight: '600' }}>{r.activeBookings.length}</span>
+                                  : <span style={{ color: '#D1D5DB' }}>0</span>}
+                              </td>
+                              <td style={{ padding: '10px 14px', color: '#6B7280', whiteSpace: 'nowrap' }}>
+                                {r.firstBooking
+                                  ? `${new Date(r.firstBooking.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${new Date(r.firstBooking.created_at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`
+                                  : <span style={{ color: '#D1D5DB' }}>No bookings yet</span>}
+                              </td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                {r.timeToFirst !== null
+                                  ? <span style={{ fontWeight: '600', color: r.timeToFirst < 3600000 ? '#065F46' : r.timeToFirst < 86400000 ? '#92400E' : '#6B7280' }}>{fmtDiff(r.timeToFirst)}</span>
+                                  : <span style={{ color: '#D1D5DB' }}>—</span>}
+                              </td>
+                              <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                                {r.avgDriverResponse !== null
+                                  ? <span style={{ fontWeight: '600', color: r.avgDriverResponse < 3600000 ? '#065F46' : r.avgDriverResponse < 86400000 ? '#92400E' : '#6B7280' }}>{fmtDiff(r.avgDriverResponse)}</span>
+                                  : <span style={{ color: '#D1D5DB' }}>—</span>}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </>
+          );
+        })()}
     </div>
   );
 }
