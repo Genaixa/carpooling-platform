@@ -229,17 +229,17 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   };
 
   const loadActivityData = async () => {
+    if (!user) return;
     setActivityLoading(true);
     try {
-      const { data: rides, error } = await supabase
-        .from('rides')
-        .select('id, departure_location, arrival_location, date_time, created_at, driver_id, status, bookings(id, created_at, status, driver_action_at, passenger_id)')
-        .order('created_at', { ascending: false })
-        .limit(200);
-      if (error) throw error;
-      setActivityData(rides || []);
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/activity?adminId=${user.id}`, {
+        headers: { 'Authorization': `Bearer ${session?.access_token}` },
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load activity');
+      setActivityData(data);
     } catch (err: any) {
-      if (isAuthError(err)) return;
       console.error('Activity load error:', err);
     } finally {
       setActivityLoading(false);

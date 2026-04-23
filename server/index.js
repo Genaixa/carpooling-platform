@@ -1613,6 +1613,29 @@ app.post('/api/admin/delete-user', async (req, res) => {
   }
 });
 
+// Get rides with booking timestamps for activity/response-time analysis
+app.get('/api/admin/activity', async (req, res) => {
+  try {
+    const { adminId } = req.query;
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const { data: rides, error } = await supabase
+      .from('rides')
+      .select('id, departure_location, arrival_location, date_time, created_at, driver_id, status, bookings(id, created_at, status, driver_action_at, passenger_id)')
+      .order('created_at', { ascending: false })
+      .limit(500);
+
+    if (error) throw error;
+    res.json(rides || []);
+  } catch (error) {
+    console.error('Activity endpoint error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // ============================================================
 // ADMIN FINANCIAL ENDPOINTS
 // ============================================================
