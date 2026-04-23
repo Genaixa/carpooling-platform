@@ -54,6 +54,7 @@ export interface Profile {
   average_rating: number | null;
   total_reviews: number;
   notify_driver_alerts: boolean;
+  sms_opt_in: boolean;
   created_at: string;
   updated_at: string;
 }

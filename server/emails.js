@@ -802,6 +802,22 @@ export async function sendPhoneBookingAdminEmail({ bookingId, passengerName, pas
   );
 }
 
+export async function sendSmsOptInAdminEmail(user) {
+  const { name, email, phone, role } = user;
+  return sendEmail('yossiadam1@gmail.com', `SMS Opt-In: ${escapeHtml(name)} wants SMS notifications`,
+    `<h2>New SMS Opt-In Request</h2>
+    <p>A user has opted in to receive SMS notifications and needs to be set up manually.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Name:</strong> ${escapeHtml(name)}</p>
+      <p><strong>Email:</strong> ${escapeHtml(email)}</p>
+      <p><strong>Phone:</strong> ${escapeHtml(phone || 'Not provided')}</p>
+      <p><strong>Role:</strong> ${escapeHtml(role)}</p>
+    </div>
+    <p>Log in to the admin dashboard to view this user's full details.</p>
+    <p><a href="${SITE_URL}/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: #fcd03a; color: #000000; text-decoration: none; border-radius: 8px; font-weight: 600;">Admin Dashboard</a></p>`
+  );
+}
+
 export async function testEmail(email, name, type = 'booking-confirmation') {
   return sendBookingConfirmationEmail(email, name,
     { seats_booked: 1, total_paid: 25 },

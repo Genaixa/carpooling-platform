@@ -2394,6 +2394,20 @@ app.post('/api/contact', contactLimiter, async (req, res) => {
   }
 });
 
+// SMS opt-in notification to admin
+app.post('/api/notify-sms-optin', async (req, res) => {
+  try {
+    const { name, email, phone, role } = req.body;
+    if (!name || !email) return res.status(400).json({ error: 'Missing required fields' });
+    const { sendSmsOptInAdminEmail } = await import('./emails.js');
+    await sendSmsOptInAdminEmail({ name, email, phone, role });
+    res.json({ success: true });
+  } catch (error) {
+    console.error('SMS opt-in notification error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Fix all seat counts (admin only)
 app.post('/api/fix-all-seats', async (req, res) => {
   try {

@@ -38,6 +38,8 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
     vehicle_year: '',
   });
 
+  const [smsOptIn, setSmsOptIn] = useState(false);
+  const [originalSmsOptIn, setOriginalSmsOptIn] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Redirect to login if not authenticated
@@ -69,6 +71,9 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
         vehicle_registration: (profile as any).vehicle_registration || '',
         vehicle_year: (profile as any).vehicle_year ? String((profile as any).vehicle_year) : '',
       });
+      const optIn = profile.sms_opt_in ?? false;
+      setSmsOptIn(optIn);
+      setOriginalSmsOptIn(optIn);
       setLoading(false);
     }
   }, [profile, user]);
@@ -149,6 +154,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
         vehicle_color: formData.vehicle_color.trim() || null,
         vehicle_registration: formData.vehicle_registration.trim() || null,
         vehicle_year: formData.vehicle_year ? parseInt(formData.vehicle_year) : null,
+        sms_opt_in: smsOptIn,
       };
 
       const { error: updateError } = await supabase
@@ -158,11 +164,25 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
 
       if (updateError) throw updateError;
 
+      // Notify admin if user newly opted in to SMS
+      if (smsOptIn && !originalSmsOptIn) {
+        fetch(`${import.meta.env.VITE_API_URL || 'http://srv1291941.hstgr.cloud:3001'}/api/notify-sms-optin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            email: formData.email,
+            phone: formData.phone.trim(),
+            role: profile?.is_approved_driver ? 'Driver' : 'Passenger',
+          }),
+        }).catch(() => {}); // fire-and-forget, don't block on it
+      }
+
       // Update the profile in context
       await updateProfile(updateData);
 
       toast.success('Profile updated successfully!');
-      
+
       // Redirect to profile after a short delay to show success message
       setTimeout(() => {
         onNavigate('profile');
@@ -319,6 +339,25 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
                 { value: 'Married', label: 'Married' },
               ]}
             />
+
+            {/* SMS Notifications */}
+            <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '24px' }}>
+              <h3 className="text-lg font-semibold text-gray-900" style={{ marginBottom: '12px' }}>Notifications</h3>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={smsOptIn}
+                  onChange={e => setSmsOptIn(e.target.checked)}
+                  style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer', accentColor: '#fcd03a' }}
+                />
+                <span style={{ fontSize: '14px', color: '#374151' }}>
+                  <strong>Receive SMS notifications</strong>
+                  <span style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>
+                    Get a text message when a passenger applies to your ride (drivers) or when a driver accepts or rejects your request (passengers). The admin will contact you to set this up.
+                  </span>
+                </span>
+              </label>
+            </div>
 
             {/* Driver Details Section - Collapsible */}
             <div className="border-t pt-6">

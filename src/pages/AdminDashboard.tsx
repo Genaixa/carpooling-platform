@@ -102,7 +102,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
 
   // Users tab state
   const [usersData, setUsersData] = useState<any[]>([]);
-  const [usersFilter, setUsersFilter] = useState<'all' | 'drivers' | 'passengers'>('all');
+  const [usersFilter, setUsersFilter] = useState<'all' | 'drivers' | 'passengers' | 'sms'>('all');
   const [usersSearch, setUsersSearch] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
@@ -228,7 +228,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const [profilesResult, bookingsResult, ridesResult] = await Promise.all([
         supabase
           .from('profiles')
-          .select('id, name, email, phone, is_approved_driver, is_admin, is_banned, average_rating, total_reviews, created_at, gender, city, profile_photo_url, driver_tier, age_group, marital_status, travel_status, partner_name, address_line1, address_line2, postcode')
+          .select('id, name, email, phone, is_approved_driver, is_admin, is_banned, average_rating, total_reviews, created_at, gender, city, profile_photo_url, driver_tier, age_group, marital_status, travel_status, partner_name, address_line1, address_line2, postcode, sms_opt_in')
           .order('created_at', { ascending: false }),
         // Fetch all non-cancelled booking passenger IDs to count per user
         supabase
@@ -2615,7 +2615,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
               {/* Filter + search row */}
               <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: '10px', flexWrap: 'wrap', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                  {(['all', 'drivers', 'passengers'] as const).map(f => (
+                  {(['all', 'drivers', 'passengers', 'sms'] as const).map(f => (
                     <button
                       key={f}
                       onClick={() => setUsersFilter(f)}
@@ -2626,7 +2626,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         color: usersFilter === f ? 'white' : '#374151',
                       }}
                     >
-                      {f === 'all' ? `All (${usersData.length})` : f === 'drivers' ? `Drivers (${usersData.filter(u => u.is_approved_driver).length})` : `Passengers (${usersData.filter(u => !u.is_approved_driver).length})`}
+                      {f === 'all' ? `All (${usersData.length})` : f === 'drivers' ? `Drivers (${usersData.filter(u => u.is_approved_driver).length})` : f === 'passengers' ? `Passengers (${usersData.filter(u => !u.is_approved_driver).length})` : `SMS Opt-ins (${usersData.filter(u => u.sms_opt_in).length})`}
                     </button>
                   ))}
                 </div>
@@ -2650,6 +2650,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                 const filtered = usersData.filter(u => {
                   if (usersFilter === 'drivers' && !u.is_approved_driver) return false;
                   if (usersFilter === 'passengers' && u.is_approved_driver) return false;
+                  if (usersFilter === 'sms' && !u.sms_opt_in) return false;
                   if (usersSearch.trim()) {
                     const s = usersSearch.toLowerCase();
                     if (!u.name?.toLowerCase().includes(s) && !u.email?.toLowerCase().includes(s)) return false;
@@ -2667,6 +2668,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Phone</th>
+                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>SMS</th>
                           <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Ref / Alias</th>
                           <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Role</th>
                           <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Activity</th>
@@ -2709,6 +2711,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                               <a href={`mailto:${u.email}`} style={{ color: '#fcd03a', textDecoration: 'none' }}>{u.email}</a>
                             </td>
                             <td style={{ padding: '10px 14px', color: '#6B7280' }}>{u.phone || '—'}</td>
+                            <td style={{ padding: '10px 14px', textAlign: 'center' }}>
+                              {u.sms_opt_in
+                                ? <span title="Opted in to SMS" style={{ display: 'inline-block', backgroundColor: '#D1FAE5', color: '#065F46', padding: '3px 10px', borderRadius: '20px', fontSize: '12px', fontWeight: '600' }}>Yes</span>
+                                : <span style={{ color: '#D1D5DB', fontSize: '12px' }}>—</span>
+                              }
+                            </td>
                             <td style={{ padding: '10px 14px' }}>
                               <span style={{ fontFamily: 'monospace', fontSize: '12px', color: '#374151', display: 'block' }}>{getUserRef(u.id)}</span>
                               <span style={{ fontSize: '11px', color: '#9CA3AF' }}>{u.is_approved_driver ? getDriverAlias(u.id) : getPassengerAlias(u.id)}</span>
