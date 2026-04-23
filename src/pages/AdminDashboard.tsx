@@ -3507,25 +3507,46 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       <span style={{ fontSize: '12px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#fcd03a', borderRadius: '3px' }} />Rides posted</span>
                       <span style={{ fontSize: '12px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#6EE7B7', borderRadius: '3px' }} />Bookings made</span>
                     </div>
-                    <div style={{ overflowX: 'auto' }}>
-                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '320px', minWidth: `${chartDays * 28}px`, paddingBottom: '24px', position: 'relative' }}>
-                        {dayBuckets.map((d, i) => (
-                          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end', minWidth: '20px' }}>
-                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center', flex: 1 }}>
-                              <div
-                                title={`${d.label}: ${d.rides} ride${d.rides !== 1 ? 's' : ''}`}
-                                style={{ width: '44%', height: d.rides > 0 ? `${Math.round((d.rides / maxBar) * 100)}%` : '2px', backgroundColor: d.rides > 0 ? '#fcd03a' : 'transparent', borderRadius: '3px 3px 0 0', minHeight: d.rides > 0 ? '4px' : '0', transition: 'height 0.3s' }}
-                              />
-                              <div
-                                title={`${d.label}: ${d.bookings} booking${d.bookings !== 1 ? 's' : ''}`}
-                                style={{ width: '44%', height: d.bookings > 0 ? `${Math.round((d.bookings / maxBar) * 100)}%` : '2px', backgroundColor: d.bookings > 0 ? '#6EE7B7' : 'transparent', borderRadius: '3px 3px 0 0', minHeight: d.bookings > 0 ? '4px' : '0', transition: 'height 0.3s' }}
-                              />
-                            </div>
-                            <span style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '4px', whiteSpace: 'nowrap' }}>
-                              {d.label.split(' ')[0]}
-                            </span>
+                    {/* Y axis label + chart */}
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      {/* Y axis */}
+                      <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', flexShrink: 0, width: '36px' }}>
+                        <span style={{ fontSize: '9px', color: '#6B7280', transform: 'rotate(-90deg) translateX(60px)', transformOrigin: 'center', whiteSpace: 'nowrap', display: 'block', marginBottom: '8px' }}>No. of rides / bookings</span>
+                        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between', alignItems: 'flex-end', height: '300px', paddingBottom: '24px' }}>
+                          <span style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1 }}>{maxBar}</span>
+                          <span style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1 }}>{Math.round(maxBar / 2)}</span>
+                          <span style={{ fontSize: '11px', color: '#6B7280', lineHeight: 1 }}>0</span>
+                        </div>
+                      </div>
+                      {/* Bars + X axis */}
+                      <div style={{ flex: 1, overflowX: 'auto' }}>
+                        <div style={{ position: 'relative', height: '276px', minWidth: `${chartDays * 28}px` }}>
+                          {/* Gridlines */}
+                          {[0, 50, 100].map(pct => (
+                            <div key={pct} style={{ position: 'absolute', left: 0, right: 0, bottom: `${pct}%`, borderTop: '1px dashed #E5E7EB', zIndex: 0 }} />
+                          ))}
+                          {/* Bars */}
+                          <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '100%', position: 'relative', zIndex: 1 }}>
+                            {dayBuckets.map((d, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', flex: 1, height: '100%', justifyContent: 'center', minWidth: '20px' }}>
+                                <div title={`${d.label}: ${d.rides} ride${d.rides !== 1 ? 's' : ''}`}
+                                  style={{ width: '44%', height: d.rides > 0 ? `${Math.round((d.rides / maxBar) * 100)}%` : '0', backgroundColor: '#fcd03a', borderRadius: '3px 3px 0 0', minHeight: d.rides > 0 ? '4px' : '0' }} />
+                                <div title={`${d.label}: ${d.bookings} booking${d.bookings !== 1 ? 's' : ''}`}
+                                  style={{ width: '44%', height: d.bookings > 0 ? `${Math.round((d.bookings / maxBar) * 100)}%` : '0', backgroundColor: '#6EE7B7', borderRadius: '3px 3px 0 0', minHeight: d.bookings > 0 ? '4px' : '0' }} />
+                              </div>
+                            ))}
                           </div>
-                        ))}
+                        </div>
+                        {/* X axis tick labels */}
+                        <div style={{ display: 'flex', gap: '4px', minWidth: `${chartDays * 28}px`, borderTop: '2px solid #E5E7EB', paddingTop: '4px' }}>
+                          {dayBuckets.map((d, i) => (
+                            <div key={i} style={{ flex: 1, minWidth: '20px', textAlign: 'center', fontSize: '10px', color: '#9CA3AF', whiteSpace: 'nowrap' }}>
+                              {d.label.split(' ')[0]}
+                            </div>
+                          ))}
+                        </div>
+                        {/* X axis title */}
+                        <div style={{ textAlign: 'center', fontSize: '11px', color: '#6B7280', marginTop: '6px' }}>Date</div>
                       </div>
                     </div>
                   </div>
