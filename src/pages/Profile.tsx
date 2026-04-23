@@ -34,6 +34,8 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [loading, setLoading] = useState(false);
   const [licenceUploading, setLicenceUploading] = useState(false);
   const [notifyDriverAlerts, setNotifyDriverAlerts] = useState(true);
+  const [smsOptIn, setSmsOptIn] = useState(false);
+  const [originalSmsOptIn, setOriginalSmsOptIn] = useState(false);
   const [myReviews, setMyReviews] = useState<Array<{ id: string; rating: number; comment: string | null; type: string; created_at: string }>>([]);
 
   useEffect(() => {
@@ -62,6 +64,9 @@ export default function Profile({ onNavigate }: ProfileProps) {
       });
       setPhotoPreview(profile.profile_photo_url || null);
       setNotifyDriverAlerts(profile.notify_driver_alerts !== false);
+      const optIn = profile.sms_opt_in ?? false;
+      setSmsOptIn(optIn);
+      setOriginalSmsOptIn(optIn);
     }
   }, [profile]);
 
@@ -174,7 +179,21 @@ export default function Profile({ onNavigate }: ProfileProps) {
         gender: formData.gender,
         marital_status: (formData.marital_status as 'Single' | 'Married') || null,
         travel_status: 'solo',
+        sms_opt_in: smsOptIn,
       });
+      if (smsOptIn && !originalSmsOptIn) {
+        setOriginalSmsOptIn(true);
+        fetch(`${API_URL}/api/notify-sms-optin`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            name: formData.name,
+            email: profile?.email,
+            phone: formData.phone,
+            role: profile?.is_approved_driver ? 'Driver' : 'Passenger',
+          }),
+        }).catch(() => {});
+      }
       toast.success('Profile updated successfully!');
       setSuccess('Profile updated successfully!');
     } catch (err: any) {
@@ -661,6 +680,24 @@ export default function Profile({ onNavigate }: ProfileProps) {
                   <option value="Single">Single</option>
                   <option value="Married">Married</option>
                 </select>
+              </div>
+
+              {/* SMS Notifications */}
+              <div style={{ borderTop: '1px solid #E5E7EB', paddingTop: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={smsOptIn}
+                    onChange={e => setSmsOptIn(e.target.checked)}
+                    style={{ marginTop: '2px', width: '16px', height: '16px', flexShrink: 0, cursor: 'pointer', accentColor: '#fcd03a' }}
+                  />
+                  <span style={{ fontSize: '14px', color: '#374151' }}>
+                    <strong>Receive SMS notifications</strong>
+                    <span style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>
+                      Get a text message when a passenger applies to your ride (drivers) or when a driver accepts or rejects your request (passengers). The admin will contact you to set this up.
+                    </span>
+                  </span>
+                </label>
               </div>
 
               {/* Error / Success */}
