@@ -52,11 +52,12 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
   const cardRef = useRef<any>(null);
   const paymentsRef = useRef<any>(null);
   const cardContainerRef = useRef<HTMLDivElement>(null);
-  const profileRef = useRef<{ name: string; email: string; phone?: string | null; city?: string | null } | null>(null);
+  const profileRef = useRef<{ name: string; email: string; phone?: string | null; city?: string | null; sms_opt_in?: boolean } | null>(null);
+  const [smsNotify, setSmsNotify] = useState(false);
 
   useEffect(() => {
-    supabase.from('profiles').select('name, email, phone, city').eq('id', userId).single()
-      .then(({ data }) => { if (data) profileRef.current = data; });
+    supabase.from('profiles').select('name, email, phone, city, sms_opt_in').eq('id', userId).single()
+      .then(({ data }) => { if (data) { profileRef.current = data; if (data.sms_opt_in) setSmsNotify(true); } });
     initializeSquare();
     return () => {
       if (cardRef.current) {
@@ -196,6 +197,7 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
           userId,
           seatsToBook,
           rideName,
+          smsNotify,
           ...(thirdPartyPassenger ? { thirdPartyPassenger } : {}),
           ...(groupDescription ? { groupDescription } : {}),
         }),
@@ -410,6 +412,24 @@ export default function PaymentModal({ amount, rideId, userId, seatsToBook, ride
                 />
                 <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
                   I have read, understood, and agree to the above.
+                </span>
+              </label>
+            </div>
+
+            {/* SMS notification opt-in */}
+            <div style={{ backgroundColor: '#F9FAFB', borderRadius: '12px', padding: '14px', marginBottom: '16px' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', cursor: 'pointer' }}>
+                <input
+                  type="checkbox"
+                  checked={smsNotify}
+                  onChange={(e) => setSmsNotify(e.target.checked)}
+                  style={{ width: '18px', height: '18px', marginTop: '2px', flexShrink: 0, accentColor: '#fcd03a', cursor: 'pointer' }}
+                />
+                <span style={{ fontSize: '13px', color: '#374151' }}>
+                  <strong>Text me when the driver responds</strong>
+                  <span style={{ display: 'block', fontSize: '12px', color: '#6B7280', marginTop: '2px' }}>
+                    The admin will send you a text when the driver accepts or rejects your request.
+                  </span>
                 </span>
               </label>
             </div>

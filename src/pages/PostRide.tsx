@@ -32,6 +32,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [driverDeclaration, setDriverDeclaration] = useState(false);
+  const [smsNotify, setSmsNotify] = useState(() => profile?.sms_opt_in ?? false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [wishCount, setWishCount] = useState<number | null>(null);
@@ -275,6 +276,7 @@ export default function PostRide({ onNavigate }: PostRideProps) {
           luggage_count: formData.luggageSize !== 'none' ? parseInt(formData.luggageCount) || 0 : 0,
           existing_occupants: existingOccupants,
           status: 'upcoming',
+          sms_notify: smsNotify,
         },
       ]).select();
 
@@ -534,6 +536,24 @@ export default function PostRide({ onNavigate }: PostRideProps) {
                   />
                   <span style={{ fontSize: '14px', lineHeight: '1.5', color: '#374151', fontWeight: '600' }}>
                     I have read, understood, and agree to all of the above.
+                  </span>
+                </label>
+              </div>
+
+              {/* SMS notification opt-in */}
+              <div style={{ backgroundColor: '#F9FAFB', borderRadius: '12px', padding: '16px', marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={smsNotify}
+                    onChange={(e) => setSmsNotify(e.target.checked)}
+                    style={{ width: '20px', height: '20px', marginTop: '2px', flexShrink: 0, accentColor: '#fcd03a', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: '14px', lineHeight: '1.5', color: '#374151' }}>
+                    <strong>Text me when a passenger applies to this ride</strong>
+                    <span style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>
+                      The admin will send you a text message when someone requests to join this ride.
+                    </span>
                   </span>
                 </label>
               </div>

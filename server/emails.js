@@ -802,6 +802,38 @@ export async function sendPhoneBookingAdminEmail({ bookingId, passengerName, pas
   );
 }
 
+export async function sendAdminSmsDriverAlert(driver, passenger, ride) {
+  return sendEmail('yossiadam1@gmail.com', `SMS Alert: Text driver ${escapeHtml(driver.name)} — new booking request`,
+    `<h2>Driver Requested SMS Notification</h2>
+    <p>A passenger has applied for a ride where the driver opted in to SMS notifications. Please text the driver.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Driver to text:</strong> ${escapeHtml(driver.name)}</p>
+      <p><strong>Driver phone:</strong> <a href="tel:${driver.phone}">${escapeHtml(driver.phone || 'Not provided')}</a></p>
+      <p><strong>Passenger:</strong> ${escapeHtml(passenger.name)}</p>
+      <p><strong>Ride:</strong> ${escapeHtml(ride.departure_location)} → ${escapeHtml(ride.arrival_location)}, ${formatDate(ride.date_time)}</p>
+    </div>
+    <p><strong>Suggested text to driver:</strong><br/>
+    <em>"ChapaRide: A passenger has applied for your ride from ${escapeHtml(ride.departure_location)} to ${escapeHtml(ride.arrival_location)} on ${formatDate(ride.date_time)}. Log in to review and accept or reject."</em></p>
+    <p><a href="${SITE_URL}/#dashboard" style="display: inline-block; padding: 12px 24px; background: #fcd03a; color: #000000; text-decoration: none; border-radius: 8px; font-weight: 600;">Open Dashboard</a></p>`
+  );
+}
+
+export async function sendAdminSmsPaxAlert(passenger, ride, status) {
+  const statusWord = status === 'accepted' ? 'accepted' : 'rejected';
+  return sendEmail('yossiadam1@gmail.com', `SMS Alert: Text passenger ${escapeHtml(passenger.name)} — booking ${statusWord}`,
+    `<h2>Passenger Requested SMS Notification</h2>
+    <p>A driver has ${statusWord} a booking where the passenger opted in to SMS notifications. Please text the passenger.</p>
+    <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
+      <p><strong>Passenger to text:</strong> ${escapeHtml(passenger.name)}</p>
+      <p><strong>Passenger phone:</strong> <a href="tel:${passenger.phone}">${escapeHtml(passenger.phone || 'Not provided')}</a></p>
+      <p><strong>Ride:</strong> ${escapeHtml(ride.departure_location)} → ${escapeHtml(ride.arrival_location)}, ${formatDate(ride.date_time)}</p>
+      <p><strong>Status:</strong> ${statusWord.toUpperCase()}</p>
+    </div>
+    <p><strong>Suggested text to passenger:</strong><br/>
+    <em>"ChapaRide: Your booking for the ride from ${escapeHtml(ride.departure_location)} to ${escapeHtml(ride.arrival_location)} on ${formatDate(ride.date_time)} has been ${statusWord}."</em></p>`
+  );
+}
+
 export async function sendSmsOptInAdminEmail(user) {
   const { name, email, phone, role } = user;
   return sendEmail('yossiadam1@gmail.com', `SMS Opt-In: ${escapeHtml(name)} wants SMS notifications`,

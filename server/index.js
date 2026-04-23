@@ -505,6 +505,7 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
     const driverPayout = totalPaid * DRIVER_RATE;
 
     // Create booking with pending_driver status
+    const { smsNotify } = req.body;
     const { data: bookingData, error: bookingError } = await supabase
       .from('bookings')
       .insert([{
@@ -516,6 +517,7 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
         driver_payout_amount: driverPayout,
         square_payment_id: paymentId,
         status: 'pending_driver',
+        sms_notify: smsNotify ? true : false,
         ...(thirdPartyPassenger ? { third_party_passenger: thirdPartyPassenger } : {}),
         ...(groupDescription ? { group_description: groupDescription } : {}),
       }])
@@ -547,8 +549,15 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
 
     // Send email to driver about new booking request
     try {
-      const { sendBookingRequestEmail } = await import('./emails.js');
+      const { sendBookingRequestEmail, sendAdminSmsDriverAlert } = await import('./emails.js');
       sendBookingRequestEmail(bookingData).catch(err => console.error('Email error:', err));
+      // Alert admin to manually text driver if ride has sms_notify
+      const { data: rideForSms } = await supabase.from('rides').select('*').eq('id', rideId).single();
+      if (rideForSms?.sms_notify) {
+        const { data: driver } = await supabase.from('profiles').select('name, phone').eq('id', rideForSms.driver_id).single();
+        const { data: passenger } = await supabase.from('profiles').select('name').eq('id', userId).single();
+        if (driver && passenger) sendAdminSmsDriverAlert(driver, passenger, rideForSms).catch(() => {});
+      }
     } catch {}
 
     res.json({ success: true, paymentId, bookingId: bookingData.id });
@@ -610,9 +619,13 @@ app.get('/api/driver/accept-booking', async (req, res) => {
     await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     try {
-      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
+      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail, sendAdminSmsPaxAlert } = await import('./emails.js');
       sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
       sendDriverBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+      if (booking.sms_notify) {
+        const { data: pax } = await supabase.from('profiles').select('name, phone').eq('id', booking.passenger_id).single();
+        if (pax && ride) sendAdminSmsPaxAlert(pax, ride, 'accepted').catch(() => {});
+      }
     } catch {}
 
     console.log(`✓ Booking accepted via email: ${bookingId}`);
@@ -655,9 +668,13 @@ app.get('/api/driver/reject-booking', async (req, res) => {
     await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
 
     try {
-      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
+      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail, sendAdminSmsPaxAlert } = await import('./emails.js');
       sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
       sendDriverBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+      if (booking.sms_notify) {
+        const { data: pax } = await supabase.from('profiles').select('name, phone').eq('id', booking.passenger_id).single();
+        if (pax && ride) sendAdminSmsPaxAlert(pax, ride, 'rejected').catch(() => {});
+      }
     } catch {}
 
     console.log(`✓ Booking rejected via email: ${bookingId}`);
@@ -710,9 +727,13 @@ app.post('/api/driver/accept-booking', async (req, res) => {
 
     // Send emails to passenger and driver
     try {
-      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail } = await import('./emails.js');
+      const { sendBookingAcceptedEmail, sendDriverBookingAcceptedEmail, sendAdminSmsPaxAlert } = await import('./emails.js');
       sendBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
       sendDriverBookingAcceptedEmail(booking).catch(err => console.error('Email error:', err));
+      if (booking.sms_notify) {
+        const { data: pax } = await supabase.from('profiles').select('name, phone').eq('id', booking.passenger_id).single();
+        if (pax && ride) sendAdminSmsPaxAlert(pax, ride, 'accepted').catch(() => {});
+      }
     } catch {}
 
     console.log(`✓ Booking accepted: ${bookingId}`);
@@ -761,9 +782,13 @@ app.post('/api/driver/reject-booking', async (req, res) => {
 
     // Send emails to passenger and driver
     try {
-      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail } = await import('./emails.js');
+      const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail, sendAdminSmsPaxAlert } = await import('./emails.js');
       sendBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
       sendDriverBookingRejectedEmail(booking).catch(err => console.error('Email error:', err));
+      if (booking.sms_notify) {
+        const { data: pax } = await supabase.from('profiles').select('name, phone').eq('id', booking.passenger_id).single();
+        if (pax && ride) sendAdminSmsPaxAlert(pax, ride, 'rejected').catch(() => {});
+      }
     } catch {}
 
     console.log(`✓ Booking rejected: ${bookingId}`);
