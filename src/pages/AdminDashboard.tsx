@@ -3508,25 +3508,25 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       <span style={{ fontSize: '12px', color: '#6B7280', display: 'flex', alignItems: 'center', gap: '6px' }}><span style={{ display: 'inline-block', width: '12px', height: '12px', backgroundColor: '#6EE7B7', borderRadius: '3px' }} />Bookings made</span>
                     </div>
                     <div style={{ overflowX: 'auto' }}>
-                      <svg viewBox={`0 0 ${Math.max(chartDays * (barWidth + 3), 400)} 240`} style={{ width: '100%', minWidth: '300px', height: '240px' }}>
-                        {dayBuckets.map((d, i) => {
-                          const x = i * (barWidth + 3);
-                          const rideH = Math.round((d.rides / maxBar) * 190);
-                          const bookH = Math.round((d.bookings / maxBar) * 190);
-                          const half = Math.floor(barWidth / 2) - 1;
-                          return (
-                            <g key={i}>
-                              {d.rides > 0 && <rect x={x} y={200 - rideH} width={half} height={rideH} fill="#fcd03a" rx="2"><title>{d.label}: {d.rides} ride{d.rides !== 1 ? 's' : ''}</title></rect>}
-                              {d.bookings > 0 && <rect x={x + half + 2} y={200 - bookH} width={half} height={bookH} fill="#6EE7B7" rx="2"><title>{d.label}: {d.bookings} booking{d.bookings !== 1 ? 's' : ''}</title></rect>}
-                              {chartDays <= 30 && (
-                                <text x={x + barWidth / 2} y={220} textAnchor="middle" fontSize="9" fill="#9CA3AF">
-                                  {d.label.split(' ')[0]}
-                                </text>
-                              )}
-                            </g>
-                          );
-                        })}
-                      </svg>
+                      <div style={{ display: 'flex', alignItems: 'flex-end', gap: '4px', height: '320px', minWidth: `${chartDays * 28}px`, paddingBottom: '24px', position: 'relative' }}>
+                        {dayBuckets.map((d, i) => (
+                          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flex: 1, height: '100%', justifyContent: 'flex-end', minWidth: '20px' }}>
+                            <div style={{ display: 'flex', alignItems: 'flex-end', gap: '2px', width: '100%', justifyContent: 'center', flex: 1 }}>
+                              <div
+                                title={`${d.label}: ${d.rides} ride${d.rides !== 1 ? 's' : ''}`}
+                                style={{ width: '44%', height: d.rides > 0 ? `${Math.round((d.rides / maxBar) * 100)}%` : '2px', backgroundColor: d.rides > 0 ? '#fcd03a' : 'transparent', borderRadius: '3px 3px 0 0', minHeight: d.rides > 0 ? '4px' : '0', transition: 'height 0.3s' }}
+                              />
+                              <div
+                                title={`${d.label}: ${d.bookings} booking${d.bookings !== 1 ? 's' : ''}`}
+                                style={{ width: '44%', height: d.bookings > 0 ? `${Math.round((d.bookings / maxBar) * 100)}%` : '2px', backgroundColor: d.bookings > 0 ? '#6EE7B7' : 'transparent', borderRadius: '3px 3px 0 0', minHeight: d.bookings > 0 ? '4px' : '0', transition: 'height 0.3s' }}
+                              />
+                            </div>
+                            <span style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '4px', whiteSpace: 'nowrap' }}>
+                              {d.label.split(' ')[0]}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
 
