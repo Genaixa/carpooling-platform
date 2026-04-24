@@ -736,19 +736,6 @@ export default function Profile({ onNavigate }: ProfileProps) {
                 >
                   {loading ? 'Updating...' : 'Update Profile'}
                 </button>
-                <button
-                  type="button"
-                  onClick={() => onNavigate('home')}
-                  style={{
-                    padding: '14px 28px',
-                    backgroundColor: '#F3F4F6', color: '#374151',
-                    borderRadius: '50px', fontSize: '16px',
-                    fontWeight: '600', border: 'none', cursor: 'pointer',
-                    transition: 'all 0.3s',
-                  }}
-                >
-                  Back
-                </button>
               </div>
             </div>
           </form>
