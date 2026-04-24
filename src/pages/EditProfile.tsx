@@ -353,7 +353,7 @@ export default function EditProfile({ onNavigate }: EditProfileProps) {
                 <span style={{ fontSize: '14px', color: '#374151' }}>
                   <strong>Receive SMS notifications</strong>
                   <span style={{ display: 'block', fontSize: '13px', color: '#6B7280', marginTop: '2px' }}>
-                    Get a text message when a passenger applies to your ride (drivers) or when a driver accepts or rejects your request (passengers). The admin will contact you to set this up.
+                    Get a text message when a passenger applies to your ride (drivers) or when a driver accepts or rejects your request (passengers).
                   </span>
                 </span>
               </label>
