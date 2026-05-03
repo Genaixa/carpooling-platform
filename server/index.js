@@ -131,7 +131,9 @@ async function runDailyNotificationCheck() {
       await sendTelegramAlert(`⚠️ *ChapaRide Email Quota*\n${monthlyCount}/${EMAIL_MONTHLY_LIMIT} emails used this month.\n${remaining} remaining — consider upgrading Resend plan.`);
     }
 
-    // 2. Find unnotified events — fetch logged IDs first, then exclude them
+    // 2. Find unnotified events — only look at the last 7 days (catch recent misses, not all history)
+    const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+
     const [{ data: loggedUsers }, { data: loggedApps }, { data: loggedSms }] = await Promise.all([
       supabase.from('notification_log').select('event_id').eq('event_type', 'new_user'),
       supabase.from('notification_log').select('event_id').eq('event_type', 'driver_application'),
@@ -142,15 +144,15 @@ async function runDailyNotificationCheck() {
     const loggedAppIds = (loggedApps || []).map(r => r.event_id);
     const loggedSmsIds = (loggedSms || []).map(r => r.event_id);
 
-    const [{ data: allUsers }, { data: allApps }, { data: allSmsUsers }] = await Promise.all([
-      supabase.from('profiles').select('*'),
-      supabase.from('driver_applications').select('*'),
-      supabase.from('profiles').select('*').eq('sms_opt_in', true),
+    const [{ data: recentUsers }, { data: recentApps }, { data: recentSmsUsers }] = await Promise.all([
+      supabase.from('profiles').select('*').gte('created_at', windowStart),
+      supabase.from('driver_applications').select('*').gte('created_at', windowStart),
+      supabase.from('profiles').select('*').eq('sms_opt_in', true).gte('updated_at', windowStart),
     ]);
 
-    const newUsers = (allUsers || []).filter(u => !loggedUserIds.includes(String(u.id)));
-    const applications = (allApps || []).filter(a => !loggedAppIds.includes(String(a.id)));
-    const smsUsers = (allSmsUsers || []).filter(u => !loggedSmsIds.includes(String(u.id)));
+    const newUsers = (recentUsers || []).filter(u => !loggedUserIds.includes(String(u.id)));
+    const applications = (recentApps || []).filter(a => !loggedAppIds.includes(String(a.id)));
+    const smsUsers = (recentSmsUsers || []).filter(u => !loggedSmsIds.includes(String(u.id)));
 
     const pendingUsers = newUsers;
     const pendingApps = applications;
