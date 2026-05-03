@@ -104,6 +104,10 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [activityData, setActivityData] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityPeriod, setActivityPeriod] = useState<7 | 30 | 90 | 0>(30);
+  const [missedSince, setMissedSince] = useState('');
+  const [missedUntil, setMissedUntil] = useState('');
+  const [missedLoading, setMissedLoading] = useState(false);
+  const [missedResult, setMissedResult] = useState<{ sent: string[]; failed: string[] } | null>(null);
 
   // Users tab state
   const [usersData, setUsersData] = useState<any[]>([]);
@@ -243,6 +247,27 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       console.error('Activity load error:', err);
     } finally {
       setActivityLoading(false);
+    }
+  };
+
+  const handleResendMissedNotifications = async () => {
+    if (!user || !missedSince) return;
+    setMissedLoading(true);
+    setMissedResult(null);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/resend-missed-notifications`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id, since: new Date(missedSince).toISOString(), until: missedUntil ? new Date(missedUntil).toISOString() : undefined }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      setMissedResult(data);
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    } finally {
+      setMissedLoading(false);
     }
   };
 
@@ -1874,6 +1899,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                     <tr key={wish.id} style={{ borderBottom: '1px solid #F3F4F6', backgroundColor: i % 2 === 0 ? 'white' : '#FAFAFA' }}>
                                       <td style={{ padding: '12px 14px' }}>
                                         <div style={{ fontWeight: '600', color: '#1F2937' }}>{u?.name || '—'}</div>
+                                        {u?.phone && <div style={{ color: '#4B5563', fontSize: '12px' }}>{u.phone}</div>}
                                         {u && <div style={{ color: '#6B7280', fontSize: '12px' }}>{u.gender || '—'}{u.age_group ? ` · ${u.age_group}` : ''}</div>}
                                         <div style={{ color: '#9CA3AF', fontSize: '11px', fontFamily: 'monospace' }}>{getUserRef(wish.user_id)}</div>
                                       </td>
@@ -3610,6 +3636,55 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                  {/* Resend missed notifications */}
+                  <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginTop: '24px' }}>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Resend Missed Admin Notifications</h3>
+                    <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#6B7280' }}>
+                      If the server was down during a period, use this to re-fire the admin notification emails for sign-ups, driver applications, and SMS opt-ins that occurred in that window.
+                    </p>
+                    <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>From (date &amp; time)</label>
+                        <input type="datetime-local" value={missedSince} onChange={e => setMissedSince(e.target.value)}
+                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', fontSize: '13px', color: '#111827' }} />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#374151', marginBottom: '4px' }}>To (optional, defaults to now)</label>
+                        <input type="datetime-local" value={missedUntil} onChange={e => setMissedUntil(e.target.value)}
+                          style={{ padding: '8px 12px', borderRadius: '8px', border: '1px solid #D1D5DB', fontSize: '13px', color: '#111827' }} />
+                      </div>
+                      <button onClick={handleResendMissedNotifications} disabled={!missedSince || missedLoading}
+                        style={{ padding: '9px 20px', backgroundColor: missedSince && !missedLoading ? '#fcd03a' : '#E5E7EB', color: '#111827', border: 'none', borderRadius: '8px', fontWeight: '700', fontSize: '13px', cursor: missedSince && !missedLoading ? 'pointer' : 'not-allowed' }}>
+                        {missedLoading ? 'Sending…' : 'Resend Notifications'}
+                      </button>
+                    </div>
+                    {missedResult && (
+                      <div style={{ marginTop: '16px' }}>
+                        {missedResult.sent.length === 0 && missedResult.failed.length === 0 ? (
+                          <p style={{ fontSize: '13px', color: '#6B7280', margin: 0 }}>No events found in that window.</p>
+                        ) : (
+                          <>
+                            {missedResult.sent.length > 0 && (
+                              <div style={{ marginBottom: '8px' }}>
+                                <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#065F46' }}>Sent ({missedResult.sent.length}):</p>
+                                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#374151' }}>
+                                  {missedResult.sent.map((s, i) => <li key={i}>{s}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                            {missedResult.failed.length > 0 && (
+                              <div>
+                                <p style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#991B1B' }}>Failed ({missedResult.failed.length}):</p>
+                                <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: '#374151' }}>
+                                  {missedResult.failed.map((s, i) => <li key={i}>{s}</li>)}
+                                </ul>
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}

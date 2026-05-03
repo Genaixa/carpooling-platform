@@ -2403,6 +2403,73 @@ app.post('/api/admin/resend-email', async (req, res) => {
   }
 });
 
+// Resend missed admin notification emails for a given time window
+app.post('/api/admin/resend-missed-notifications', async (req, res) => {
+  try {
+    const { adminId, since, until } = req.body;
+    if (!adminId || !since) return res.status(400).json({ error: 'adminId and since are required' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    const {
+      sendNewUserNotification,
+      sendDriverApplicationNotification,
+      sendSmsOptInAdminEmail,
+    } = await import('./emails.js');
+
+    const untilTs = until || new Date().toISOString();
+    const sent = [];
+    const failed = [];
+
+    // New user sign-ups
+    const { data: newUsers } = await supabase
+      .from('profiles')
+      .select('*')
+      .gte('created_at', since)
+      .lte('created_at', untilTs)
+      .order('created_at', { ascending: true });
+
+    for (const user of newUsers || []) {
+      const ok = await sendNewUserNotification(user);
+      (ok ? sent : failed).push(`sign-up: ${user.email}`);
+    }
+
+    // Driver applications
+    const { data: applications } = await supabase
+      .from('driver_applications')
+      .select('*')
+      .gte('created_at', since)
+      .lte('created_at', untilTs)
+      .order('created_at', { ascending: true });
+
+    for (const app of applications || []) {
+      const ok = await sendDriverApplicationNotification(app);
+      (ok ? sent : failed).push(`driver-application: ${app.first_name} ${app.surname}`);
+    }
+
+    // SMS opt-ins (profiles where sms_opt_in flipped to true in window)
+    const { data: smsUsers } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('sms_opt_in', true)
+      .gte('updated_at', since)
+      .lte('updated_at', untilTs)
+      .order('updated_at', { ascending: true });
+
+    for (const user of smsUsers || []) {
+      const ok = await sendSmsOptInAdminEmail(user);
+      (ok ? sent : failed).push(`sms-opt-in: ${user.email}`);
+    }
+
+    console.log(`[Admin resend-missed] since=${since} sent=${sent.length} failed=${failed.length} (admin: ${adminId})`);
+    res.json({ success: true, sent, failed });
+  } catch (error) {
+    console.error('Admin resend-missed-notifications error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Test email endpoint (admin only)
 app.post('/api/test-email', async (req, res) => {
   try {
