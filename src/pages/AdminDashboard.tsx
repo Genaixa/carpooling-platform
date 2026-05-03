@@ -250,6 +250,23 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     }
   };
 
+  const handleBackfillNotificationLog = async () => {
+    if (!user || !window.confirm('This will mark all existing users, driver applications and SMS opt-ins as already notified, so the daily auto-check only looks at NEW events going forward. Run this once after setting up the notification_log table. Continue?')) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/backfill-notification-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed');
+      alert(`Backfill complete: ${data.counts.users} users, ${data.counts.driver_applications} driver apps, ${data.counts.sms_opt_ins} SMS opt-ins marked as notified.`);
+    } catch (err: any) {
+      alert('Error: ' + err.message);
+    }
+  };
+
   const handleResendMissedNotifications = async () => {
     if (!user || !missedSince) return;
     setMissedLoading(true);
@@ -3639,9 +3656,20 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   </div>
                   {/* Resend missed notifications */}
                   <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '24px', boxShadow: '0 2px 12px rgba(0,0,0,0.06)', marginTop: '24px' }}>
-                    <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Resend Missed Admin Notifications</h3>
+                    <h3 style={{ margin: '0 0 6px 0', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Notification Tracking</h3>
+                    <p style={{ margin: '0 0 12px 0', fontSize: '13px', color: '#6B7280' }}>
+                      The server now auto-checks daily for missed sign-up, driver application, and SMS opt-in notifications and sends them via Telegram if not already notified. You'll also get a Telegram alert when 90/100 monthly emails are used.
+                    </p>
+                    <div style={{ background: '#FEF9E0', border: '1px solid #FCD03A', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px', color: '#92400E' }}>
+                      <strong>One-time setup required:</strong> Run the two CREATE TABLE statements in Supabase SQL editor, then click "Initialise Tracking" below to mark all existing records as already handled.
+                      <button onClick={handleBackfillNotificationLog}
+                        style={{ marginLeft: '12px', padding: '5px 14px', background: '#fcd03a', color: '#000', border: 'none', borderRadius: '6px', fontWeight: '700', fontSize: '12px', cursor: 'pointer' }}>
+                        Initialise Tracking
+                      </button>
+                    </div>
+                    <h4 style={{ margin: '0 0 6px 0', fontSize: '13px', fontWeight: '700', color: '#374151' }}>Manual resend (for a specific downtime window)</h4>
                     <p style={{ margin: '0 0 16px 0', fontSize: '13px', color: '#6B7280' }}>
-                      If the server was down during a period, use this to re-fire the admin notification emails for sign-ups, driver applications, and SMS opt-ins that occurred in that window.
+                      Once tracking is set up, use the daily auto-check instead. This manual tool is only needed for past events before tracking was enabled.
                     </p>
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'flex-end' }}>
                       <div>
