@@ -35,6 +35,39 @@ function formatDate(dateString) {
 let lastEmailTime = 0;
 const EMAIL_MIN_GAP_MS = 350;
 
+// ── Monthly quota tracking ─────────────────────────────────────────────────
+async function incrementEmailCount() {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const { data } = await supabase.from('email_monthly_stats').select('sent_count').eq('month', month).single();
+    const next = (data?.sent_count ?? 0) + 1;
+    await supabase.from('email_monthly_stats').upsert({ month, sent_count: next }, { onConflict: 'month' });
+  } catch { /* non-fatal */ }
+}
+
+export async function getMonthlyEmailCount() {
+  try {
+    const month = new Date().toISOString().slice(0, 7);
+    const { data } = await supabase.from('email_monthly_stats').select('sent_count').eq('month', month).single();
+    return data?.sent_count ?? 0;
+  } catch { return 0; }
+}
+
+// ── Admin notification log ─────────────────────────────────────────────────
+async function isAlreadyNotified(eventType, eventId) {
+  try {
+    const { data } = await supabase.from('notification_log').select('event_id').eq('event_type', eventType).eq('event_id', String(eventId)).single();
+    return !!data;
+  } catch { return false; }
+}
+
+async function markNotified(eventType, eventId) {
+  try {
+    await supabase.from('notification_log').upsert({ event_type: eventType, event_id: String(eventId) }, { onConflict: 'event_type,event_id' });
+  } catch { /* non-fatal */ }
+}
+
+// ── Core send ──────────────────────────────────────────────────────────────
 async function sendEmail(to, subject, html) {
   const now = Date.now();
   const wait = EMAIL_MIN_GAP_MS - (now - lastEmailTime);
@@ -50,6 +83,7 @@ async function sendEmail(to, subject, html) {
       html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">${html}<div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #ddd; color: #666; font-size: 12px;"><p>Safe travels!<br>The ChapaRide Team</p></div></div>`,
     });
     if (error) { console.error('Email error:', error); return false; }
+    incrementEmailCount();
     return true;
   } catch (err) { console.error('Email send failed:', err); return false; }
 }
@@ -320,7 +354,8 @@ export async function sendDriverRejectedEmail(application) {
 
 // 8. New driver application notification (to admin)
 export async function sendDriverApplicationNotification(application) {
-  return sendEmail(ADMIN_EMAIL, 'New Driver Application to Review',
+  if (await isAlreadyNotified('driver_application', application.id)) return true;
+  const ok = await sendEmail(ADMIN_EMAIL, 'New Driver Application to Review',
     `<h2>New Driver Application</h2>
     <p>A new driver application has been submitted and needs your review.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
@@ -332,6 +367,8 @@ export async function sendDriverApplicationNotification(application) {
     </div>
     <p><a href="${SITE_URL}/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: #fcd03a; color: #000000; text-decoration: none; border-radius: 8px; font-weight: 600;">Review Application</a></p>`
   );
+  if (ok) markNotified('driver_application', application.id);
+  return ok;
 }
 
 // 9. Ride match notification (to wish creator)
@@ -671,7 +708,8 @@ export async function sendContactFormEmail({ name, email, subject, message }) {
 }
 
 export async function sendNewUserNotification(user) {
-  return sendEmail(ADMIN_EMAIL, 'New Passenger Registered on ChapaRide',
+  if (await isAlreadyNotified('new_user', user.id)) return true;
+  const ok = await sendEmail(ADMIN_EMAIL, 'New Passenger Registered on ChapaRide',
     `<h2>New Passenger Sign-Up</h2>
     <p>A new passenger has registered on ChapaRide.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
@@ -684,6 +722,8 @@ export async function sendNewUserNotification(user) {
     </div>
     <p><a href="${SITE_URL}/#admin-dashboard" style="background:#fcd03a;color:#000;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:600;">View in Admin Dashboard</a></p>`
   );
+  if (ok) markNotified('new_user', user.id);
+  return ok;
 }
 
 // 20. Price nudge for driver (ride has no bookings close to departure, price above route average)
@@ -835,8 +875,9 @@ export async function sendAdminSmsPaxAlert(passenger, ride, status) {
 }
 
 export async function sendSmsOptInAdminEmail(user) {
+  if (await isAlreadyNotified('sms_opt_in', user.id)) return true;
   const { name, email, phone, role } = user;
-  return sendEmail('yossiadam1@gmail.com', `SMS Opt-In: ${escapeHtml(name)} wants SMS notifications`,
+  const ok = await sendEmail('yossiadam1@gmail.com', `SMS Opt-In: ${escapeHtml(name)} wants SMS notifications`,
     `<h2>New SMS Opt-In Request</h2>
     <p>A user has opted in to receive SMS notifications and needs to be set up manually.</p>
     <div style="background: #f5f5f5; padding: 15px; border-radius: 8px; margin: 20px 0;">
@@ -848,6 +889,8 @@ export async function sendSmsOptInAdminEmail(user) {
     <p>Log in to the admin dashboard to view this user's full details.</p>
     <p><a href="${SITE_URL}/#admin-dashboard" style="display: inline-block; padding: 12px 24px; background: #fcd03a; color: #000000; text-decoration: none; border-radius: 8px; font-weight: 600;">Admin Dashboard</a></p>`
   );
+  if (ok) markNotified('sms_opt_in', user.id);
+  return ok;
 }
 
 export async function testEmail(email, name, type = 'booking-confirmation') {
