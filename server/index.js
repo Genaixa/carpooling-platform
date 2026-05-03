@@ -116,74 +116,75 @@ async function sendTelegramAlert(message) {
 
 // ── Daily notification health check ──────────────────────────────────────────
 const EMAIL_MONTHLY_LIMIT = 100;
-const EMAIL_ALERT_THRESHOLD = 90;   // alert when this many sent in current month
-const EMAIL_RESERVE = 10;           // keep this many back for urgent operational emails
+const EMAIL_ALERT_THRESHOLD = 90;
+const EMAIL_RESERVE = 10;
+
+async function getLastCheckTime() {
+  try {
+    const { data } = await supabase.from('notification_log').select('notified_at').eq('event_type', 'last_check').eq('event_id', 'last_check').single();
+    return data?.notified_at ? new Date(data.notified_at) : null;
+  } catch { return null; }
+}
+
+async function saveLastCheckTime() {
+  try {
+    await supabase.from('notification_log').upsert({ event_type: 'last_check', event_id: 'last_check', notified_at: new Date().toISOString() }, { onConflict: 'event_type,event_id' });
+  } catch { /* non-fatal */ }
+}
 
 async function runDailyNotificationCheck() {
   try {
-    const { getMonthlyEmailCount, sendNewUserNotification, sendDriverApplicationNotification, sendSmsOptInAdminEmail } = await import('./emails.js');
+    const { getMonthlyEmailCount, sendDriverApplicationNotification, sendSmsOptInAdminEmail } = await import('./emails.js');
 
     // 1. Check monthly quota
     const monthlyCount = await getMonthlyEmailCount();
     const remaining = EMAIL_MONTHLY_LIMIT - monthlyCount;
-
     if (monthlyCount >= EMAIL_ALERT_THRESHOLD) {
       await sendTelegramAlert(`⚠️ *ChapaRide Email Quota*\n${monthlyCount}/${EMAIL_MONTHLY_LIMIT} emails used this month.\n${remaining} remaining — consider upgrading Resend plan.`);
     }
 
-    // 2. Find unnotified events — only look at the last 7 days (catch recent misses, not all history)
-    const windowStart = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
+    // 2. Window = since last successful check (catches exactly the downtime, nothing more)
+    const lastCheck = await getLastCheckTime();
+    const windowStart = lastCheck ? lastCheck.toISOString() : new Date(Date.now() - 25 * 60 * 60 * 1000).toISOString();
 
-    const [{ data: loggedUsers }, { data: loggedApps }, { data: loggedSms }] = await Promise.all([
-      supabase.from('notification_log').select('event_id').eq('event_type', 'new_user'),
+    // Save checkpoint now so a crash mid-run doesn't re-process the same events next time
+    await saveLastCheckTime();
+
+    const [{ data: loggedApps }, { data: loggedSms }] = await Promise.all([
       supabase.from('notification_log').select('event_id').eq('event_type', 'driver_application'),
       supabase.from('notification_log').select('event_id').eq('event_type', 'sms_opt_in'),
     ]);
-
-    const loggedUserIds = (loggedUsers || []).map(r => r.event_id);
     const loggedAppIds = (loggedApps || []).map(r => r.event_id);
     const loggedSmsIds = (loggedSms || []).map(r => r.event_id);
 
-    const [{ data: recentUsers }, { data: recentApps }, { data: recentSmsUsers }] = await Promise.all([
-      supabase.from('profiles').select('*').gte('created_at', windowStart),
+    // Only check driver applications and SMS opt-ins — sign-ups are visible in the dashboard
+    const [{ data: recentApps }, { data: recentSmsUsers }] = await Promise.all([
       supabase.from('driver_applications').select('*').gte('created_at', windowStart),
       supabase.from('profiles').select('*').eq('sms_opt_in', true).gte('updated_at', windowStart),
     ]);
 
-    const newUsers = (recentUsers || []).filter(u => !loggedUserIds.includes(String(u.id)));
-    const applications = (recentApps || []).filter(a => !loggedAppIds.includes(String(a.id)));
-    const smsUsers = (recentSmsUsers || []).filter(u => !loggedSmsIds.includes(String(u.id)));
-
-    const pendingUsers = newUsers;
-    const pendingApps = applications;
-    const pendingSms = smsUsers;
-    const totalPending = pendingUsers.length + pendingApps.length + pendingSms.length;
+    const pendingApps = (recentApps || []).filter(a => !loggedAppIds.includes(String(a.id)));
+    const pendingSms = (recentSmsUsers || []).filter(u => !loggedSmsIds.includes(String(u.id)));
+    const totalPending = pendingApps.length + pendingSms.length;
 
     if (totalPending === 0) return;
 
-    // 3. Check if we have quota to send
+    // 3. Check quota
     const sendable = remaining - EMAIL_RESERVE;
     if (sendable <= 0) {
-      const nextMonth = new Date(new Date().setDate(1));
-      nextMonth.setMonth(nextMonth.getMonth() + 1);
-      const resetDate = nextMonth.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+      const resetDate = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
       await sendTelegramAlert(
         `⚠️ *ChapaRide: ${totalPending} missed notification${totalPending > 1 ? 's' : ''} pending*\n` +
-        `Not enough email quota to send (${monthlyCount}/${EMAIL_MONTHLY_LIMIT} used).\n` +
-        `They will be sent automatically when quota resets on ${resetDate}.`
+        `Not enough email quota (${monthlyCount}/${EMAIL_MONTHLY_LIMIT} used).\n` +
+        `Will send automatically when quota resets on ${resetDate}.`
       );
       return;
     }
 
-    // 4. Send what we can, in priority order: sign-ups → driver apps → SMS opt-ins
+    // 4. Send — driver applications first, then SMS opt-ins
     const summary = [];
     let budget = sendable;
 
-    for (const user of pendingUsers) {
-      if (budget <= 0) break;
-      const ok = await sendNewUserNotification(user);
-      if (ok) { summary.push(`Sign-up: ${user.name}`); budget--; }
-    }
     for (const app of pendingApps) {
       if (budget <= 0) break;
       const ok = await sendDriverApplicationNotification(app);
@@ -196,22 +197,18 @@ async function runDailyNotificationCheck() {
     }
 
     if (summary.length > 0) {
-      await sendTelegramAlert(
-        `✅ *ChapaRide: Sent ${summary.length} missed notification${summary.length > 1 ? 's' : ''}*\n` +
-        summary.map(s => `• ${s}`).join('\n')
-      );
+      await sendTelegramAlert(`✅ *ChapaRide: Sent ${summary.length} missed notification${summary.length > 1 ? 's' : ''}*\n` + summary.map(s => `• ${s}`).join('\n'));
     }
-
     const stillPending = totalPending - summary.length;
     if (stillPending > 0) {
-      await sendTelegramAlert(`⚠️ *ChapaRide:* ${stillPending} more pending notifications could not be sent — quota limit reached. Will retry tomorrow.`);
+      await sendTelegramAlert(`⚠️ *ChapaRide:* ${stillPending} pending notifications held back — quota limit reached. Will retry tomorrow.`);
     }
   } catch (err) {
     console.error('[DailyCheck] Error:', err.message);
   }
 }
 
-// Run once on startup (60s delay to let server settle) then every 24 hours
+// Run once on startup (60s delay) then every 24 hours
 setTimeout(() => {
   runDailyNotificationCheck();
   setInterval(runDailyNotificationCheck, 24 * 60 * 60 * 1000);
