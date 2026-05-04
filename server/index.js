@@ -880,6 +880,8 @@ app.post('/api/driver/reject-booking', async (req, res) => {
 
     if (updateError) throw updateError;
 
+    await recalculateSeats(booking.ride_id); await recalculateComposition(booking.ride_id);
+
     // Send emails to passenger and driver
     try {
       const { sendBookingRejectedEmail, sendDriverBookingRejectedEmail, sendAdminSmsPaxAlert } = await import('./emails.js');
@@ -1238,6 +1240,27 @@ app.post('/api/admin/edit-ride', async (req, res) => {
     res.json({ success: true, updates: rideUpdates });
   } catch (error) {
     console.error('Admin edit ride error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/admin/recalculate-seats', async (req, res) => {
+  try {
+    const { adminId, rideId } = req.body;
+    if (!adminId || !rideId) return res.status(400).json({ error: 'Missing required fields' });
+    if (!await verifyUser(req, res, adminId)) return;
+
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    await recalculateSeats(rideId);
+    await recalculateComposition(rideId);
+
+    const { data: ride } = await supabase.from('rides').select('seats_available').eq('id', rideId).single();
+    console.log(`✓ Admin recalculated seats for ride: ${rideId} → ${ride?.seats_available} available`);
+    res.json({ success: true, seats_available: ride?.seats_available });
+  } catch (error) {
+    console.error('Recalculate seats error:', error);
     res.status(500).json({ error: error.message });
   }
 });
@@ -1797,14 +1820,7 @@ app.get('/api/admin/rides-overview', async (req, res) => {
       };
     });
 
-    // Exclude ghost rides: upcoming but past their departure date with no bookings
-    const now = new Date();
-    const visibleRides = ridesWithFinancials.filter(r => {
-      if (r.status === 'upcoming' && new Date(r.date_time) < now && r.bookings.length === 0) return false;
-      return true;
-    });
-
-    res.json({ success: true, rides: visibleRides });
+    res.json({ success: true, rides: ridesWithFinancials });
   } catch (error) {
     console.error('Rides overview error:', error);
     res.status(500).json({ error: error.message });
@@ -3415,12 +3431,30 @@ async function nudgeUnfulfilledWishes() {
 }
 
 // Run every 15 minutes
+async function syncAllRideSeats() {
+  try {
+    const { data: rides } = await supabase
+      .from('rides')
+      .select('id')
+      .eq('status', 'upcoming');
+    if (!rides || rides.length === 0) return;
+    for (const ride of rides) {
+      await recalculateSeats(ride.id);
+      await recalculateComposition(ride.id);
+    }
+    console.log(`✓ Seat sync complete — ${rides.length} upcoming rides checked`);
+  } catch (err) {
+    console.error('Seat sync error:', err);
+  }
+}
+
 setInterval(cleanupPastRides, 15 * 60 * 1000);
 setInterval(sendPostRideReminders, 15 * 60 * 1000);
 setInterval(sendContactDetailEmails, 15 * 60 * 1000);
 setInterval(nudgeUnfulfilledWishes, 15 * 60 * 1000);
 setInterval(checkFlexibleDateMatches, 15 * 60 * 1000);
 setInterval(checkUnfilledRidePricing, 15 * 60 * 1000);
+setInterval(syncAllRideSeats, 60 * 60 * 1000);
 
 // Global error handler — catches multer errors (file size/type) and returns JSON
 app.use((err, req, res, next) => {
@@ -3438,4 +3472,5 @@ app.listen(PORT, () => {
   setTimeout(nudgeUnfulfilledWishes, 20000);
   setTimeout(checkFlexibleDateMatches, 25000);
   setTimeout(checkUnfilledRidePricing, 30000);
+  setTimeout(syncAllRideSeats, 35000);
 });

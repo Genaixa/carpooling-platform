@@ -566,6 +566,24 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     }
   };
 
+  const handleRecalculateSeats = async (rideId: string) => {
+    if (!user) return;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/admin/recalculate-seats`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ adminId: user.id, rideId }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success(`Seats recalculated — ${data.seats_available} now available`);
+      setRidesOverview(prev => prev.map(r => r.id === rideId ? { ...r, seats_available: data.seats_available } : r));
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to recalculate seats');
+    }
+  };
+
   const handleAdminCompleteRide = async (rideId: string) => {
     if (!user) return;
     if (!window.confirm('Mark this ride as complete? Review reminder emails will be sent to the driver and passengers.')) return;
@@ -1740,6 +1758,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                           style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#6366f1', color: 'white', whiteSpace: 'nowrap' }}
                                         >
                                           Edit Ride
+                                        </button>
+                                      )}
+                                      {ride.status === 'upcoming' && (
+                                        <button
+                                          onClick={e => { e.stopPropagation(); handleRecalculateSeats(ride.id); }}
+                                          style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#0891b2', color: 'white', whiteSpace: 'nowrap' }}
+                                          title="Sync seats_available with actual confirmed/pending bookings"
+                                        >
+                                          Fix Seats
                                         </button>
                                       )}
                                       {ride.status === 'upcoming' && (
