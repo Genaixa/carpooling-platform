@@ -96,10 +96,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     }
   };
 
-  const loadData = async () => {
+  const loadData = async (attempt = 0) => {
     if (!user) return;
     try {
       setLoading(true);
+      setError('');
+
       const { data: ridesData, error: ridesError } = await supabase
         .from('rides')
         .select('*')
@@ -110,82 +112,83 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const allRides = ridesData || [];
       setRides(allRides);
 
-      if (allRides.length > 0) {
-        const rideIds = allRides.map(r => r.id);
+      const rideIds = allRides.map(r => r.id);
 
-        // Load pending bookings
-        const { data: pending, error: pendingError } = await supabase
-          .from('bookings')
-          .select('*, ride:rides!bookings_ride_id_fkey(*), passenger:profiles!bookings_passenger_id_fkey(*)')
-          .in('ride_id', rideIds)
-          .eq('status', 'pending_driver');
+      // Run all independent queries in parallel
+      const [pendingResult, confirmedResult, reviewsResult, wishesResult] = await Promise.all([
+        rideIds.length > 0
+          ? supabase.from('bookings')
+              .select('*, ride:rides!bookings_ride_id_fkey(*), passenger:profiles!bookings_passenger_id_fkey(*)')
+              .in('ride_id', rideIds)
+              .eq('status', 'pending_driver')
+          : Promise.resolve({ data: [], error: null }),
 
-        if (pendingError) throw pendingError;
-        setPendingBookings(pending || []);
+        rideIds.length > 0
+          ? supabase.from('bookings')
+              .select('*, passenger:profiles!bookings_passenger_id_fkey(*)')
+              .in('ride_id', rideIds)
+              .in('status', ['confirmed', 'completed'])
+          : Promise.resolve({ data: [], error: null }),
 
-        // Load confirmed bookings per ride
-        const { data: confirmed, error: confirmedError } = await supabase
-          .from('bookings')
-          .select('*, passenger:profiles!bookings_passenger_id_fkey(*)')
-          .in('ride_id', rideIds)
-          .in('status', ['confirmed', 'completed']);
-
-        if (confirmedError) throw confirmedError;
-        const grouped: Record<string, Booking[]> = {};
-        (confirmed || []).forEach(b => {
-          if (!grouped[b.ride_id]) grouped[b.ride_id] = [];
-          grouped[b.ride_id].push(b);
-        });
-        setRideBookings(grouped);
-
-        // Load reviews already submitted by this driver
-        const { data: driverReviews } = await supabase
-          .from('reviews')
+        supabase.from('reviews')
           .select('booking_id')
           .eq('reviewer_id', user.id)
-          .eq('type', 'driver-to-passenger');
-        setReviewedBookingIds(new Set((driverReviews || []).map((r: any) => r.booking_id)));
-      }
+          .eq('type', 'driver-to-passenger'),
 
-      // Load passenger wishes for approved drivers
-      if (profile?.is_approved_driver) {
-        try {
-          const todayStr = new Date().toISOString().split('T')[0];
-          const { data: wishesData } = await supabase
-            .from('ride_wishes')
-            .select('*, user:profiles!ride_wishes_user_id_fkey(*)')
-            .eq('status', 'active')
-            .gte('desired_date', todayStr)
-            .order('desired_date', { ascending: true });
-          setPassengerWishes(wishesData || []);
+        profile?.is_approved_driver
+          ? supabase.from('ride_wishes')
+              .select('*, user:profiles!ride_wishes_user_id_fkey(*)')
+              .eq('status', 'active')
+              .gte('desired_date', new Date().toISOString().split('T')[0])
+              .order('desired_date', { ascending: true })
+          : Promise.resolve({ data: [], error: null }),
+      ]);
 
-          // Check for matching rides for each wish
-          if (wishesData && wishesData.length > 0) {
-            const matchMap: Record<string, { mine: number; others: number }> = {};
-            for (const wish of wishesData) {
-              const dateStart = `${wish.desired_date}T00:00:00`;
-              const dateEnd = `${wish.desired_date}T23:59:59`;
-              const { data: matchingRides } = await supabase
-                .from('rides')
-                .select('driver_id')
-                .eq('departure_location', wish.departure_location)
-                .eq('arrival_location', wish.arrival_location)
-                .eq('status', 'upcoming')
-                .gte('date_time', dateStart)
-                .lte('date_time', dateEnd);
+      if (pendingResult.error) throw pendingResult.error;
+      setPendingBookings(pendingResult.data || []);
 
-              const mine = (matchingRides || []).filter(r => r.driver_id === user.id).length;
-              const others = (matchingRides || []).length - mine;
-              matchMap[wish.id] = { mine, others };
-            }
-            setWishMatchingRides(matchMap);
-          }
-        } catch (e) {
-          console.error('Error loading passenger wishes:', e);
-        }
+      if (confirmedResult.error) throw confirmedResult.error;
+      const grouped: Record<string, Booking[]> = {};
+      (confirmedResult.data || []).forEach(b => {
+        if (!grouped[b.ride_id]) grouped[b.ride_id] = [];
+        grouped[b.ride_id].push(b);
+      });
+      setRideBookings(grouped);
+
+      setReviewedBookingIds(new Set((reviewsResult.data || []).map((r: any) => r.booking_id)));
+
+      const wishesData = wishesResult.data || [];
+      setPassengerWishes(wishesData);
+
+      // Fan out wish-matching queries in parallel
+      if (wishesData.length > 0) {
+        const matchResults = await Promise.all(
+          wishesData.map(wish =>
+            supabase.from('rides')
+              .select('driver_id')
+              .eq('departure_location', wish.departure_location)
+              .eq('arrival_location', wish.arrival_location)
+              .eq('status', 'upcoming')
+              .gte('date_time', `${wish.desired_date}T00:00:00`)
+              .lte('date_time', `${wish.desired_date}T23:59:59`)
+              .then(({ data }) => ({ wishId: wish.id, rides: data || [] }))
+          )
+        );
+        const matchMap: Record<string, { mine: number; others: number }> = {};
+        matchResults.forEach(({ wishId, rides }) => {
+          matchMap[wishId] = {
+            mine: rides.filter(r => r.driver_id === user.id).length,
+            others: rides.filter(r => r.driver_id !== user.id).length,
+          };
+        });
+        setWishMatchingRides(matchMap);
       }
     } catch (error: any) {
       if (isAuthError(error)) return;
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+        return loadData(attempt + 1);
+      }
       console.error('Error loading data:', error);
       setError('Failed to load dashboard data');
     } finally {
@@ -390,8 +393,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         {error && (
-          <div style={{ marginBottom: '20px', borderRadius: '12px', backgroundColor: '#fee2e2', padding: '16px', border: '1px solid #fca5a5' }}>
+          <div style={{ marginBottom: '20px', borderRadius: '12px', backgroundColor: '#fee2e2', padding: '16px', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <p style={{ fontSize: '14px', color: '#991b1b', margin: 0 }}>{error}</p>
+            <button onClick={() => loadData()} style={{ flexShrink: 0, fontSize: '13px', fontWeight: '600', color: '#991b1b', background: 'none', border: '1px solid #991b1b', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer' }}>Try again</button>
           </div>
         )}
 
@@ -424,7 +428,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                           onMouseLeave={e => (e.currentTarget.style.backgroundColor = 'white')}
                         >
                           <td style={{ padding: '14px 16px', fontWeight: '600', color: '#1F2937' }}>
-                            {(booking.passenger as any)?.name || 'Passenger'}
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span>{(booking.passenger as any)?.name || 'Passenger'}</span>
+                              {(booking.passenger as any)?.total_reviews > 0
+                                ? <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#fefce8', color: '#854d0e', border: '1px solid #fef08a', fontWeight: '500' }}>⭐ {(booking.passenger as any).average_rating?.toFixed(1)} ({(booking.passenger as any).total_reviews} {(booking.passenger as any).total_reviews === 1 ? 'review' : 'reviews'})</span>
+                                : <span style={{ fontSize: '11px', padding: '2px 7px', borderRadius: '10px', backgroundColor: '#F3F4F6', color: '#6B7280', border: '1px solid #E5E7EB', fontWeight: '500' }}>No reviews yet</span>
+                              }
+                              <button onClick={() => onNavigate('public-profile', undefined, booking.passenger_id)} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: '#4338CA', fontSize: '11px', fontWeight: '600', textDecoration: 'underline' }}>View Profile</button>
+                            </div>
                             {(booking as any).third_party_passenger && (
                               <div style={{ marginTop: '4px', padding: '6px 8px', backgroundColor: '#eff6ff', border: '1px solid #bfdbfe', borderRadius: '6px' }}>
                                 <p style={{ margin: '0 0 2px', fontSize: '11px', fontWeight: '700', color: '#1e40af' }}>Travelling: {(booking as any).third_party_passenger.name}</p>

@@ -203,7 +203,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
 
     setSubmitting(true);
     try {
-      const { error } = await supabase.from('driver_applications').insert([{
+      const { data: insertedApp, error } = await supabase.from('driver_applications').insert([{
         user_id: user.id,
         first_name: formData.first_name.trim(),
         surname: formData.surname.trim(),
@@ -222,7 +222,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
         bank_account_number: formData.bank_account_number.trim(),
         bank_sort_code: formData.bank_sort_code.trim(),
         status: 'pending',
-      }]);
+      }]).select('id');
 
       if (error) throw error;
       toast.success('Application submitted successfully! We will review it shortly.');
@@ -232,6 +232,7 @@ export default function DriverApplication({ onNavigate }: DriverApplicationProps
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ application: {
+          id: insertedApp?.[0]?.id,
           first_name: formData.first_name.trim(),
           surname: formData.surname.trim(),
           age_group: formData.age_group,

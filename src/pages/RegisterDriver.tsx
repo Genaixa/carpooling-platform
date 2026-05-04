@@ -189,7 +189,7 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
       }
 
       // Step 4: Insert driver application
-      const { error: appError } = await supabase.from('driver_applications').insert([{
+      const { data: insertedApp, error: appError } = await supabase.from('driver_applications').insert([{
         user_id: userId,
         first_name: formData.firstName.trim(),
         surname: formData.surname.trim(),
@@ -208,7 +208,7 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
         bank_account_number: formData.bankAccountNumber.trim(),
         bank_sort_code: formData.bankSortCode.trim(),
         status: 'pending',
-      }]);
+      }]).select('id');
 
       if (appError) throw appError;
 
@@ -218,6 +218,7 @@ export default function RegisterDriver({ onNavigate }: RegisterDriverProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           application: {
+            id: insertedApp?.[0]?.id,
             first_name: formData.firstName.trim(),
             surname: formData.surname.trim(),
             age_group: formData.ageGroup,

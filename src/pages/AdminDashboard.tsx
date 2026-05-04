@@ -11,6 +11,7 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 const API_URL = import.meta.env.VITE_API_URL || '';
+const USERS_PAGE_SIZE = 50;
 
 interface AdminDashboardProps {
   onNavigate: NavigateFn;
@@ -114,6 +115,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [usersFilter, setUsersFilter] = useState<'all' | 'drivers' | 'passengers' | 'sms'>('all');
   const [usersSearch, setUsersSearch] = useState('');
   const [usersLoading, setUsersLoading] = useState(false);
+  const [usersPage, setUsersPage] = useState(0);
+  const [usersTotalCount, setUsersTotalCount] = useState(0);
+  const [usersTabCounts, setUsersTabCounts] = useState({ all: 0, drivers: 0, passengers: 0, sms: 0 });
+  const [csvLoading, setCsvLoading] = useState(false);
+  const usersSearchTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [usersSort, setUsersSort] = useState('');
+  const [usersSortDir, setUsersSortDir] = useState<'asc' | 'desc'>('asc');
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<Record<string, any>>({});
@@ -151,7 +159,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (tab === 'applications') loadApplications();
       else if (tab === 'licence-reviews') loadPendingLicences();
       else if (tab === 'finances') loadFinancialData();
-      else if (tab === 'users') loadUsersData();
+      else if (tab === 'users') { loadUsersData(0, usersFilter, usersSearch); loadUsersTabCounts(); }
       else if (tab === 'activity') loadActivityData();
     }
   }, [user, profile, filter, tab]);
@@ -288,47 +296,105 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     }
   };
 
-  const loadUsersData = async () => {
+  const loadUsersData = async (page = 0, filter = usersFilter, search = usersSearch, sortField = usersSort, sortDir = usersSortDir) => {
     setUsersLoading(true);
     try {
-      const [profilesResult, bookingsResult, ridesResult] = await Promise.all([
-        supabase
-          .from('profiles')
-          .select('id, name, email, phone, is_approved_driver, is_admin, is_banned, average_rating, total_reviews, created_at, gender, city, profile_photo_url, driver_tier, age_group, marital_status, travel_status, partner_name, address_line1, address_line2, postcode, sms_opt_in')
-          .order('created_at', { ascending: false }),
-        // Fetch all non-cancelled booking passenger IDs to count per user
-        supabase
-          .from('bookings')
-          .select('passenger_id')
-          .not('status', 'eq', 'cancelled'),
-        // Fetch all non-cancelled ride driver IDs to count per user
-        supabase
-          .from('rides')
-          .select('driver_id')
-          .not('status', 'eq', 'cancelled'),
+      const orderCol = sortField || 'created_at';
+      const orderAsc = sortField ? sortDir === 'asc' : false;
+      let query = supabase
+        .from('profiles')
+        .select('id, name, email, phone, is_approved_driver, is_admin, is_banned, average_rating, total_reviews, created_at, gender, city, profile_photo_url, driver_tier, age_group, marital_status, travel_status, partner_name, address_line1, address_line2, postcode, sms_opt_in', { count: 'exact' })
+        .order(orderCol, { ascending: orderAsc })
+        .range(page * USERS_PAGE_SIZE, (page + 1) * USERS_PAGE_SIZE - 1);
+
+      if (filter === 'drivers') query = query.eq('is_approved_driver', true);
+      else if (filter === 'passengers') query = query.eq('is_approved_driver', false);
+      else if (filter === 'sms') query = query.eq('sms_opt_in', true);
+      if (search.trim()) query = query.or(`name.ilike.%${search.trim()}%,email.ilike.%${search.trim()}%`);
+
+      const profilesResult = await query;
+      const profiles = profilesResult.data || [];
+      setUsersTotalCount(profilesResult.count || 0);
+
+      const ids = profiles.map((p: any) => p.id);
+      const [bookingsResult, ridesResult] = await Promise.all([
+        ids.length
+          ? supabase.from('bookings').select('passenger_id').in('passenger_id', ids).not('status', 'eq', 'cancelled')
+          : Promise.resolve({ data: [] as any[] }),
+        ids.length
+          ? supabase.from('rides').select('driver_id').in('driver_id', ids).not('status', 'eq', 'cancelled')
+          : Promise.resolve({ data: [] as any[] }),
       ]);
 
-      // Build lookup maps: userId -> count
       const bookingCounts: Record<string, number> = {};
-      for (const b of bookingsResult.data || []) {
-        bookingCounts[b.passenger_id] = (bookingCounts[b.passenger_id] || 0) + 1;
-      }
+      for (const b of (bookingsResult as any).data || []) bookingCounts[b.passenger_id] = (bookingCounts[b.passenger_id] || 0) + 1;
       const rideCounts: Record<string, number> = {};
-      for (const r of ridesResult.data || []) {
-        rideCounts[r.driver_id] = (rideCounts[r.driver_id] || 0) + 1;
-      }
+      for (const r of (ridesResult as any).data || []) rideCounts[r.driver_id] = (rideCounts[r.driver_id] || 0) + 1;
 
-      const enriched = (profilesResult.data || []).map(u => ({
-        ...u,
-        bookings_count: bookingCounts[u.id] || 0,
-        rides_count: rideCounts[u.id] || 0,
-      }));
-      setUsersData(enriched);
+      setUsersData(profiles.map((u: any) => ({ ...u, bookings_count: bookingCounts[u.id] || 0, rides_count: rideCounts[u.id] || 0 })));
     } catch (err: any) {
       if (isAuthError(err)) return;
       toast.error('Failed to load users');
     } finally {
       setUsersLoading(false);
+    }
+  };
+
+  const loadUsersTabCounts = async () => {
+    const [all, drivers, passengers, sms] = await Promise.all([
+      supabase.from('profiles').select('id', { count: 'exact', head: true }),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_approved_driver', true),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('is_approved_driver', false),
+      supabase.from('profiles').select('id', { count: 'exact', head: true }).eq('sms_opt_in', true),
+    ]);
+    setUsersTabCounts({ all: all.count || 0, drivers: drivers.count || 0, passengers: passengers.count || 0, sms: sms.count || 0 });
+  };
+
+  const downloadUsersCSV = async () => {
+    setCsvLoading(true);
+    try {
+      // Fetch ALL matching users (no pagination) for the current filter/search
+      let query = supabase
+        .from('profiles')
+        .select('id, name, email, phone, is_approved_driver, is_admin, is_banned, average_rating, total_reviews, created_at, gender, city, driver_tier, age_group, marital_status, travel_status, partner_name, address_line1, address_line2, postcode, sms_opt_in')
+        .order('created_at', { ascending: false })
+        .limit(100000);
+
+      if (usersFilter === 'drivers') query = query.eq('is_approved_driver', true);
+      else if (usersFilter === 'passengers') query = query.eq('is_approved_driver', false);
+      else if (usersFilter === 'sms') query = query.eq('sms_opt_in', true);
+      if (usersSearch.trim()) query = query.or(`name.ilike.%${usersSearch.trim()}%,email.ilike.%${usersSearch.trim()}%`);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      const users = data || [];
+
+      const ids = users.map((u: any) => u.id);
+      const [bookingsResult, ridesResult] = await Promise.all([
+        ids.length ? supabase.from('bookings').select('passenger_id').in('passenger_id', ids).not('status', 'eq', 'cancelled') : Promise.resolve({ data: [] as any[] }),
+        ids.length ? supabase.from('rides').select('driver_id').in('driver_id', ids).not('status', 'eq', 'cancelled') : Promise.resolve({ data: [] as any[] }),
+      ]);
+      const bookingCounts: Record<string, number> = {};
+      for (const b of (bookingsResult as any).data || []) bookingCounts[b.passenger_id] = (bookingCounts[b.passenger_id] || 0) + 1;
+      const rideCounts: Record<string, number> = {};
+      for (const r of (ridesResult as any).data || []) rideCounts[r.driver_id] = (rideCounts[r.driver_id] || 0) + 1;
+      const enriched = users.map((u: any) => ({ ...u, bookings_count: bookingCounts[u.id] || 0, rides_count: rideCounts[u.id] || 0 }));
+
+      const headers = ['ID', 'Name', 'Email', 'Phone', 'Role', 'Driver Tier', 'Gender', 'Age Group', 'City', 'Address Line 1', 'Address Line 2', 'Postcode', 'Marital Status', 'Travel Status', 'Partner Name', 'SMS Opt-in', 'Is Admin', 'Is Banned', 'Average Rating', 'Total Reviews', 'Bookings Count', 'Rides Count', 'Joined'];
+      const escape = (val: any) => { if (val == null) return ''; const str = String(val); return str.includes(',') || str.includes('"') || str.includes('\n') ? `"${str.replace(/"/g, '""')}"` : str; };
+      const rows = enriched.map((u: any) => [escape(u.id), escape(u.name), escape(u.email), escape(u.phone), escape(u.is_approved_driver ? 'Driver' : 'Passenger'), escape(u.driver_tier), escape(u.gender), escape(u.age_group), escape(u.city), escape(u.address_line1), escape(u.address_line2), escape(u.postcode), escape(u.marital_status), escape(u.travel_status), escape(u.partner_name), escape(u.sms_opt_in ? 'Yes' : 'No'), escape(u.is_admin ? 'Yes' : 'No'), escape(u.is_banned ? 'Yes' : 'No'), escape(u.average_rating), escape(u.total_reviews), escape(u.bookings_count), escape(u.rides_count), escape(u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB') : '')].join(','));
+      const csv = [headers.join(','), ...rows].join('\n');
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `chaparide-users-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err: any) {
+      toast.error('Failed to download CSV');
+    } finally {
+      setCsvLoading(false);
     }
   };
 
@@ -865,7 +931,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.success(unban ? 'User unbanned' : 'User banned');
       setConfirmBan(null);
       setBanReason(prev => { const n = { ...prev }; delete n[userId]; return n; });
-      loadUsersData();
+      loadUsersData(usersPage, usersFilter, usersSearch, usersSort, usersSortDir);
     } catch (err: any) {
       toast.error(err.message || 'Failed to update ban status');
     } finally {
@@ -887,7 +953,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (data.error) throw new Error(data.error);
       toast.success('User account deleted');
       setConfirmDelete(null);
-      loadUsersData();
+      loadUsersData(usersPage, usersFilter, usersSearch, usersSort, usersSortDir);
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete user');
     } finally {
@@ -910,7 +976,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.success('Profile updated');
       setEditingUser(null);
       setEditUserData({});
-      loadUsersData();
+      loadUsersData(usersPage, usersFilter, usersSearch, usersSort, usersSortDir);
     } catch (err: any) {
       toast.error(err.message || 'Failed to update profile');
     } finally {
@@ -2686,7 +2752,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   {(['all', 'drivers', 'passengers', 'sms'] as const).map(f => (
                     <button
                       key={f}
-                      onClick={() => setUsersFilter(f)}
+                      onClick={() => { setUsersFilter(f); setUsersPage(0); loadUsersData(0, f, usersSearch); }}
                       style={{
                         padding: '8px 18px', borderRadius: '20px', fontSize: '13px', fontWeight: '600',
                         border: 'none', cursor: 'pointer',
@@ -2694,7 +2760,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                         color: usersFilter === f ? 'white' : '#374151',
                       }}
                     >
-                      {f === 'all' ? `All (${usersData.length})` : f === 'drivers' ? `Drivers (${usersData.filter(u => u.is_approved_driver).length})` : f === 'passengers' ? `Passengers (${usersData.filter(u => !u.is_approved_driver).length})` : `SMS Opt-ins (${usersData.filter(u => u.sms_opt_in).length})`}
+                      {f === 'all' ? `All (${usersTabCounts.all})` : f === 'drivers' ? `Drivers (${usersTabCounts.drivers})` : f === 'passengers' ? `Passengers (${usersTabCounts.passengers})` : `SMS Opt-ins (${usersTabCounts.sms})`}
                     </button>
                   ))}
                 </div>
@@ -2702,7 +2768,15 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   type="text"
                   placeholder="Search name or email..."
                   value={usersSearch}
-                  onChange={e => setUsersSearch(e.target.value)}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setUsersSearch(val);
+                    if (usersSearchTimer.current) clearTimeout(usersSearchTimer.current);
+                    usersSearchTimer.current = setTimeout(() => {
+                      setUsersPage(0);
+                      loadUsersData(0, usersFilter, val);
+                    }, 400);
+                  }}
                   style={{
                     marginLeft: isMobile ? 0 : 'auto', padding: '8px 14px', fontSize: '13px',
                     border: '1px solid #E5E7EB', borderRadius: '10px', outline: 'none',
@@ -2710,43 +2784,67 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                     boxSizing: 'border-box',
                   }}
                 />
+                <button
+                  onClick={downloadUsersCSV}
+                  disabled={csvLoading}
+                  style={{
+                    padding: '8px 16px', borderRadius: '10px', fontSize: '13px', fontWeight: '600',
+                    border: '1px solid #D1D5DB', cursor: csvLoading ? 'not-allowed' : 'pointer',
+                    backgroundColor: 'white', color: csvLoading ? '#9CA3AF' : '#374151',
+                    display: 'flex', alignItems: 'center', gap: '6px',
+                    whiteSpace: 'nowrap',
+                  }}
+                  title="Download all matching users as CSV"
+                >
+                  {csvLoading ? 'Downloading...' : '⬇ Download CSV'}
+                </button>
               </div>
 
               {usersLoading ? (
                 <div style={{ textAlign: 'center', padding: '60px' }}><Loading /></div>
-              ) : (() => {
-                const filtered = usersData.filter(u => {
-                  if (usersFilter === 'drivers' && !u.is_approved_driver) return false;
-                  if (usersFilter === 'passengers' && u.is_approved_driver) return false;
-                  if (usersFilter === 'sms' && !u.sms_opt_in) return false;
-                  if (usersSearch.trim()) {
-                    const s = usersSearch.toLowerCase();
-                    if (!u.name?.toLowerCase().includes(s) && !u.email?.toLowerCase().includes(s)) return false;
-                  }
-                  return true;
-                });
-                return filtered.length === 0 ? (
-                  <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '40px 0' }}>No users match your filter.</p>
-                ) : (
+              ) : usersData.length === 0 ? (
+                <p style={{ color: '#9CA3AF', textAlign: 'center', padding: '40px 0' }}>No users match your filter.</p>
+              ) : (
+                <>
                   <div style={{ overflowX: 'auto' }}>
                     <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
                       <thead>
-                        <tr style={{ backgroundColor: '#F9FAFB' }}>
-                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Photo</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Name</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Email</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Phone</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>SMS</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Ref / Alias</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Role</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Activity</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Rating</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Joined</th>
-                          <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Actions</th>
-                        </tr>
+                        {(() => {
+                          const sortIcon = (field: string) => usersSort === field ? (usersSortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕';
+                          const thSort = (field: string, label: string, align: 'left' | 'center' = 'left') => {
+                            const active = usersSort === field;
+                            return (
+                              <th
+                                onClick={() => {
+                                  const newDir = usersSort === field && usersSortDir === 'asc' ? 'desc' : 'asc';
+                                  setUsersSort(field); setUsersSortDir(newDir); setUsersPage(0);
+                                  loadUsersData(0, usersFilter, usersSearch, field, newDir);
+                                }}
+                                style={{ padding: '10px 14px', textAlign: align, fontWeight: '700', color: active ? '#fcd03a' : '#374151', cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }}
+                              >
+                                {label}<span style={{ opacity: 0.5, fontSize: '11px' }}>{sortIcon(field)}</span>
+                              </th>
+                            );
+                          };
+                          return (
+                            <tr style={{ backgroundColor: '#F9FAFB' }}>
+                              <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Photo</th>
+                              {thSort('name', 'Name')}
+                              {thSort('email', 'Email')}
+                              {thSort('phone', 'Phone')}
+                              {thSort('sms_opt_in', 'SMS', 'center')}
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Ref / Alias</th>
+                              {thSort('is_approved_driver', 'Role', 'center')}
+                              <th style={{ padding: '10px 14px', textAlign: 'center', fontWeight: '700', color: '#374151' }}>Activity</th>
+                              {thSort('average_rating', 'Rating', 'center')}
+                              {thSort('created_at', 'Joined')}
+                              <th style={{ padding: '10px 14px', textAlign: 'left', fontWeight: '700', color: '#374151' }}>Actions</th>
+                            </tr>
+                          );
+                        })()}
                       </thead>
                       <tbody>
-                        {filtered.map(u => (
+                        {usersData.map(u => (
                           <React.Fragment key={u.id}>
                           <tr style={{ borderBottom: '1px solid #F3F4F6' }}
                             onMouseEnter={e => (e.currentTarget.style.backgroundColor = '#F9FAFB')}
@@ -3134,11 +3232,26 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       </tbody>
                     </table>
                     <div style={{ padding: '12px 14px', borderTop: '1px solid #F3F4F6', color: '#6B7280', fontSize: '13px' }}>
-                      Showing {filtered.length} of {usersData.length} users
+                      Showing {usersPage * USERS_PAGE_SIZE + 1}–{Math.min((usersPage + 1) * USERS_PAGE_SIZE, usersTotalCount)} of {usersTotalCount} users
                     </div>
                   </div>
-                );
-              })()}
+                  {usersTotalCount > USERS_PAGE_SIZE && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '16px', marginTop: '16px' }}>
+                      <button
+                        onClick={() => { const p = usersPage - 1; setUsersPage(p); loadUsersData(p, usersFilter, usersSearch); }}
+                        disabled={usersPage === 0 || usersLoading}
+                        style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', border: '1px solid #E5E7EB', cursor: usersPage === 0 ? 'not-allowed' : 'pointer', backgroundColor: usersPage === 0 ? '#F9FAFB' : 'white', color: usersPage === 0 ? '#D1D5DB' : '#374151' }}
+                      >← Prev</button>
+                      <span style={{ fontSize: '13px', color: '#6B7280' }}>Page {usersPage + 1} of {Math.ceil(usersTotalCount / USERS_PAGE_SIZE)}</span>
+                      <button
+                        onClick={() => { const p = usersPage + 1; setUsersPage(p); loadUsersData(p, usersFilter, usersSearch); }}
+                        disabled={(usersPage + 1) * USERS_PAGE_SIZE >= usersTotalCount || usersLoading}
+                        style={{ padding: '8px 20px', borderRadius: '10px', fontSize: '13px', fontWeight: '600', border: '1px solid #E5E7EB', cursor: (usersPage + 1) * USERS_PAGE_SIZE >= usersTotalCount ? 'not-allowed' : 'pointer', backgroundColor: (usersPage + 1) * USERS_PAGE_SIZE >= usersTotalCount ? '#F9FAFB' : 'white', color: (usersPage + 1) * USERS_PAGE_SIZE >= usersTotalCount ? '#D1D5DB' : '#374151' }}
+                      >Next →</button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </>
         )}

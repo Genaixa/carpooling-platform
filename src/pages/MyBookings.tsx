@@ -86,36 +86,37 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
     };
   }, [user]);
 
-  const loadBookings = async () => {
+  const loadBookings = async (attempt = 0) => {
     if (!user) return;
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('bookings')
-        .select(`*, ride:rides!bookings_ride_id_fkey(*, driver:profiles!rides_driver_id_fkey(*))`)
-        .eq('passenger_id', user.id)
-        .order('created_at', { ascending: false });
+      setError('');
 
-      if (error) throw error;
-      setBookings(data || []);
+      const [bookingsResult, myReviewsResult, receivedResult] = await Promise.all([
+        supabase.from('bookings')
+          .select(`*, ride:rides!bookings_ride_id_fkey(*, driver:profiles!rides_driver_id_fkey(*))`)
+          .eq('passenger_id', user.id)
+          .order('created_at', { ascending: false }),
+        supabase.from('reviews')
+          .select('booking_id')
+          .eq('reviewer_id', user.id)
+          .eq('type', 'passenger-to-driver'),
+        supabase.from('reviews')
+          .select('*, reviewer:profiles!reviews_reviewer_id_fkey(*)')
+          .eq('reviewee_id', user.id)
+          .order('created_at', { ascending: false }),
+      ]);
 
-      // Load reviews already submitted by this passenger
-      const { data: myReviews } = await supabase
-        .from('reviews')
-        .select('booking_id')
-        .eq('reviewer_id', user.id)
-        .eq('type', 'passenger-to-driver');
-      setReviewedBookingIds(new Set((myReviews || []).map((r: any) => r.booking_id)));
-
-      // Load reviews received by this passenger
-      const { data: received } = await supabase
-        .from('reviews')
-        .select('*, reviewer:profiles!reviews_reviewer_id_fkey(*)')
-        .eq('reviewee_id', user.id)
-        .order('created_at', { ascending: false });
-      setReceivedReviews((received || []) as Review[]);
+      if (bookingsResult.error) throw bookingsResult.error;
+      setBookings(bookingsResult.data || []);
+      setReviewedBookingIds(new Set((myReviewsResult.data || []).map((r: any) => r.booking_id)));
+      setReceivedReviews((receivedResult.data || []) as Review[]);
     } catch (error: any) {
       if (isAuthError(error)) return;
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 1500 * (attempt + 1)));
+        return loadBookings(attempt + 1);
+      }
       console.error('Error loading bookings:', error);
       setError('Failed to load bookings');
     } finally {
@@ -329,8 +330,9 @@ export default function MyBookings({ onNavigate }: MyBookingsProps) {
 
       <main style={{ maxWidth: '1200px', margin: '0 auto', padding: isMobile ? '20px 16px' : '40px 20px' }}>
         {error && (
-          <div style={{ marginBottom: '20px', borderRadius: '12px', backgroundColor: '#fee2e2', padding: '16px', border: '1px solid #fca5a5' }}>
+          <div style={{ marginBottom: '20px', borderRadius: '12px', backgroundColor: '#fee2e2', padding: '16px', border: '1px solid #fca5a5', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
             <p style={{ fontSize: '14px', color: '#991b1b', margin: 0 }}>{error}</p>
+            <button onClick={() => loadBookings()} style={{ flexShrink: 0, fontSize: '13px', fontWeight: '600', color: '#991b1b', background: 'none', border: '1px solid #991b1b', borderRadius: '6px', padding: '4px 12px', cursor: 'pointer' }}>Try again</button>
           </div>
         )}
 
