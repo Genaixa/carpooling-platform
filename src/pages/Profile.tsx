@@ -37,6 +37,8 @@ export default function Profile({ onNavigate }: ProfileProps) {
   const [smsOptIn, setSmsOptIn] = useState(false);
   const [originalSmsOptIn, setOriginalSmsOptIn] = useState(false);
   const [myReviews, setMyReviews] = useState<Array<{ id: string; rating: number; comment: string | null; type: string; created_at: string }>>([]);
+  const [bankDetails, setBankDetails] = useState({ bank_account_name: '', bank_account_number: '', bank_sort_code: '' });
+  const [bankLoading, setBankLoading] = useState(false);
 
   useEffect(() => {
     if (user) {
@@ -48,6 +50,26 @@ export default function Profile({ onNavigate }: ProfileProps) {
         .then(({ data }) => setMyReviews(data || []));
     }
   }, [user]);
+
+  useEffect(() => {
+    if (user && profile?.is_approved_driver) {
+      supabase
+        .from('driver_applications')
+        .select('bank_account_name, bank_account_number, bank_sort_code')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .then(({ data }) => {
+          if (data?.[0]) {
+            setBankDetails({
+              bank_account_name: data[0].bank_account_name || '',
+              bank_account_number: data[0].bank_account_number || '',
+              bank_sort_code: data[0].bank_sort_code || '',
+            });
+          }
+        });
+    }
+  }, [user, profile?.is_approved_driver]);
 
   useEffect(() => {
     if (profile) {
@@ -266,6 +288,26 @@ export default function Profile({ onNavigate }: ProfileProps) {
       window.location.reload();
     } catch (err: any) {
       toast.error(err.message || 'Failed to delete licence photo');
+    }
+  };
+
+  const handleSaveBankDetails = async () => {
+    if (!user) return;
+    setBankLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch(`${API_URL}/api/update-bank-details`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${session?.access_token}` },
+        body: JSON.stringify({ userId: user.id, ...bankDetails }),
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      toast.success('Bank details updated!');
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update bank details');
+    } finally {
+      setBankLoading(false);
     }
   };
 
@@ -740,6 +782,78 @@ export default function Profile({ onNavigate }: ProfileProps) {
             </div>
           </form>
         </div>
+
+        {/* Bank Details — approved drivers only */}
+        {profile.is_approved_driver && (
+          <div style={{
+            backgroundColor: 'white', borderRadius: '20px', padding: '32px',
+            boxShadow: '0 4px 20px rgba(0,0,0,0.06)', marginBottom: '24px',
+            borderLeft: '5px solid #6366f1',
+          }}>
+            <h3 style={{ fontSize: '18px', fontWeight: '700', color: '#1F2937', marginBottom: '8px' }}>
+              Bank Details
+            </h3>
+            <p style={{ fontSize: '14px', color: '#6B7280', marginBottom: '24px', margin: '0 0 24px 0' }}>
+              Used by the admin to process your driver payouts. Keep these up to date.
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div>
+                <label style={labelStyle}>Account Holder Name</label>
+                <input
+                  type="text"
+                  value={bankDetails.bank_account_name}
+                  onChange={e => setBankDetails(prev => ({ ...prev, bank_account_name: e.target.value }))}
+                  placeholder="As it appears on your bank account"
+                  style={inputStyle()}
+                  onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                  onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                />
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
+                <div>
+                  <label style={labelStyle}>Account Number</label>
+                  <input
+                    type="text"
+                    value={bankDetails.bank_account_number}
+                    onChange={e => setBankDetails(prev => ({ ...prev, bank_account_number: e.target.value }))}
+                    placeholder="8 digits"
+                    style={inputStyle()}
+                    onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                  />
+                </div>
+                <div>
+                  <label style={labelStyle}>Sort Code</label>
+                  <input
+                    type="text"
+                    value={bankDetails.bank_sort_code}
+                    onChange={e => setBankDetails(prev => ({ ...prev, bank_sort_code: e.target.value }))}
+                    placeholder="XX-XX-XX"
+                    style={inputStyle()}
+                    onFocus={(e) => e.target.style.borderColor = '#6366f1'}
+                    onBlur={(e) => e.target.style.borderColor = '#E5E7EB'}
+                  />
+                </div>
+              </div>
+              <div>
+                <button
+                  onClick={handleSaveBankDetails}
+                  disabled={bankLoading}
+                  style={{
+                    padding: '14px 32px',
+                    background: bankLoading ? '#9CA3AF' : '#6366f1',
+                    color: 'white', borderRadius: '50px', fontSize: '16px',
+                    fontWeight: '700', border: 'none',
+                    cursor: bankLoading ? 'not-allowed' : 'pointer',
+                    transition: 'all 0.3s',
+                  }}
+                >
+                  {bankLoading ? 'Saving...' : 'Save Bank Details'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Driver Alert Notifications — approved drivers only */}
         {/* Passenger Alert Notifications — hidden while feature is paused

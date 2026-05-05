@@ -1231,6 +1231,13 @@ app.post('/api/admin/edit-ride', async (req, res) => {
       rideUpdates.seats_available = newTotal - confirmedSeats;
     }
 
+    if (updates.vehicle_make !== undefined) {
+      rideUpdates.vehicle_make = updates.vehicle_make || null;
+    }
+    if (updates.vehicle_model !== undefined) {
+      rideUpdates.vehicle_model = updates.vehicle_model || null;
+    }
+
     if (Object.keys(rideUpdates).length === 0) return res.status(400).json({ error: 'No valid updates provided' });
 
     const { error } = await supabase.from('rides').update(rideUpdates).eq('id', rideId);
@@ -1668,13 +1675,52 @@ app.post('/api/admin/update-user', async (req, res) => {
       if (key in updates) sanitized[key] = updates[key] || null;
     }
 
-    const { error } = await supabase.from('profiles').update(sanitized).eq('id', userId);
-    if (error) throw error;
+    if (Object.keys(sanitized).length > 0) {
+      const { error } = await supabase.from('profiles').update(sanitized).eq('id', userId);
+      if (error) throw error;
+    }
+
+    const bankAllowed = ['bank_account_name', 'bank_account_number', 'bank_sort_code'];
+    const bankUpdates = {};
+    for (const key of bankAllowed) {
+      if (key in updates) bankUpdates[key] = updates[key] || null;
+    }
+    if (Object.keys(bankUpdates).length > 0) {
+      const { data: latestApp } = await supabase.from('driver_applications').select('id').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+      if (latestApp) {
+        const { error: bankErr } = await supabase.from('driver_applications').update(bankUpdates).eq('id', latestApp.id);
+        if (bankErr) throw bankErr;
+      }
+    }
 
     console.log(`✓ Admin updated profile: ${userId}`);
     res.json({ success: true });
   } catch (error) {
     console.error('Admin update user error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.post('/api/update-bank-details', async (req, res) => {
+  try {
+    const { userId, bank_account_name, bank_account_number, bank_sort_code } = req.body;
+    if (!userId) return res.status(400).json({ error: 'Missing userId' });
+    if (!await verifyUser(req, res, userId)) return;
+
+    const { data: latestApp } = await supabase.from('driver_applications').select('id').eq('user_id', userId).order('created_at', { ascending: false }).limit(1).single();
+    if (!latestApp) return res.status(404).json({ error: 'No driver application found' });
+
+    const { error } = await supabase.from('driver_applications').update({
+      bank_account_name: bank_account_name || null,
+      bank_account_number: bank_account_number || null,
+      bank_sort_code: bank_sort_code || null,
+    }).eq('id', latestApp.id);
+    if (error) throw error;
+
+    console.log(`✓ Driver updated bank details: ${userId}`);
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Update bank details error:', error);
     res.status(500).json({ error: error.message });
   }
 });

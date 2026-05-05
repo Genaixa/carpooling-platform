@@ -27,6 +27,8 @@ interface RideOverview {
   seats_available: number;
   price_per_seat: number;
   existing_occupants: { males: number; females: number; couples: number } | null;
+  vehicle_make: string | null;
+  vehicle_model: string | null;
   status: string;
   cancelled_by: string | null;
   completed_by: string | null;
@@ -94,7 +96,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [bookingActionModal, setBookingActionModal] = useState<{ bookingId: string; passengerName: string; route: string; action: 'accept' | 'reject' } | null>(null);
   const [bookingActionBy, setBookingActionBy] = useState<'driver' | 'passenger'>('driver');
   const [bookingActionLoading, setBookingActionLoading] = useState(false);
-  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number | string; existing_occupants: { males: number; females: number; couples: number } | null } | null>(null);
+  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number | string; existing_occupants: { males: number; females: number; couples: number } | null; vehicle_make: string; vehicle_model: string } | null>(null);
   const [editRideLoading, setEditRideLoading] = useState(false);
   const [editingPassengerGender, setEditingPassengerGender] = useState<Record<string, string>>({});
   const [payoutAmount, setPayoutAmount] = useState('');
@@ -125,6 +127,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [expandedUser, setExpandedUser] = useState<string | null>(null);
   const [editingUser, setEditingUser] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState<Record<string, any>>({});
+  const [userBankDetails, setUserBankDetails] = useState<Record<string, { bank_account_name: string | null; bank_account_number: string | null; bank_sort_code: string | null }>>({});
   const [editUserLoading, setEditUserLoading] = useState(false);
   const [userHistoryData, setUserHistoryData] = useState<Record<string, { bookingsAsPassenger: any[]; ridesAsDriver: any[] }>>({});
   const [userHistoryLoading, setUserHistoryLoading] = useState<string | null>(null);
@@ -546,6 +549,12 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
     }
   };
 
+  const loadUserBankDetails = async (userId: string) => {
+    if (userBankDetails[userId] !== undefined) return;
+    const { data } = await supabase.from('driver_applications').select('bank_account_name, bank_account_number, bank_sort_code').eq('user_id', userId).order('created_at', { ascending: false }).limit(1);
+    setUserBankDetails(prev => ({ ...prev, [userId]: data?.[0] || { bank_account_name: null, bank_account_number: null, bank_sort_code: null } }));
+  };
+
   const handleResendEmail = async (bookingId: string) => {
     const emailType = resendTypes[bookingId] || 'booking-accepted';
     setResendLoading(bookingId);
@@ -648,6 +657,8 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             seats_total: editRideModal.seats_available + editRideModal.seats_booked,
             price_per_seat: parseFloat(String(editRideModal.price_per_seat)),
             existing_occupants: editRideModal.existing_occupants,
+            vehicle_make: editRideModal.vehicle_make,
+            vehicle_model: editRideModal.vehicle_model,
           },
         }),
       });
@@ -655,7 +666,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (data.error) throw new Error(data.error);
       toast.success('Ride updated');
       setRidesOverview(prev => prev.map(r => r.id === editRideModal.rideId
-        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: parseFloat(String(editRideModal.price_per_seat)), existing_occupants: editRideModal.existing_occupants }
+        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: parseFloat(String(editRideModal.price_per_seat)), existing_occupants: editRideModal.existing_occupants, vehicle_make: editRideModal.vehicle_make || null, vehicle_model: editRideModal.vehicle_model || null }
         : r
       ));
       setEditRideModal(null);
@@ -992,6 +1003,9 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       const data = await res.json();
       if (data.error) throw new Error(data.error);
       toast.success('Profile updated');
+      if ('bank_account_name' in editUserData || 'bank_account_number' in editUserData || 'bank_sort_code' in editUserData) {
+        setUserBankDetails(prev => ({ ...prev, [userId]: { bank_account_name: editUserData.bank_account_name || null, bank_account_number: editUserData.bank_account_number || null, bank_sort_code: editUserData.bank_sort_code || null } }));
+      }
       setEditingUser(null);
       setEditUserData({});
       loadUsersData(usersPage, usersFilter, usersSearch, usersSort, usersSortDir);
@@ -1754,7 +1768,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       )}
                                       {ride.status === 'upcoming' && (
                                         <button
-                                          onClick={e => { e.stopPropagation(); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_booked: ride.seats_total - ride.seats_available, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 } }); }}
+                                          onClick={e => { e.stopPropagation(); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_booked: ride.seats_total - ride.seats_available, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 }, vehicle_make: ride.vehicle_make || '', vehicle_model: ride.vehicle_model || '' }); }}
                                           style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#6366f1', color: 'white', whiteSpace: 'nowrap' }}
                                         >
                                           Edit Ride
@@ -2892,7 +2906,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                 </div>
                               )}
                             </td>
-                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937', cursor: 'pointer' }} onClick={() => { const next = expandedUser === u.id ? null : u.id; setExpandedUser(next); if (next) loadUserHistory(next); }}>
+                            <td style={{ padding: '10px 14px', fontWeight: '600', color: '#1F2937', cursor: 'pointer' }} onClick={() => { const next = expandedUser === u.id ? null : u.id; setExpandedUser(next); if (next) { loadUserHistory(next); if (u.is_approved_driver) loadUserBankDetails(next); } }}>
                               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                                 {u.name || '—'}
                                 <span style={{ fontSize: '10px', color: '#9CA3AF', transform: expandedUser === u.id ? 'rotate(180deg)' : 'rotate(0deg)', display: 'inline-block', transition: 'transform 0.2s' }}>▼</span>
@@ -3102,6 +3116,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                         <strong>Address:</strong> {[u.address_line1, u.address_line2, u.city, u.postcode].filter(Boolean).join(', ')}
                                       </span>
                                     )}
+                                    {u.is_approved_driver && userBankDetails[u.id] && (userBankDetails[u.id].bank_account_name || userBankDetails[u.id].bank_account_number) && (
+                                      <span style={{ gridColumn: 'span 2' }}>
+                                        <strong>Bank:</strong> {[userBankDetails[u.id].bank_account_name, userBankDetails[u.id].bank_account_number ? `Acc: ${userBankDetails[u.id].bank_account_number}` : null, userBankDetails[u.id].bank_sort_code ? `SC: ${userBankDetails[u.id].bank_sort_code}` : null].filter(Boolean).join(' · ')}
+                                      </span>
+                                    )}
                                   </div>
                                   {/* Edit form — shown below read-only view when editing */}
                                   {editingUser === u.id ? (
@@ -3146,6 +3165,21 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                             <option value="solo">Solo</option><option value="couple">Couple</option>
                                           </select>
                                         </div>
+                                        {u.is_approved_driver && (<>
+                                          <div style={{ gridColumn: 'span 3', borderTop: '1px solid #E5E7EB', paddingTop: '8px', marginTop: '2px' }}>
+                                            <p style={{ fontSize: '11px', fontWeight: '700', color: '#6366f1', textTransform: 'uppercase', margin: '0 0 8px 0' }}>Bank Details</p>
+                                          </div>
+                                          {[
+                                            { key: 'bank_account_name', label: 'Account Holder Name' },
+                                            { key: 'bank_account_number', label: 'Account Number' },
+                                            { key: 'bank_sort_code', label: 'Sort Code' },
+                                          ].map(({ key, label }) => (
+                                            <div key={key}>
+                                              <label style={{ fontSize: '11px', fontWeight: '700', color: '#6B7280', textTransform: 'uppercase', display: 'block', marginBottom: '3px' }}>{label}</label>
+                                              <input type="text" value={editUserData[key] ?? ''} onChange={e => setEditUserData(prev => ({ ...prev, [key]: e.target.value }))} style={{ width: '100%', padding: '6px 8px', fontSize: '13px', border: '1px solid #D1D5DB', borderRadius: '6px', boxSizing: 'border-box' }} />
+                                            </div>
+                                          ))}
+                                        </>)}
                                       </div>
                                       <div style={{ display: 'flex', gap: '8px' }}>
                                         <button onClick={() => handleAdminUpdateUser(u.id)} disabled={editUserLoading} style={{ padding: '7px 18px', fontSize: '13px', fontWeight: '600', backgroundColor: '#fcd03a', color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer' }}>
@@ -3158,7 +3192,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                     </>
                                   ) : (
                                     <button
-                                      onClick={() => { setEditingUser(u.id); setEditUserData({ name: u.name || '', email: u.email || '', phone: u.phone || '', gender: u.gender || '', age_group: u.age_group || '', marital_status: u.marital_status || '', travel_status: u.travel_status || 'solo', partner_name: u.partner_name || '', address_line1: u.address_line1 || '', address_line2: u.address_line2 || '', city: u.city || '', postcode: u.postcode || '' }); }}
+                                      onClick={() => { setEditingUser(u.id); setEditUserData({ name: u.name || '', email: u.email || '', phone: u.phone || '', gender: u.gender || '', age_group: u.age_group || '', marital_status: u.marital_status || '', travel_status: u.travel_status || 'solo', partner_name: u.partner_name || '', address_line1: u.address_line1 || '', address_line2: u.address_line2 || '', city: u.city || '', postcode: u.postcode || '', ...(u.is_approved_driver ? { bank_account_name: userBankDetails[u.id]?.bank_account_name || '', bank_account_number: userBankDetails[u.id]?.bank_account_number || '', bank_sort_code: userBankDetails[u.id]?.bank_sort_code || '' } : {}) }); }}
                                       style={{ fontSize: '12px', padding: '5px 14px', borderRadius: '6px', border: '1px solid #D1D5DB', backgroundColor: '#F9FAFB', color: '#374151', cursor: 'pointer', fontWeight: '600' }}
                                     >
                                       ✏ Edit Profile
@@ -3374,6 +3408,29 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                   />
                 </div>
               ))}
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '24px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Car Make</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Toyota"
+                  value={editRideModal.vehicle_make}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, vehicle_make: e.target.value } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Car Model</label>
+                <input
+                  type="text"
+                  placeholder="e.g., Corolla"
+                  value={editRideModal.vehicle_model}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, vehicle_model: e.target.value } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                />
+              </div>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
