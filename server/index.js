@@ -574,7 +574,7 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
 
     // Validate seats and amount server-side against the actual ride price
     const seatsCount = parseInt(seatsToBook, 10) || 1;
-    const { data: rideCheck } = await supabase.from('rides').select('price_per_seat, seats_available').eq('id', rideId).single();
+    const { data: rideCheck } = await supabase.from('rides').select('price_per_seat, seats_available, existing_occupants, driver_id').eq('id', rideId).single();
     if (!rideCheck) return res.status(404).json({ error: 'Ride not found' });
     if (seatsCount < 1 || seatsCount > rideCheck.seats_available) {
       return res.status(400).json({ error: 'Invalid seat count' });
@@ -582,6 +582,54 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
     const expectedAmount = rideCheck.price_per_seat * seatsCount;
     if (Math.abs(amount - expectedAmount) > 0.01) {
       return res.status(400).json({ error: 'Invalid payment amount' });
+    }
+
+    // Validate gender compatibility server-side
+    // Couples (groupDescription set) bypass the check — mixed by definition
+    if (!groupDescription) {
+      let passengerGender = null;
+      if (thirdPartyPassenger?.gender) {
+        passengerGender = thirdPartyPassenger.gender;
+      } else {
+        const { data: passengerProfile } = await supabase.from('profiles').select('gender').eq('id', userId).single();
+        passengerGender = passengerProfile?.gender || null;
+      }
+
+      if (passengerGender) {
+        const { data: driverProfile } = await supabase.from('profiles').select('gender').eq('id', rideCheck.driver_id).single();
+        const driverGender = driverProfile?.gender || null;
+        const occ = rideCheck.existing_occupants || {};
+        let males = (occ.males || 0) + (occ.couples || 0) + (occ.booked_males || 0) + (occ.booked_couples || 0);
+        let females = (occ.females || 0) + (occ.couples || 0) + (occ.booked_females || 0) + (occ.booked_couples || 0);
+        if (driverGender === 'Male') males += 1;
+        else if (driverGender === 'Female') females += 1;
+
+        const { data: existingBookings } = await supabase
+          .from('bookings')
+          .select('passenger:profiles!bookings_passenger_id_fkey(gender), group_description, third_party_passenger')
+          .eq('ride_id', rideId)
+          .in('status', ['confirmed', 'pending_driver']);
+        const hasBookedFemale = (existingBookings || []).some(b =>
+          b.passenger?.gender === 'Female' || b.group_description === 'Couple' || b.third_party_passenger?.gender === 'Female'
+        );
+        const hasBookedMale = (existingBookings || []).some(b =>
+          b.passenger?.gender === 'Male' || b.group_description === 'Couple' || b.third_party_passenger?.gender === 'Male'
+        );
+
+        let compatible = true;
+        if (passengerGender === 'Female') {
+          compatible = females >= 1 || hasBookedFemale || seatsCount >= 2;
+        } else if (passengerGender === 'Male') {
+          compatible = males >= 1 || hasBookedMale;
+        }
+
+        if (!compatible) {
+          const reason = passengerGender === 'Female'
+            ? 'This ride has no women in the car — female passengers cannot book unless 2 or more seats are booked together'
+            : 'This ride has no men or couples in the car — male passengers cannot book this ride';
+          return res.status(400).json({ error: reason });
+        }
+      }
     }
 
     const totalAmountCents = BigInt(Math.round(amount * 100));
