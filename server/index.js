@@ -3372,9 +3372,9 @@ async function checkFlexibleDateMatches() {
 async function checkUnfilledRidePricing() {
   try {
     const now = new Date();
-    // Target rides departing in 47h–48h14m (14-min window, one cron hit per ride)
-    const windowStart = new Date(now.getTime() + 47 * 60 * 60 * 1000).toISOString();
-    const windowEnd = new Date(now.getTime() + (48 * 60 + 14) * 60 * 1000).toISOString();
+    // Target rides departing in 47h50m–48h04m (14-min window, one cron hit per ride)
+    const windowStart = new Date(now.getTime() + (47 * 60 + 50) * 60 * 1000).toISOString();
+    const windowEnd = new Date(now.getTime() + (48 * 60 + 4) * 60 * 1000).toISOString();
 
     const { data: rides } = await supabase
       .from('rides')
