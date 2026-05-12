@@ -191,7 +191,7 @@ export default function Home({ onNavigate }: HomeProps) {
         const hasBookedMale = activeBookingsForCompat.some(b => b.passenger?.gender === 'Male' || b.group_description === 'Couple');
         compatible = checkRideCompatibility(
           effectiveGender,
-          ride.driver.gender,
+          ride.driver?.gender || null,
           occupants,
           seatsRequested,
           hasBookedFemale,
@@ -200,7 +200,7 @@ export default function Home({ onNavigate }: HomeProps) {
         if (!compatible) {
           incompatibilityReason = getIncompatibilityReason(
             effectiveGender,
-            ride.driver.gender,
+            ride.driver?.gender || null,
             occupants,
             seatsRequested,
             hasBookedFemale,
@@ -719,13 +719,19 @@ export default function Home({ onNavigate }: HomeProps) {
                           <>
                             <tr>
                               <td style={{ padding: '3px 0', color: '#6B7280', verticalAlign: 'middle' }}>
-                                <button onClick={() => onNavigate('public-profile', undefined, ride.driver.id)} style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', padding: 0 }}>{getDriverAlias(ride.driver.id)}</button>
-                                {isGold && <span style={{ marginLeft: '5px', fontSize: '11px', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde047', borderRadius: '8px', padding: '1px 6px' }}>⭐ Gold</span>}
-                                {' · '}{ride.driver?.gender || 'Unknown'}
-                                {(ride.driver as any).age_group && <>{' · '}Age {(ride.driver as any).age_group}</>}
-                                {(ride.driver as any).city && <>{' · '}{(ride.driver as any).city}</>}
-                                {(ride.driver as any).marital_status && <>{' · '}{(ride.driver as any).marital_status}</>}
-                                {ride.driver.average_rating != null && ride.driver.average_rating > 0 && <>{' · '}★ {ride.driver.average_rating.toFixed(1)}</>}
+                                {ride.driver ? (
+                                  <>
+                                    <button onClick={() => onNavigate('public-profile', undefined, ride.driver!.id)} style={{ color: '#fcd03a', background: 'none', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: '700', padding: 0 }}>{getDriverAlias(ride.driver.id)}</button>
+                                    {isGold && <span style={{ marginLeft: '5px', fontSize: '11px', fontWeight: '700', color: '#92400e', backgroundColor: '#fef3c7', border: '1px solid #fde047', borderRadius: '8px', padding: '1px 6px' }}>⭐ Gold</span>}
+                                    {' · '}{ride.driver.gender || 'Unknown'}
+                                    {(ride.driver as any).age_group && <>{' · '}Age {(ride.driver as any).age_group}</>}
+                                    {(ride.driver as any).city && <>{' · '}{(ride.driver as any).city}</>}
+                                    {(ride.driver as any).marital_status && <>{' · '}{(ride.driver as any).marital_status}</>}
+                                    {ride.driver.average_rating != null && ride.driver.average_rating > 0 && <>{' · '}★ {ride.driver.average_rating.toFixed(1)}</>}
+                                  </>
+                                ) : (
+                                  <span style={{ color: '#9CA3AF', fontStyle: 'italic' }}>Log in to see driver details</span>
+                                )}
                               </td>
                             </tr>
                             <tr>
