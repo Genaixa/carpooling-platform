@@ -570,7 +570,7 @@ export default function Home({ onNavigate }: HomeProps) {
         {/* Rides within this destination */}
         <div>
           {destRides.map((ride, rideIdx) => {
-            const isGold = (ride.driver as any).driver_tier === 'gold';
+            const isGold = (ride.driver as any)?.driver_tier === 'gold';
             return (
             <div
               key={ride.id}
