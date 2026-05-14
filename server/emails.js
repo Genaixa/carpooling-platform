@@ -1,5 +1,6 @@
 import { Resend } from 'resend';
 import { createClient } from '@supabase/supabase-js';
+import crypto from 'crypto';
 
 const resend = new Resend(process.env.RESEND_API_KEY || process.env.VITE_RESEND_API_KEY);
 
@@ -11,6 +12,14 @@ const supabase = createClient(
 const SITE_URL = process.env.SITE_URL || 'https://chaparide.com';
 const API_URL = process.env.API_URL || 'https://chaparide.com';
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || 'info@chaparide.com';
+const EMAIL_LINK_SECRET = process.env.EMAIL_LINK_SECRET;
+
+function signEmailLink(bookingId, driverId) {
+  const expires = Math.floor(Date.now() / 1000) + 7 * 24 * 60 * 60; // 7 days
+  const payload = `${bookingId}:${driverId}:${expires}`;
+  const sig = crypto.createHmac('sha256', EMAIL_LINK_SECRET).update(payload).digest('hex');
+  return { expires, sig };
+}
 
 function escapeHtml(str) {
   if (!str) return '';
@@ -124,8 +133,9 @@ async function getDetails(bookingData) {
 export async function sendBookingRequestEmail(bookingData) {
   const { ride, driver, passenger } = await getDetails(bookingData);
   if (!ride || !driver || !passenger) return false;
-  const acceptUrl = `${API_URL}/api/driver/accept-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}`;
-  const rejectUrl = `${API_URL}/api/driver/reject-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}`;
+  const { expires, sig } = signEmailLink(bookingData.id, ride.driver_id);
+  const acceptUrl = `${API_URL}/api/driver/accept-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}&expires=${expires}&sig=${sig}`;
+  const rejectUrl = `${API_URL}/api/driver/reject-booking?bookingId=${bookingData.id}&driverId=${ride.driver_id}&expires=${expires}&sig=${sig}`;
 
   const thirdParty = bookingData.third_party_passenger;
   const ratingText = passenger.average_rating

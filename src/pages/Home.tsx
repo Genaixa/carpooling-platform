@@ -12,6 +12,7 @@ import PaymentModal from '../components/PaymentModal';
 import LocationDropdown from '../components/LocationDropdown';
 import StarRating from '../components/StarRating';
 import toast from 'react-hot-toast';
+import { trackEvent } from '../lib/analytics';
 
 interface HomeProps {
   onNavigate: NavigateFn;
@@ -496,6 +497,7 @@ export default function Home({ onNavigate }: HomeProps) {
     }
 
     // Open the Square payment modal
+    trackEvent('payment_open', { rideId: ride.id, userId: user?.id, departureLocation: ride.departure_location, arrivalLocation: ride.arrival_location });
     setSelectedRide(ride);
     setSeatsForPayment(seatsToBook);
     setShowPaymentModal(true);
@@ -503,6 +505,9 @@ export default function Home({ onNavigate }: HomeProps) {
 
   // Handle successful Square payment
   const handlePaymentSuccess = async (paymentId: string) => {
+    if (selectedRide) {
+      trackEvent('booking_complete', { rideId: selectedRide.id, userId: user?.id, departureLocation: selectedRide.departure_location, arrivalLocation: selectedRide.arrival_location });
+    }
     setShowPaymentModal(false);
     setSelectedRide(null);
     setBookingRide(null);

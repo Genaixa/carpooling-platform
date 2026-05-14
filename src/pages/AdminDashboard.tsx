@@ -68,7 +68,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const isMobile = useIsMobile();
   const [applications, setApplications] = useState<DriverApplication[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts' | 'phone' | 'activity'>('applications');
+  const [tab, setTab] = useState<'applications' | 'licence-reviews' | 'finances' | 'lookup' | 'users' | 'alerts' | 'phone' | 'activity' | 'funnel'>('applications');
   const [phoneSubTab, setPhoneSubTab] = useState<'booking' | 'ride'>('booking');
   const [alertWishes, setAlertWishes] = useState<any[]>([]);
   const [alertsLoading, setAlertsLoading] = useState(false);
@@ -107,6 +107,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [activityData, setActivityData] = useState<any[]>([]);
   const [activityLoading, setActivityLoading] = useState(false);
   const [activityPeriod, setActivityPeriod] = useState<7 | 30 | 90 | 0>(30);
+
+  // Funnel tab state
+  const [funnelData, setFunnelData] = useState<any[]>([]);
+  const [funnelLoading, setFunnelLoading] = useState(false);
+  const [funnelPeriod, setFunnelPeriod] = useState<7 | 30 | 90>(30);
+  const [kpiReports, setKpiReports] = useState<{ id: string; created_at: string; report_type: string; period_label: string; report_text: string }[]>([]);
+  const [openKpiReportId, setOpenKpiReportId] = useState<string | null>(null);
   const [missedSince, setMissedSince] = useState('');
   const [missedUntil, setMissedUntil] = useState('');
   const [missedLoading, setMissedLoading] = useState(false);
@@ -164,8 +171,13 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       else if (tab === 'finances') loadFinancialData();
       else if (tab === 'users') { loadUsersData(0, usersFilter, usersSearch); loadUsersTabCounts(); }
       else if (tab === 'activity') loadActivityData();
+      else if (tab === 'funnel') loadFunnelData();
     }
   }, [user, profile, filter, tab]);
+
+  useEffect(() => {
+    if (tab === 'funnel') loadFunnelData();
+  }, [funnelPeriod]);
 
 
   const loadPendingLicences = async () => {
@@ -258,6 +270,31 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       console.error('Activity load error:', err);
     } finally {
       setActivityLoading(false);
+    }
+  };
+
+  const loadFunnelData = async () => {
+    if (!user) return;
+    setFunnelLoading(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const [funnelRes, reportRes] = await Promise.all([
+        fetch(`${API_URL}/api/admin/funnel?adminId=${user.id}&days=${funnelPeriod}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        }),
+        fetch(`${API_URL}/api/admin/kpi-reports?adminId=${user.id}`, {
+          headers: { 'Authorization': `Bearer ${session?.access_token}` },
+        }),
+      ]);
+      const funnelJson = await funnelRes.json();
+      if (!funnelRes.ok) throw new Error(funnelJson.error || 'Failed to load funnel');
+      setFunnelData(funnelJson);
+      const reportJson = await reportRes.json();
+      setKpiReports(Array.isArray(reportJson) ? reportJson : []);
+    } catch (err: any) {
+      console.error('Funnel load error:', err);
+    } finally {
+      setFunnelLoading(false);
     }
   };
 
@@ -1146,6 +1183,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             { key: 'users' as const, label: 'All Users' },
             { key: 'phone' as const, label: '📞 Phone' },
             { key: 'activity' as const, label: '📊 Activity' },
+            { key: 'funnel' as const, label: '🎯 Funnel' },
           ]).map(t => (
             <button
               key={t.key}
@@ -3911,6 +3949,207 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                       </div>
                     )}
                   </div>
+                </>
+              )}
+            </>
+          );
+        })()}
+
+        {tab === 'funnel' && (() => {
+          const views = funnelData.filter((e: any) => e.event_type === 'ride_view').length;
+          const opens = funnelData.filter((e: any) => e.event_type === 'payment_open').length;
+          const completions = funnelData.filter((e: any) => e.event_type === 'booking_complete').length;
+          const viewToOpen = views > 0 ? Math.round((opens / views) * 100) : 0;
+          const openToComplete = opens > 0 ? Math.round((completions / opens) * 100) : 0;
+          const viewToComplete = views > 0 ? Math.round((completions / views) * 100) : 0;
+
+          // Per-route breakdown
+          const routeMap: Record<string, { views: number; opens: number; completions: number }> = {};
+          funnelData.forEach((e: any) => {
+            const key = e.departure_location && e.arrival_location ? `${e.departure_location} → ${e.arrival_location}` : 'Unknown route';
+            if (!routeMap[key]) routeMap[key] = { views: 0, opens: 0, completions: 0 };
+            if (e.event_type === 'ride_view') routeMap[key].views++;
+            if (e.event_type === 'payment_open') routeMap[key].opens++;
+            if (e.event_type === 'booking_complete') routeMap[key].completions++;
+          });
+          const routes = Object.entries(routeMap).sort((a, b) => (b[1].views + b[1].opens) - (a[1].views + a[1].opens));
+
+          // Recommendations
+          const coldRoutes = Object.entries(routeMap).filter(([, d]) => d.views >= 3 && d.completions === 0).sort((a, b) => b[1].views - a[1].views);
+          const recs: { icon: string; text: string; colour: string }[] = [];
+          if (views === 0) {
+            recs.push({ icon: '⚠️', text: 'No ride views recorded yet — the site may not be getting traffic. Share active rides on WhatsApp or social media to drive visitors.', colour: '#FEF2F2' });
+          } else if (views < 10) {
+            recs.push({ icon: '⚠️', text: `Only ${views} ride view${views === 1 ? '' : 's'} in this period — traffic is very low. Encourage drivers to share their ride listings directly with potential passengers.`, colour: '#FEF2F2' });
+          }
+          if (views >= 5 && viewToOpen < 15) {
+            recs.push({ icon: '🔍', text: `Only ${viewToOpen}% of viewers clicked Book. People are browsing but not acting — check that ride listings show driver rating, car details, and a clear departure spot.`, colour: '#FEF3C7' });
+          } else if (views >= 5 && viewToOpen < 35) {
+            recs.push({ icon: '📌', text: `${viewToOpen}% view-to-click rate — there is room to improve. Complete driver profiles (photo, rating, car) typically increase this to 40%+.`, colour: '#FEF3C7' });
+          }
+          if (opens >= 3 && openToComplete < 40) {
+            recs.push({ icon: '💳', text: `${openToComplete}% of Book clicks resulted in a payment — high drop-off at checkout. Consider adding a reassurance note before the card form (e.g. "You won't be charged until the driver confirms").`, colour: '#FEF2F2' });
+          } else if (opens >= 3 && openToComplete < 70) {
+            recs.push({ icon: '💳', text: `${openToComplete}% payment completion rate — some drop-off at checkout. Healthy range is 70–90%. Watch this trend over the coming weeks.`, colour: '#FEF3C7' });
+          }
+          if (coldRoutes.length > 0) {
+            const names = coldRoutes.slice(0, 2).map(([r]) => r).join(' and ');
+            recs.push({ icon: '❄️', text: `Routes with views but zero bookings: ${names}. Check pricing vs alternatives and make sure the driver profile is complete.`, colour: '#EFF6FF' });
+          }
+          if (views >= 10 && viewToOpen >= 35 && openToComplete >= 70) {
+            recs.push({ icon: '✅', text: 'Funnel looks healthy. Keep monitoring weekly and focus on growing top-of-funnel traffic.', colour: '#F0FDF4' });
+          }
+
+          return (
+            <>
+              <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '24px' }}>
+                {([7, 30, 90] as const).map(v => (
+                  <button key={v} onClick={() => setFunnelPeriod(v)} style={{
+                    padding: '8px 18px', borderRadius: '20px', border: 'none', cursor: 'pointer', fontWeight: '700', fontSize: '13px',
+                    backgroundColor: funnelPeriod === v ? '#fcd03a' : '#F3F4F6',
+                    color: funnelPeriod === v ? 'white' : '#374151',
+                  }}>{v === 7 ? 'Last 7 days' : v === 30 ? 'Last 30 days' : 'Last 90 days'}</button>
+                ))}
+              </div>
+
+              {funnelLoading ? (
+                <p style={{ color: '#6B7280' }}>Loading funnel data…</p>
+              ) : funnelData.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '48px', color: '#9CA3AF' }}>
+                  <p style={{ fontSize: '32px', margin: '0 0 12px' }}>📭</p>
+                  <p style={{ fontWeight: '700', color: '#374151' }}>No events yet</p>
+                  <p style={{ fontSize: '13px' }}>Tracking starts from today — data will appear as users browse rides.</p>
+                </div>
+              ) : (
+                <>
+                  {/* Summary funnel cards */}
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '16px', marginBottom: '32px' }}>
+                    {[
+                      { label: 'Ride Views', value: views, sub: 'clicked to see a ride', color: '#3B82F6' },
+                      { label: 'Book Clicked', value: opens, sub: `${viewToOpen}% of viewers`, color: '#F59E0B' },
+                      { label: 'Bookings Done', value: completions, sub: `${openToComplete}% of book clicks`, color: '#10B981' },
+                      { label: 'Overall Conversion', value: `${viewToComplete}%`, sub: 'view → booked', color: '#8B5CF6' },
+                    ].map(card => (
+                      <div key={card.label} style={{ background: '#fff', borderRadius: '12px', padding: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', borderTop: `4px solid ${card.color}` }}>
+                        <div style={{ fontSize: '28px', fontWeight: '800', color: card.color }}>{card.value}</div>
+                        <div style={{ fontWeight: '700', fontSize: '13px', color: '#111827', marginTop: '4px' }}>{card.label}</div>
+                        <div style={{ fontSize: '12px', color: '#9CA3AF', marginTop: '2px' }}>{card.sub}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Visual funnel bar */}
+                  <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
+                    <h3 style={{ margin: '0 0 20px', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Conversion Funnel</h3>
+                    {[
+                      { label: 'Viewed a ride', count: views, color: '#3B82F6' },
+                      { label: 'Clicked Book', count: opens, color: '#F59E0B' },
+                      { label: 'Completed booking', count: completions, color: '#10B981' },
+                    ].map(step => (
+                      <div key={step.label} style={{ marginBottom: '14px' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px' }}>
+                          <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>{step.label}</span>
+                          <span style={{ fontSize: '13px', fontWeight: '700', color: step.color }}>{step.count}</span>
+                        </div>
+                        <div style={{ background: '#F3F4F6', borderRadius: '6px', height: '12px', overflow: 'hidden' }}>
+                          <div style={{ width: `${views > 0 ? Math.round((step.count / views) * 100) : 0}%`, background: step.color, height: '100%', borderRadius: '6px', minWidth: step.count > 0 ? '4px' : '0' }} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Per-route breakdown */}
+                  {routes.length > 0 && (
+                    <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
+                      <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#111827' }}>By Route</h3>
+                      <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '13px' }}>
+                          <thead>
+                            <tr style={{ borderBottom: '2px solid #F3F4F6' }}>
+                              {['Route', 'Views', 'Book Clicked', 'Booked', 'Conversion'].map(h => (
+                                <th key={h} style={{ padding: '8px 12px', textAlign: h === 'Route' ? 'left' : 'center', fontWeight: '700', color: '#374151' }}>{h}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {routes.map(([route, counts]) => {
+                              const conv = counts.views > 0 ? Math.round((counts.completions / counts.views) * 100) : 0;
+                              return (
+                                <tr key={route} style={{ borderBottom: '1px solid #F9FAFB' }}>
+                                  <td style={{ padding: '10px 12px', fontWeight: '600', color: '#111827' }}>{route}</td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: '#3B82F6', fontWeight: '700' }}>{counts.views}</td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: '#F59E0B', fontWeight: '700' }}>{counts.opens}</td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center', color: '#10B981', fontWeight: '700' }}>{counts.completions}</td>
+                                  <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                                    <span style={{ background: conv === 0 ? '#FEF2F2' : conv < 20 ? '#FEF3C7' : '#D1FAE5', color: conv === 0 ? '#EF4444' : conv < 20 ? '#D97706' : '#059669', padding: '2px 8px', borderRadius: '20px', fontWeight: '700', fontSize: '12px' }}>{conv}%</span>
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Recommendations */}
+                  {recs.length > 0 && (
+                    <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', marginBottom: '24px' }}>
+                      <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#111827' }}>Recommendations</h3>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                        {recs.map((rec, i) => (
+                          <div key={i} style={{ background: rec.colour, borderRadius: '10px', padding: '14px 16px', display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
+                            <span style={{ fontSize: '18px', flexShrink: 0 }}>{rec.icon}</span>
+                            <span style={{ fontSize: '13px', color: '#374151', lineHeight: '1.5' }}>{rec.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Report history log */}
+                  {kpiReports.length > 0 && (() => {
+                    const TYPE_BADGE: Record<string, { label: string; bg: string; color: string }> = {
+                      weekly:    { label: 'Weekly',    bg: '#EFF6FF', color: '#1D4ED8' },
+                      monthly:   { label: 'Monthly',   bg: '#F0FDF4', color: '#059669' },
+                      quarterly: { label: 'Quarterly', bg: '#FEF3C7', color: '#D97706' },
+                      semester:  { label: 'Half-Year', bg: '#F5F3FF', color: '#7C3AED' },
+                      annual:    { label: 'Annual',    bg: '#FEF2F2', color: '#DC2626' },
+                    };
+                    return (
+                      <div style={{ background: '#fff', borderRadius: '12px', padding: '24px', boxShadow: '0 1px 4px rgba(0,0,0,0.08)' }}>
+                        <h3 style={{ margin: '0 0 16px', fontSize: '15px', fontWeight: '700', color: '#111827' }}>📋 Report History</h3>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
+                          {kpiReports.map((report, idx) => {
+                            const badge = TYPE_BADGE[report.report_type] || { label: report.report_type, bg: '#F3F4F6', color: '#374151' };
+                            const isOpen = openKpiReportId === report.id;
+                            return (
+                              <div key={report.id} style={{ borderBottom: idx < kpiReports.length - 1 ? '1px solid #F3F4F6' : 'none' }}>
+                                <button
+                                  onClick={() => setOpenKpiReportId(isOpen ? null : report.id)}
+                                  style={{ width: '100%', background: 'none', border: 'none', cursor: 'pointer', padding: '14px 4px', display: 'flex', alignItems: 'center', gap: '12px', textAlign: 'left' }}
+                                >
+                                  <span style={{ fontSize: '16px' }}>{isOpen ? '▾' : '▸'}</span>
+                                  <span style={{ background: badge.bg, color: badge.color, padding: '2px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '700', flexShrink: 0 }}>{badge.label}</span>
+                                  <span style={{ fontWeight: '600', fontSize: '13px', color: '#111827', flex: 1 }}>{report.period_label || '—'}</span>
+                                  <span style={{ fontSize: '12px', color: '#9CA3AF', flexShrink: 0 }}>
+                                    {new Date(report.created_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                                  </span>
+                                </button>
+                                {isOpen && (
+                                  <div style={{ padding: '0 4px 20px 36px' }}>
+                                    <pre style={{ margin: 0, fontFamily: 'inherit', fontSize: '13px', color: '#374151', lineHeight: '1.7', whiteSpace: 'pre-wrap', wordBreak: 'break-word', background: '#F9FAFB', borderRadius: '8px', padding: '16px' }}>
+                                      {report.report_text.replace(/\*/g, '').replace(/_/g, '')}
+                                    </pre>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </>
               )}
             </>

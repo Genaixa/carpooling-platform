@@ -9,6 +9,7 @@ import PaymentModal from '../components/PaymentModal';
 import { useIsMobile } from '../hooks/useIsMobile';
 import toast from 'react-hot-toast';
 import type { NavigateFn } from '../lib/types';
+import { trackEvent } from '../lib/analytics';
 
 interface RideDetailsProps {
   rideId: string;
@@ -42,6 +43,7 @@ export default function RideDetails({ rideId, onNavigate }: RideDetailsProps) {
 
       if (rideError) throw rideError;
       setRide(rideData);
+      trackEvent('ride_view', { rideId, userId: user?.id, departureLocation: rideData.departure_location, arrivalLocation: rideData.arrival_location });
 
       // Load bookings for this ride (confirmed + pending_driver)
       const { data: bookingsData } = await supabase

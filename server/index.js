@@ -99,8 +99,8 @@ if (!SQUARE_ACCESS_TOKEN || !VITE_SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const COMMISSION_RATE = 0.25; // 25% platform commission
 const DRIVER_RATE = 0.75;    // 75% to driver
 
-const TELEGRAM_BOT_TOKEN = '8645116179:AAF9nwZI6CluAhHCUR4A38LA6ilAPMDXCss';
-const TELEGRAM_CHAT_ID = '6749360113';
+const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
+const TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
 
 async function sendTelegramAlert(message) {
   try {
@@ -251,6 +251,14 @@ const notifyLimiter = rateLimit({
   message: { error: 'Too many requests. Please try again shortly.' },
 });
 
+const trackLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: 60, // max 60 events/min per IP — generous for real users, blocks bots
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many tracking requests.' },
+});
+
 // Security headers
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
@@ -275,9 +283,33 @@ const upload = multer({
   },
 });
 
+const EMAIL_LINK_SECRET = process.env.EMAIL_LINK_SECRET;
+
 // ============================================================
-// AUTH HELPER — verify Bearer token matches claimed userId
+// AUTH HELPERS
 // ============================================================
+
+function requireToken(req, res) {
+  const auth = req.headers['authorization'] || '';
+  if (!auth.startsWith('Bearer ')) {
+    res.status(401).json({ error: 'Missing auth token' });
+    return false;
+  }
+  return true;
+}
+
+function verifyEmailLink(bookingId, driverId, expires, sig) {
+  if (!EMAIL_LINK_SECRET || !expires || !sig) return false;
+  if (Date.now() / 1000 > parseInt(expires, 10)) return false;
+  const payload = `${bookingId}:${driverId}:${expires}`;
+  const expected = crypto.createHmac('sha256', EMAIL_LINK_SECRET).update(payload).digest('hex');
+  try {
+    return crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected));
+  } catch {
+    return false; // length mismatch from tampered sig
+  }
+}
+
 async function verifyUser(req, res, claimedUserId) {
   const auth = req.headers['authorization'] || '';
   const token = auth.startsWith('Bearer ') ? auth.slice(7) : null;
@@ -294,6 +326,7 @@ async function verifyUser(req, res, claimedUserId) {
 
 app.post('/api/upload-profile-photo', upload.single('photo'), async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { userId } = req.body;
     if (!userId || !req.file) {
       return res.status(400).json({ error: 'Missing userId or photo file' });
@@ -576,6 +609,7 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
     const seatsCount = parseInt(seatsToBook, 10) || 1;
     const { data: rideCheck } = await supabase.from('rides').select('price_per_seat, seats_available, existing_occupants, driver_id').eq('id', rideId).single();
     if (!rideCheck) return res.status(404).json({ error: 'Ride not found' });
+    if (rideCheck.driver_id === userId) return res.status(400).json({ error: 'You cannot book your own ride' });
     if (seatsCount < 1 || seatsCount > rideCheck.seats_available) {
       return res.status(400).json({ error: 'Invalid seat count' });
     }
@@ -737,8 +771,9 @@ app.post('/api/create-payment', paymentLimiter, async (req, res) => {
 // Accept booking via email link (GET)
 app.get('/api/driver/accept-booking', async (req, res) => {
   try {
-    const { bookingId, driverId } = req.query;
+    const { bookingId, driverId, expires, sig } = req.query;
     if (!bookingId || !driverId) return res.redirect(`${SITE_URL}/#dashboard?error=missing-params`);
+    if (!verifyEmailLink(bookingId, driverId, expires, sig)) return res.redirect(`${SITE_URL}/#dashboard?error=invalid-link`);
 
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
     if (!booking) return res.redirect(`${SITE_URL}/#dashboard?error=booking-not-found`);
@@ -787,8 +822,9 @@ app.get('/api/driver/accept-booking', async (req, res) => {
 // Reject booking via email link (GET)
 app.get('/api/driver/reject-booking', async (req, res) => {
   try {
-    const { bookingId, driverId } = req.query;
+    const { bookingId, driverId, expires, sig } = req.query;
     if (!bookingId || !driverId) return res.redirect(`${SITE_URL}/#dashboard?error=missing-params`);
+    if (!verifyEmailLink(bookingId, driverId, expires, sig)) return res.redirect(`${SITE_URL}/#dashboard?error=invalid-link`);
 
     const { data: booking } = await supabase.from('bookings').select('*').eq('id', bookingId).single();
     if (!booking) return res.redirect(`${SITE_URL}/#dashboard?error=booking-not-found`);
@@ -1402,6 +1438,7 @@ app.post('/api/admin/reject-booking', async (req, res) => {
 
 app.post('/api/admin/cancel-ride', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId, rideId, cancelledBy } = req.body;
     if (!adminId || !rideId || !cancelledBy) return res.status(400).json({ error: 'Missing required fields' });
     if (!['driver', 'passenger'].includes(cancelledBy)) return res.status(400).json({ error: 'cancelledBy must be driver or passenger' });
@@ -1710,6 +1747,7 @@ app.post('/api/admin/revoke-driver', async (req, res) => {
 
 app.post('/api/admin/update-user', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId, userId, updates } = req.body;
     if (!adminId || !userId || !updates) return res.status(400).json({ error: 'Missing required fields' });
     if (!await verifyUser(req, res, adminId)) return;
@@ -1831,8 +1869,51 @@ app.post('/api/admin/delete-user', async (req, res) => {
 });
 
 // Get rides with booking timestamps for activity/response-time analysis
+app.get('/api/admin/kpi-reports', async (req, res) => {
+  try {
+    if (!requireToken(req, res)) return;
+    const { adminId } = req.query;
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+    const { data, error } = await supabase
+      .from('kpi_reports')
+      .select('id, created_at, report_type, period_label, report_text')
+      .order('created_at', { ascending: false })
+      .limit(100);
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+app.get('/api/admin/funnel', async (req, res) => {
+  try {
+    if (!requireToken(req, res)) return;
+    const { adminId, days } = req.query;
+    if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
+    if (!await verifyUser(req, res, adminId)) return;
+    const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
+    if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
+
+    let query = supabase.from('ride_events').select('event_type, ride_id, departure_location, arrival_location, created_at').order('created_at', { ascending: false });
+    const daysNum = parseInt(days) || 30;
+    const since = new Date(Date.now() - daysNum * 86400000).toISOString();
+    query = query.gte('created_at', since);
+
+    const { data, error } = await query;
+    if (error) throw error;
+    res.json(data || []);
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.get('/api/admin/activity', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId } = req.query;
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
     if (!await verifyUser(req, res, adminId)) return;
@@ -1860,6 +1941,7 @@ app.get('/api/admin/activity', async (req, res) => {
 // Get all rides with driver info and booking summaries
 app.get('/api/admin/rides-overview', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId } = req.query;
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
     if (!await verifyUser(req, res, adminId)) return;
@@ -1955,6 +2037,7 @@ app.post('/api/admin/record-payout', async (req, res) => {
 // Get all recorded payouts
 app.get('/api/admin/payouts', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId } = req.query;
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
     if (!await verifyUser(req, res, adminId)) return;
@@ -2090,11 +2173,7 @@ app.post('/api/admin/manual-ride', async (req, res) => {
     // Check wish matches and send confirmation email (non-blocking)
     const rideId = ride.id;
     Promise.all([
-      fetch(`${API_URL}/api/check-wish-matches`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ride_id: rideId }),
-      }).catch(() => {}),
+      checkWishMatchesForRide(rideId).catch(() => {}),
       import('./emails.js').then(({ sendRidePostedEmail }) =>
         sendRidePostedEmail(ride).catch(err => console.error('Ride posted email error:', err))
       ).catch(() => {}),
@@ -2110,6 +2189,7 @@ app.post('/api/admin/manual-ride', async (req, res) => {
 
 app.get('/api/admin/users', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId } = req.query;
     if (!adminId) return res.status(400).json({ error: 'Missing adminId' });
 
@@ -2182,6 +2262,7 @@ app.post('/api/admin/reject-licence', async (req, res) => {
 // Toggle admin status for a user
 app.post('/api/admin/toggle-admin', async (req, res) => {
   try {
+    if (!requireToken(req, res)) return;
     const { adminId, userId, makeAdmin } = req.body;
     if (!adminId || !userId) return res.status(400).json({ error: 'Missing required fields' });
     if (!await verifyUser(req, res, adminId)) return;
@@ -2257,13 +2338,13 @@ app.post('/api/reviews/submit', async (req, res) => {
 
     if (existing) return res.status(400).json({ error: 'You have already reviewed this booking' });
 
-    // Insert review
+    // Insert review — use ride_id from the booking record, not the caller-supplied value
     const { data: review, error: reviewError } = await supabase
       .from('reviews')
       .insert([{
         reviewer_id: reviewerId,
         reviewee_id: revieweeId,
-        ride_id: rideId,
+        ride_id: booking.ride_id,
         booking_id: bookingId,
         rating,
         comment: comment || null,
@@ -2717,6 +2798,7 @@ app.post('/api/test-email', async (req, res) => {
   try {
     const { type, email, name, adminId } = req.body;
     if (!adminId) return res.status(401).json({ error: 'Admin ID required' });
+    if (!await verifyUser(req, res, adminId)) return;
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
     const { testEmail } = await import('./emails.js');
@@ -2728,6 +2810,29 @@ app.post('/api/test-email', async (req, res) => {
 });
 
 // Public contact form
+// ── Event tracking (funnel analytics) ────────────────────────────────────────
+app.post('/api/track-event', trackLimiter, async (req, res) => {
+  try {
+    const { eventType, rideId, userId, sessionId, departureLocation, arrivalLocation } = req.body;
+    const validTypes = ['ride_view', 'payment_open', 'booking_complete'];
+    if (!eventType || !validTypes.includes(eventType) || !sessionId) {
+      return res.status(400).json({ error: 'Invalid event' });
+    }
+    const { error } = await supabase.from('ride_events').insert({
+      event_type: eventType,
+      ride_id: rideId || null,
+      user_id: userId || null,
+      session_id: sessionId,
+      departure_location: departureLocation || null,
+      arrival_location: arrivalLocation || null,
+    });
+    if (error) throw error;
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 app.post('/api/contact', contactLimiter, async (req, res) => {
   try {
     const { name, email, subject, message } = req.body;
@@ -2770,6 +2875,7 @@ app.post('/api/fix-all-seats', async (req, res) => {
   try {
     const { adminId } = req.body;
     if (!adminId) return res.status(401).json({ error: 'Admin ID required' });
+    if (!await verifyUser(req, res, adminId)) return;
     const { data: admin } = await supabase.from('profiles').select('is_admin').eq('id', adminId).single();
     if (!admin?.is_admin) return res.status(403).json({ error: 'Not authorized' });
     const { data: rides } = await supabase.from('rides').select('id, seats_total').eq('status', 'upcoming');
@@ -3103,70 +3209,69 @@ app.get('/api/wish-count', async (req, res) => {
 // ============================================================
 // CHECK WISH MATCHES (called after a ride is posted)
 // ============================================================
+
+async function checkWishMatchesForRide(rideId) {
+  const { data: ride, error: rideError } = await supabase
+    .from('rides')
+    .select('*')
+    .eq('id', rideId)
+    .single();
+
+  if (rideError || !ride) return { matches: 0, emailsSent: 0 };
+
+  const rideDate = new Date(ride.date_time).toISOString().split('T')[0];
+
+  const { data: matches, error: matchError } = await supabase
+    .from('ride_wishes')
+    .select('*, user:profiles!ride_wishes_user_id_fkey(gender, travel_status)')
+    .eq('status', 'active')
+    .eq('departure_location', ride.departure_location)
+    .eq('arrival_location', ride.arrival_location)
+    .eq('desired_date', rideDate);
+
+  if (matchError) throw matchError;
+
+  const { data: driver } = await supabase.from('profiles').select('gender').eq('id', ride.driver_id).single();
+  const driverGender = driver?.gender || null;
+  const occupants = ride.existing_occupants || null;
+
+  let emailsSent = 0;
+  if (matches && matches.length > 0) {
+    const { sendRideMatchEmail } = await import('./emails.js');
+    for (const wish of matches) {
+      if (wish.user_id === ride.driver_id) continue;
+
+      if ((wish.passengers_count || 1) === 1) {
+        const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
+        if (passengerGender) {
+          const occ = occupants || { males: 0, females: 0, couples: 0 };
+          let males = (occ.males || 0) + (occ.couples || 0);
+          let females = (occ.females || 0) + (occ.couples || 0);
+          if (driverGender === 'Male') males++;
+          if (driverGender === 'Female') females++;
+          if (passengerGender === 'Female' && females < 1) continue;
+          if (passengerGender === 'Male' && males < 1) continue;
+        }
+      }
+
+      try {
+        await sendRideMatchEmail(wish, ride);
+        emailsSent++;
+      } catch (emailErr) {
+        console.error('Error sending match email:', emailErr);
+      }
+    }
+  }
+
+  return { matches: matches?.length || 0, emailsSent };
+}
+
 app.post('/api/check-wish-matches', notifyLimiter, async (req, res) => {
   try {
     const { ride_id } = req.body;
     if (!ride_id) return res.status(400).json({ error: 'ride_id required' });
-
-    // Fetch the newly posted ride
-    const { data: ride, error: rideError } = await supabase
-      .from('rides')
-      .select('*')
-      .eq('id', ride_id)
-      .single();
-
-    if (rideError || !ride) return res.status(404).json({ error: 'Ride not found' });
-
-    // Extract just the date part from the ride's date_time
-    const rideDate = new Date(ride.date_time).toISOString().split('T')[0];
-
-    // Find matching active wishes (include user profile for gender check)
-    const { data: matches, error: matchError } = await supabase
-      .from('ride_wishes')
-      .select('*, user:profiles!ride_wishes_user_id_fkey(gender, travel_status)')
-      .eq('status', 'active')
-      .eq('departure_location', ride.departure_location)
-      .eq('arrival_location', ride.arrival_location)
-      .eq('desired_date', rideDate);
-
-    if (matchError) throw matchError;
-
-    // Get driver profile for gender compatibility check
-    const { data: driver } = await supabase.from('profiles').select('gender').eq('id', ride.driver_id).single();
-    const driverGender = driver?.gender || null;
-    const occupants = ride.existing_occupants || null;
-
-    let emailsSent = 0;
-    if (matches && matches.length > 0) {
-      const { sendRideMatchEmail } = await import('./emails.js');
-      for (const wish of matches) {
-        // Don't notify the driver about their own wish
-        if (wish.user_id === ride.driver_id) continue;
-
-        // Groups (2+ passengers) skip gender compatibility check entirely
-        if ((wish.passengers_count || 1) === 1) {
-          const passengerGender = wish.user?.travel_status === 'couple' ? null : (wish.user?.gender || null);
-          if (passengerGender) {
-            const occ = occupants || { males: 0, females: 0, couples: 0 };
-            let males = (occ.males || 0) + (occ.couples || 0);
-            let females = (occ.females || 0) + (occ.couples || 0);
-            if (driverGender === 'Male') males++;
-            if (driverGender === 'Female') females++;
-            if (passengerGender === 'Female' && females < 1) continue;
-            if (passengerGender === 'Male' && males < 1) continue;
-          }
-        }
-
-        try {
-          await sendRideMatchEmail(wish, ride);
-          emailsSent++;
-        } catch (emailErr) {
-          console.error('Error sending match email:', emailErr);
-        }
-      }
-    }
-
-    res.json({ matches: matches?.length || 0, emailsSent });
+    const result = await checkWishMatchesForRide(ride_id);
+    res.json(result);
   } catch (error) {
     console.error('Check wish matches error:', error);
     res.status(500).json({ error: 'Failed to check wish matches' });
