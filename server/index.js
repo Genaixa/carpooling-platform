@@ -1322,6 +1322,12 @@ app.post('/api/admin/edit-ride', async (req, res) => {
       rideUpdates.vehicle_model = updates.vehicle_model || null;
     }
 
+    if (updates.date_time !== undefined) {
+      const dt = new Date(updates.date_time);
+      if (isNaN(dt.getTime())) return res.status(400).json({ error: 'Invalid date/time' });
+      rideUpdates.date_time = updates.date_time;
+    }
+
     if (Object.keys(rideUpdates).length === 0) return res.status(400).json({ error: 'No valid updates provided' });
 
     const { error } = await supabase.from('rides').update(rideUpdates).eq('id', rideId);

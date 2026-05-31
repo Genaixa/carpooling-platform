@@ -96,7 +96,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
   const [bookingActionModal, setBookingActionModal] = useState<{ bookingId: string; passengerName: string; route: string; action: 'accept' | 'reject' } | null>(null);
   const [bookingActionBy, setBookingActionBy] = useState<'driver' | 'passenger'>('driver');
   const [bookingActionLoading, setBookingActionLoading] = useState(false);
-  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number | string; existing_occupants: { males: number; females: number; couples: number } | null; vehicle_make: string; vehicle_model: string } | null>(null);
+  const [editRideModal, setEditRideModal] = useState<{ rideId: string; route: string; seats_booked: number; seats_available: number; price_per_seat: number | string; existing_occupants: { males: number; females: number; couples: number } | null; vehicle_make: string; vehicle_model: string; edit_date: string; edit_time: string } | null>(null);
   const [editRideLoading, setEditRideLoading] = useState(false);
   const [editingPassengerGender, setEditingPassengerGender] = useState<Record<string, string>>({});
   const [payoutAmount, setPayoutAmount] = useState('');
@@ -681,6 +681,11 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       toast.error('Price must be at least £10');
       return;
     }
+    const newDateTime = new Date(`${editRideModal.edit_date}T${editRideModal.edit_time}`).toISOString();
+    if (isNaN(new Date(newDateTime).getTime())) {
+      toast.error('Invalid date or time');
+      return;
+    }
     setEditRideLoading(true);
     try {
       const { data: { session } } = await supabase.auth.getSession();
@@ -696,6 +701,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
             existing_occupants: editRideModal.existing_occupants,
             vehicle_make: editRideModal.vehicle_make,
             vehicle_model: editRideModal.vehicle_model,
+            date_time: newDateTime,
           },
         }),
       });
@@ -703,7 +709,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
       if (data.error) throw new Error(data.error);
       toast.success('Ride updated');
       setRidesOverview(prev => prev.map(r => r.id === editRideModal.rideId
-        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: parseFloat(String(editRideModal.price_per_seat)), existing_occupants: editRideModal.existing_occupants, vehicle_make: editRideModal.vehicle_make || null, vehicle_model: editRideModal.vehicle_model || null }
+        ? { ...r, seats_total: editRideModal.seats_available + editRideModal.seats_booked, seats_available: data.updates.seats_available ?? editRideModal.seats_available, price_per_seat: parseFloat(String(editRideModal.price_per_seat)), existing_occupants: editRideModal.existing_occupants, vehicle_make: editRideModal.vehicle_make || null, vehicle_model: editRideModal.vehicle_model || null, date_time: newDateTime }
         : r
       ));
       setEditRideModal(null);
@@ -1806,7 +1812,7 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
                                       )}
                                       {ride.status === 'upcoming' && (
                                         <button
-                                          onClick={e => { e.stopPropagation(); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_booked: ride.seats_total - ride.seats_available, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 }, vehicle_make: ride.vehicle_make || '', vehicle_model: ride.vehicle_model || '' }); }}
+                                          onClick={e => { e.stopPropagation(); const _dt = new Date(ride.date_time); const _off = _dt.getTimezoneOffset(); const _loc = new Date(_dt.getTime() - _off * 60000); setEditRideModal({ rideId: ride.id, route: `${ride.departure_location} → ${ride.arrival_location}`, seats_booked: ride.seats_total - ride.seats_available, seats_available: ride.seats_available, price_per_seat: ride.price_per_seat, existing_occupants: ride.existing_occupants ?? { males: 0, females: 0, couples: 0 }, vehicle_make: ride.vehicle_make || '', vehicle_model: ride.vehicle_model || '', edit_date: _loc.toISOString().slice(0, 10), edit_time: _loc.toISOString().slice(11, 16) }); }}
                                           style={{ padding: '3px 10px', borderRadius: '12px', fontSize: '11px', fontWeight: '700', border: 'none', cursor: 'pointer', backgroundColor: '#6366f1', color: 'white', whiteSpace: 'nowrap' }}
                                         >
                                           Edit Ride
@@ -3405,6 +3411,27 @@ export default function AdminDashboard({ onNavigate }: AdminDashboardProps) {
           <div style={{ backgroundColor: 'white', borderRadius: '20px', padding: '32px', maxWidth: '460px', width: '100%', boxShadow: '0 25px 60px rgba(0,0,0,0.3)' }}>
             <h3 style={{ fontSize: '20px', fontWeight: '700', color: '#1F2937', margin: '0 0 4px 0' }}>Edit Ride</h3>
             <p style={{ fontSize: '13px', color: '#6B7280', margin: '0 0 24px 0' }}>{editRideModal.route}</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Date</label>
+                <input
+                  type="date"
+                  value={editRideModal.edit_date}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, edit_date: e.target.value } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                />
+              </div>
+              <div>
+                <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: '#374151', marginBottom: '6px' }}>Time</label>
+                <input
+                  type="time"
+                  value={editRideModal.edit_time}
+                  onChange={e => setEditRideModal(prev => prev ? { ...prev, edit_time: e.target.value } : prev)}
+                  style={{ width: '100%', padding: '10px 12px', borderRadius: '10px', border: '2px solid #E8EBED', fontSize: '15px', boxSizing: 'border-box' }}
+                />
+              </div>
+            </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', marginBottom: '20px' }}>
               <div>
